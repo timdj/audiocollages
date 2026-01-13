@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Foto → MIDI (8 sporen)</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0c10; color:#e9eef5; }
+    header { position: sticky; top: 0; background: rgba(15, 18, 26, 0.92); backdrop-filter: blur(8px);
+             border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 14px 10px; z-index: 10;}
+    h1 { margin: 0 0 8px; font-size: 16px; font-weight: 700; letter-spacing: .2px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .card { background:#121522; border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; }
+    .grow { flex: 1 1 320px; }
+    label { font-size: 12px; opacity: .9; display:block; margin-bottom: 6px; }
+    input[type="text"]{ width: min(720px, 100%); padding: 10px 12px; border-radius: 12px;
+      border:1px solid rgba(255,255,255,0.14); background:#0f1220; color:#e9eef5; outline:none; }
+    input[type="file"]{ width: 100%; }
+    input[type="number"], input[type="range"]{
+      accent-color: #6ea8fe;
+    }
+    .btn { appearance: none; border: 1px solid rgba(255,255,255,0.14); background: #1a2140;
+      color: #e9eef5; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 650; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn.secondary { background:#121522; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    .status { padding: 10px 12px; border-radius: 12px; background:#0f1220; border:1px dashed rgba(255,255,255,0.18); }
+    canvas { width: 100%; height: auto; border-radius: 14px; border:1px solid rgba(255,255,255,0.10); background:#0a0b12; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 980px){ .grid { grid-template-columns: 1fr 1fr; } }
+    .small { font-size: 12px; opacity:.85; line-height: 1.4; }
+    .controls { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (min-width: 680px){ .controls { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    .pill { display:inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.10); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Foto → MIDI (scan lange richting, korte kant in 8 sporen)</h1>
+  <div class="row">
+    <button id="btnTranslate" class="btn" disabled>Vertaal → Download MIDI</button>
+    <button id="btnPreview" class="btn secondary" disabled>Preview scan</button>
+    <span class="pill mono" id="metaPill">Geen afbeelding</span>
+  </div>
+</header>
+
+<main style="padding:14px;">
+  <div class="grid">
+    <section class="card grow">
+      <div class="row">
+        <div class="grow">
+          <label>Upload foto</label>
+          <input id="fileInput" type="file" accept="image/*" />
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+
+      <label>Of laad foto via URL (let op: sommige sites blokkeren dit door CORS)</label>
+      <div class="row">
+        <input id="urlInput" type="text" placeholder="https://voorbeeld.nl/foto.jpg" />
+        <button id="btnLoadUrl" class="btn secondary">Laad URL</button>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="controls">
+        <div>
+          <label>Tempo (BPM)</label>
+          <input id="tempo" type="number" min="30" max="300" value="120" />
+        </div>
+        <div>
+          <label>Steps (resolutie scan)</label>
+          <input id="steps" type="number" min="32" max="2048" value="256" />
+        </div>
+        <div>
+          <label>Laagste noot</label>
+          <input id="noteMin" type="number" min="0" max="127" value="36" />
+        </div>
+        <div>
+          <label>Hoogste noot</label>
+          <input id="noteMax" type="number" min="0" max="127" value="84" />
+        </div>
+        <div>
+          <label>Velocity min</label>
+          <input id="velMin" type="number" min="0" max="127" value="20" />
+        </div>
+        <div>
+          <label>Velocity max</label>
+          <input id="velMax" type="number" min="1" max="127" value="110" />
+        </div>
+        <div>
+          <label>Drempel (zwart/laag) → (wit/hoog)</label>
+          <input id="gamma" type="range" min="0.50" max="2.50" step="0.01" value="1.00" />
+          <div class="small"><span class="mono" id="gammaLabel">1.00</span></div>
+        </div>
+        <div>
+          <label>Notelengte (in steps)</label>
+          <input id="noteLenSteps" type="number" min="1" max="16" value="1" />
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="status">
+        <div class="mono" id="status">Laad een foto om te beginnen.</div>
+        <div class="small" style="margin-top:6px;">
+          Werking: de lange kant wordt gescand in <b>Steps</b>. De korte kant wordt verdeeld in <b>8 sporen</b>.
+          Per step en spoor wordt gemiddelde helderheid → MIDI noot + velocity.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <label>Preview (8 sporen + scan richting)</label>
+      <canvas id="preview" width="1200" height="800"></canvas>
+      <div class="small" style="margin-top:8px;">
+        Tip: als je foto “liggend” is, scant hij van links→rechts. Als hij “staand” is, scant hij van boven→beneden.
+      </div>
+    </section>
+  </div>
+
+  <canvas id="work" width="1" height="1" style="display:none"></canvas>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const fileInput = $('fileInput');
+  const urlInput = $('urlInput');
+  const btnLoadUrl = $('btnLoadUrl');
+  const btnTranslate = $('btnTranslate');
+  const btnPreview = $('btnPreview');
+  const statusEl = $('status');
+  const preview = $('preview');
+  const work = $('work');
+  const metaPill = $('metaPill');
+
+  const tempoEl = $('tempo');
+  const stepsEl = $('steps');
+  const noteMinEl = $('noteMin');
+  const noteMaxEl = $('noteMax');
+  const velMinEl = $('velMin');
+  const velMaxEl = $('velMax');
+  const gammaEl = $('gamma');
+  const gammaLabel = $('gammaLabel');
+  const noteLenStepsEl = $('noteLenSteps');
+
+  gammaEl.addEventListener('input', () => gammaLabel.textContent = Number(gammaEl.value).toFixed(2));
+
+  let img = new Image();
+  img.crossOrigin = "anonymous";
+  let imgLoaded = false;
+
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
+
+  function setButtonsEnabled(on) {
+    btnTranslate.disabled = !on;
+    btnPreview.disabled = !on;
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function drawPreview(scan) {
+    const ctx = preview.getContext('2d', { willReadFrequently: true });
+    const cw = preview.width, ch = preview.height;
+    ctx.clearRect(0,0,cw,ch);
+
+    // Fit image into canvas
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const scale = Math.min(cw/iw, ch/ih);
+    const dw = Math.floor(iw*scale), dh = Math.floor(ih*scale);
+    const ox = Math.floor((cw-dw)/2), oy = Math.floor((ch-dh)/2);
+    ctx.drawImage(img, 0,0,iw,ih, ox,oy,dw,dh);
+
+    // Overlay band lines (8 lanes on short axis)
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    const isLandscape = iw >= ih;
+
+    for (let i=1;i<8;i++){
+      ctx.beginPath();
+      if (isLandscape) {
+        const y = oy + (dh * i / 8);
+        ctx.moveTo(ox, y);
+        ctx.lineTo(ox+dw, y);
+      } else {
+        const x = ox + (dw * i / 8);
+        ctx.moveTo(x, oy);
+        ctx.lineTo(x, oy+dh);
+      }
+      ctx.stroke();
+    }
+
+    // Scan line at current step (optional)
+    if (scan && scan.stepIndex != null && scan.steps > 0) {
+      ctx.strokeStyle = "rgba(110,168,254,0.95)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (isLandscape) {
+        const x = ox + (dw * scan.stepIndex / scan.steps);
+        ctx.moveTo(x, oy);
+        ctx.lineTo(x, oy+dh);
+      } else {
+        const y = oy + (dh * scan.stepIndex / scan.steps);
+        ctx.moveTo(ox, y);
+        ctx.lineTo(ox+dw, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function loadFromFile(file) {
+    const url = URL.createObjectURL(file);
+    imgLoaded = false;
+    img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgLoaded = true;
+      metaPill.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+      setStatus("Afbeelding geladen. Kies eventueel instellingen en klik ‘Vertaal → Download MIDI’.");
+      setButtonsEnabled(true);
+      drawPreview(null);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      setStatus("Kon de afbeelding niet laden.");
+      setButtonsEnabled(false);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  async function loadFromUrl(url) {
+    imgLoaded = false;
+    setButtonsEnabled(false);
+    setStatus("Bezig met laden via URL…");
+
+    // Try direct load first (may fail due to CORS)
+    img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgLoaded = true;
+      metaPill.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+      setStatus("Afbeelding geladen. Klik ‘Vertaal → Download MIDI’.");
+      setButtonsEnabled(true);
+      drawPreview(null);
+    };
+    img.onerror = async () => {
+      // Fallback: fetch as blob (still subject to CORS, but sometimes works)
+      try {
+        const res = await fetch(url, { mode: "cors" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        img = new Image();
+        img.onload = () => {
+          imgLoaded = true;
+          metaPill.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+          setStatus("Afbeelding geladen. Klik ‘Vertaal → Download MIDI’.");
+          setButtonsEnabled(true);
+          drawPreview(null);
+          URL.revokeObjectURL(objUrl);
+        };
+        img.onerror = () => {
+          setStatus("Kon de afbeelding niet laden (mogelijk CORS). Download de foto en upload hem lokaal.");
+          setButtonsEnabled(false);
+          URL.revokeObjectURL(objUrl);
+        };
+        img.src = objUrl;
+      } catch (e) {
+        setStatus("Kon de afbeelding niet laden (mogelijk CORS). Download de foto en upload hem lokaal.");
+        setButtonsEnabled(false);
+      }
+    };
+    img.src = url;
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) loadFromFile(f);
+  });
+
+  btnLoadUrl.addEventListener('click', () => {
+    const u = (urlInput.value || "").trim();
+    if (!u) return setStatus("Plak eerst een URL.");
+    loadFromUrl(u);
+  });
+
+  // --- MIDI writer (Format 1) ---
+  function u16(n){ return [ (n>>8)&255, n&255 ]; }
+  function u32(n){ return [ (n>>24)&255, (n>>16)&255, (n>>8)&255, n&255 ]; }
+
+  function varLen(value) {
+    let buffer = value & 0x7F;
+    let out = [];
+    while ((value >>= 7)) {
+      buffer <<= 8;
+      buffer |= ((value & 0x7F) | 0x80);
+    }
+    while (true) {
+      out.push(buffer & 0xFF);
+      if (buffer & 0x80) buffer >>= 8;
+      else break;
+    }
+    return out;
+  }
+
+  function strBytes(s){
+    return Array.from(s).map(ch => ch.charCodeAt(0) & 255);
+  }
+
+  function chunk(tag, dataBytes){
+    return [...strBytes(tag), ...u32(dataBytes.length), ...dataBytes];
+  }
+
+  function tempoMeta(bpm){
+    const mpqn = Math.round(60000000 / bpm);
+    // NOTE: delta-time is written by makeTrackFromEvents; do NOT include it here.
+    return [0xFF, 0x51, 0x03, (mpqn>>16)&255, (mpqn>>8)&255, mpqn&255];
+  }
+
+  function endOfTrack(){
+    // NOTE: delta-time is written by makeTrackFromEvents; do NOT include it here.
+    return [0xFF, 0x2F, 0x00];
+  }
+
+  function makeTrackFromEvents(events) {
+    // events: [{tick, bytes:[...] }], bytes excludes delta
+    events.sort((a,b) => a.tick - b.tick);
+    let out = [];
+    let lastTick = 0;
+    for (const ev of events){
+      const dt = ev.tick - lastTick;
+      out.push(...varLen(dt));
+      out.push(...ev.bytes);
+      lastTick = ev.tick;
+    }
+    out.push(...varLen(0));
+    out.push(...endOfTrack());
+    return chunk("MTrk", out);
+  }
+
+  function brightnessAt(imgData, x, y) {
+    const i = (y * imgData.width + x) * 4;
+    const r = imgData.data[i], g = imgData.data[i+1], b = imgData.data[i+2];
+    return (r + g + b) / (3 * 255);
+  }
+
+  function analyzeToMidi() {
+    if (!imgLoaded) return null;
+
+    const bpm = clamp(parseInt(tempoEl.value || "120", 10), 30, 300);
+    const steps = clamp(parseInt(stepsEl.value || "256", 10), 32, 2048);
+    let noteMin = clamp(parseInt(noteMinEl.value || "36", 10), 0, 127);
+    let noteMax = clamp(parseInt(noteMaxEl.value || "84", 10), 0, 127);
+    const velMin = clamp(parseInt(velMinEl.value || "20", 10), 0, 127);
+    const velMax = clamp(parseInt(velMaxEl.value || "110", 10), 1, 127);
+    const gamma = clamp(parseFloat(gammaEl.value || "1.0"), 0.5, 2.5);
+    const noteLenSteps = clamp(parseInt(noteLenStepsEl.value || "1", 10), 1, 16);
+
+    if (noteMax < noteMin) [noteMin, noteMax] = [noteMax, noteMin];
+
+    // Prepare work canvas
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    work.width = iw;
+    work.height = ih;
+    const wctx = work.getContext('2d', { willReadFrequently: true });
+    wctx.clearRect(0,0,iw,ih);
+    wctx.drawImage(img, 0, 0);
+
+    const imgData = wctx.getImageData(0,0,iw,ih);
+
+    const isLandscape = iw >= ih;
+    const scanLen = isLandscape ? iw : ih;
+    const shortLen = isLandscape ? ih : iw;
+
+    // MIDI timing (Format 0, single track for maximum compatibility)
+    const TPQ = 480;
+    const stepTicks = Math.round(TPQ / 4); // 1/16 note
+    const noteTicks = stepTicks * noteLenSteps;
+
+    // Collect all events (tempo + all lanes) into one track
+    const events = [];
+    events.push({ tick: 0, bytes: tempoMeta(bpm) });
+
+    // sampling density within each band and slice
+    const sampAlong = 6;   // along scan direction
+    const sampAcross = 6;  // across band thickness
+
+    for (let lane = 0; lane < 8; lane++) {
+      const channel = lane & 0x0F; // 0..7
+
+      for (let s = 0; s < steps; s++) {
+        // slice in scan axis [a0,a1)
+        const a0 = Math.floor((s * scanLen) / steps);
+        const a1 = Math.max(a0 + 1, Math.floor(((s+1) * scanLen) / steps));
+
+        // band in short axis [b0,b1)
+        const b0 = Math.floor((lane * shortLen) / 8);
+        const b1 = Math.max(b0 + 1, Math.floor(((lane+1) * shortLen) / 8));
+
+        // sample grid
+        let sum = 0;
+        let count = 0;
+
+        for (let ia = 0; ia < sampAlong; ia++) {
+          const a = Math.floor(a0 + ( (ia + 0.5) * (a1 - a0) / sampAlong ));
+          for (let ib = 0; ib < sampAcross; ib++) {
+            const b = Math.floor(b0 + ( (ib + 0.5) * (b1 - b0) / sampAcross ));
+
+            let x, y;
+            if (isLandscape) { x = clamp(a, 0, iw-1); y = clamp(b, 0, ih-1); }
+            else { x = clamp(b, 0, iw-1); y = clamp(a, 0, ih-1); }
+
+            sum += brightnessAt(imgData, x, y);
+            count++;
+          }
+        }
+
+        let br = (count ? (sum / count) : 0);
+        // gamma curve: allow emphasizing dark/light
+        br = Math.pow(clamp(br, 0, 1), gamma);
+
+        const note = Math.round(noteMin + br * (noteMax - noteMin));
+        const vel = Math.round(velMin + br * (velMax - velMin));
+
+        const startTick = s * stepTicks;
+        const endTick = startTick + noteTicks;
+
+        // Always write explicit status bytes (no running-status optimization)
+        events.push({ tick: startTick, bytes: [0x90 | channel, note & 127, vel & 127] });
+        events.push({ tick: endTick,   bytes: [0x80 | channel, note & 127, 0x00] });
+      }
+    }
+
+    const track = makeTrackFromEvents(events);
+
+    // Header (MThd)
+    const format = 0;
+    const numTracks = 1;
+    const header = [
+      ...strBytes("MThd"),
+      ...u32(6),
+      ...u16(format),
+      ...u16(numTracks),
+      ...u16(TPQ)
+    ];
+
+    const fileBytes = new Uint8Array([
+      ...header,
+      ...track
+    ]);
+
+    return { fileBytes, meta: { bpm, steps, noteMin, noteMax, velMin, velMax, gamma, noteLenSteps, iw, ih } };
+  }
+
+  function downloadMidi(bytes, filename) {
+    const blob = new Blob([bytes], { type: "audio/midi" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2500);
+  }
+
+  btnTranslate.addEventListener('click', () => {
+    try {
+      setStatus("Analyseren en MIDI genereren…");
+      const res = analyzeToMidi();
+      if (!res) return setStatus("Geen afbeelding geladen.");
+
+      const base = "foto_scan_8sporen";
+      const ts = new Date().toISOString().replace(/[:.]/g,'-');
+      const fn = `${base}_${ts}.mid`;
+
+      downloadMidi(res.fileBytes, fn);
+      setStatus(`Klaar! MIDI gedownload: ${fn}`);
+    } catch (e) {
+      console.error(e);
+      setStatus("Fout tijdens analyse/MIDI export. Probeer andere settings of een andere foto.");
+    }
+  });
+
+  btnPreview.addEventListener('click', () => {
+    if (!imgLoaded) return;
+    // quick animated scan preview
+    const steps = clamp(parseInt(stepsEl.value || "256", 10), 32, 2048);
+    let s = 0;
+    const start = performance.now();
+    const durMs = 1200;
+    function tick(now){
+      const t = (now - start) / durMs;
+      s = Math.floor(clamp(t, 0, 1) * (steps-1));
+      drawPreview({ stepIndex: s, steps });
+      if (t < 1) requestAnimationFrame(tick);
+      else drawPreview(null);
+    }
+    requestAnimationFrame(tick);
+  });
+
+  // Initial
+  drawPreview(null);
+})();
+</script>
+</body>
+</html>

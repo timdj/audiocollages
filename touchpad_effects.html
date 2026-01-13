@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modulaire Web Synth (JS + GLSL)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#121826; --panel2:#0f1522; --txt:#e7eefc; --muted:#9bb0d0;
+      --accent:#7c5cff; --good:#2bd576; --warn:#ffcc66; --bad:#ff4d6d;
+      --border:rgba(255,255,255,.08);
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 900px at 10% 0%, rgba(124,92,255,.22), transparent 55%),
+                  radial-gradient(1200px 900px at 90% 10%, rgba(43,213,118,.12), transparent 55%),
+                  var(--bg);
+      color:var(--txt);
+      overflow-x:hidden;
+    }
+    header{
+      padding:22px 18px 14px;
+      display:flex; gap:16px; align-items:flex-end; justify-content:space-between;
+      max-width:1100px; margin:0 auto;
+    }
+    .title{
+      display:flex; flex-direction:column; gap:6px;
+    }
+    h1{margin:0; font-size:20px; letter-spacing:.3px}
+    .sub{color:var(--muted); font-size:13px; line-height:1.35}
+    .row{display:flex; gap:14px; flex-wrap:wrap; justify-content:flex-end; align-items:center}
+    button{
+      appearance:none; border:1px solid var(--border); color:var(--txt);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      padding:10px 12px; border-radius:12px; cursor:pointer;
+      box-shadow: 0 1px 0 rgba(255,255,255,.06) inset;
+      transition: transform .06s ease, border-color .2s ease, background .2s ease;
+      font-weight:600; font-size:13px;
+    }
+    button:hover{border-color:rgba(124,92,255,.45)}
+    button:active{transform: translateY(1px)}
+    button.primary{border-color:rgba(124,92,255,.55); background: linear-gradient(180deg, rgba(124,92,255,.35), rgba(124,92,255,.14));}
+    button.good{border-color:rgba(43,213,118,.55); background: linear-gradient(180deg, rgba(43,213,118,.26), rgba(43,213,118,.10));}
+    .pill{
+      font-size:12px; color:var(--muted); border:1px solid var(--border);
+      padding:8px 10px; border-radius:999px; background:rgba(0,0,0,.18);
+    }
+    main{
+      max-width:1100px; margin:0 auto; padding:0 18px 30px;
+      display:grid; grid-template-columns: 1.15fr .85fr; gap:14px;
+    }
+    @media (max-width: 980px){
+      main{grid-template-columns:1fr}
+    }
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panel .hd{
+      padding:14px 16px 10px;
+      display:flex; justify-content:space-between; align-items:baseline;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .panel .hd .h{
+      font-weight:800; letter-spacing:.25px; font-size:13px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .tag{
+      font-size:11px; color:rgba(255,255,255,.85);
+      background: rgba(124,92,255,.18);
+      border:1px solid rgba(124,92,255,.35);
+      padding:3px 8px; border-radius:999px;
+    }
+    .panel .bd{padding:14px 16px 16px}
+    .grid{
+      display:grid; grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    @media (max-width: 520px){
+      .grid{grid-template-columns:1fr}
+    }
+    .mod{
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(0,0,0,.12));
+      border:1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      padding:12px;
+    }
+    .mod .mh{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      margin-bottom:10px;
+    }
+    .mod .mh .name{font-weight:800; font-size:12px; letter-spacing:.25px}
+    .mod .mh .mini{color:var(--muted); font-size:11px}
+    .ctrl{display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; margin:8px 0}
+    .ctrl label{font-size:12px; color:rgba(231,238,252,.9)}
+    .ctrl output{font-size:11px; color:var(--muted); min-width:62px; text-align:right}
+    input[type="range"]{width:100%}
+    select, input[type="number"]{
+      width:100%; padding:10px 10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.22); color:var(--txt);
+      outline:none;
+    }
+    .small{font-size:11px; color:var(--muted); line-height:1.35}
+    .kbd{
+      display:grid; grid-template-columns: repeat(10, minmax(0,1fr)); gap:6px;
+      margin-top:10px;
+    }
+    .key{
+      user-select:none;
+      text-align:center;
+      padding:10px 0;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      font-weight:700;
+      font-size:12px;
+      cursor:pointer;
+    }
+    .key.on{
+      border-color:rgba(43,213,118,.55);
+      background: rgba(43,213,118,.18);
+    }
+    canvas{width:100%; height:360px; display:block; background:#06080c}
+    .meter{
+      height:10px; border-radius:999px; border:1px solid rgba(255,255,255,.10);
+      overflow:hidden; background: rgba(0,0,0,.25);
+    }
+    .meter > div{
+      height:100%; width:0%;
+      background: linear-gradient(90deg, rgba(124,92,255,.95), rgba(43,213,118,.95));
+      transition: width .05s linear;
+    }
+    .two{
+      display:grid; grid-template-columns: 1fr 1fr; gap:10px;
+    }
+    @media (max-width:520px){ .two{grid-template-columns:1fr} }
+    .footer{
+      max-width:1100px; margin:0 auto; padding:0 18px 30px;
+      color:var(--muted); font-size:12px; line-height:1.45;
+    }
+    a{color:#b7a8ff}
+    code{color:#d9d2ff}
+  
+    .pad{
+      position:relative;
+      margin-top:10px;
+      height:440px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background:
+        radial-gradient(220px 140px at 20% 10%, rgba(124,92,255,.22), transparent 60%),
+        radial-gradient(220px 140px at 80% 90%, rgba(43,213,118,.16), transparent 60%),
+        rgba(0,0,0,.18);
+      overflow:hidden;
+      touch-action:none; /* critical: smooth finger glide without page scrolling */
+      user-select:none;
+    }
+    .pad::before{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,.06) 1px, transparent 1px);
+      background-size: 20px 20px;
+      opacity:.55;
+      pointer-events:none;
+    }
+    .pad .dot{
+      position:absolute;
+      width:18px; height:18px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,.18);
+      box-shadow: 0 10px 20px rgba(0,0,0,.35);
+      transform: translate(-50%, -50%);
+      left:50%; top:50%;
+      pointer-events:none;
+    }
+    .pad .readout{
+      position:absolute; left:10px; bottom:10px;
+      font-size:11px; color:rgba(231,238,252,.88);
+      padding:6px 8px; border-radius:999px;
+      background: rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.10);
+      pointer-events:none;
+    }
+
+
+    .recRow{display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap}
+    .recDot{width:10px; height:10px; border-radius:999px; background:rgba(255,77,109,.25); border:1px solid rgba(255,77,109,.55)}
+    .recDot.on{background:rgba(255,77,109,.95); box-shadow:0 0 0 6px rgba(255,77,109,.12)}
+    .recStat{font-size:11px; color:var(--muted)}
+    .recLink{font-size:12px; color:#b7a8ff; text-decoration:none; border:1px solid rgba(255,255,255,.10); padding:8px 10px; border-radius:12px; background:rgba(0,0,0,.18)}
+    .recLink[aria-disabled="true"]{opacity:.5; pointer-events:none}
+
+</style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>Modulaire synthesizer (JavaScript + WebAudio + GLSL)</h1>
+      <div class="sub">
+        Een kleine “modulaire” rack: Osc → Filter → Amp/Envelope → Delay → Output, met LFO-modulatie en een GLSL visualizer.
+        Klik <b>Start Audio</b> (browser policy) en speel met de toetsen (A S D F G H J K L ;).
+      </div>
+    </div>
+    <div class="row">
+      <span class="pill" id="statusPill">Audio: uit</span>
+      <button class="primary" id="startBtn">Start Audio</button>
+      <button id="panicBtn" title="Stop alle noten">Panic</button>
+      <button class="good" id="randomBtn" title="Random preset">Random preset</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="hd">
+        <div class="h">Visualizer <span class="tag">GLSL</span></div>
+        <div class="small">FFT bins + level → shader uniforms</div>
+      </div>
+      <div class="bd">
+        <canvas id="gl" width="1024" height="360"></canvas>
+        <div style="height:10px"></div>
+        <div class="two">
+          <div>
+            <div class="small">Output level</div>
+            <div class="meter"><div id="levelBar"></div></div>
+          </div>
+          <div>
+            <div class="small">Master volume</div>
+            <input id="master" type="range" min="0" max="1" step="0.001" value="0.25" />
+          </div>
+        </div>
+        <div style="height:10px"></div>
+        <div class="small">
+          Tip: zet de filter resonance hoog en LFO depth omhoog voor “wub”.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <div class="h">Rack <span class="tag">WebAudio</span></div>
+        <div class="small">Simpele modulatie-routing</div>
+      </div>
+      <div class="bd">
+        <div class="grid">
+
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">OSC</div>
+                <div class="mini">VCO</div>
+              </div>
+              <select id="wave">
+                <option value="sawtooth">saw</option>
+                <option value="square">square</option>
+                <option value="triangle">triangle</option>
+                <option value="sine">sine</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Detune (cent)</label><output id="detuneOut">0</output>
+              <input id="detune" type="range" min="-1200" max="1200" step="1" value="0" />
+            </div>
+            <div class="ctrl">
+              <label>Sub osc mix</label><output id="subOut">0.20</output>
+              <input id="sub" type="range" min="0" max="1" step="0.001" value="0.20" />
+            </div>
+            <div class="small">Sub osc = -1 oct sine.</div>
+          </div>
+
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">FILTER</div>
+                <div class="mini">VCF</div>
+              </div>
+              <select id="filterType">
+                <option value="lowpass">lowpass</option>
+                <option value="bandpass">bandpass</option>
+                <option value="highpass">highpass</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Cutoff (Hz)</label><output id="cutOut">1200</output>
+              <input id="cut" type="range" min="40" max="12000" step="1" value="1200" />
+            </div>
+            <div class="ctrl">
+              <label>Resonance (Q)</label><output id="resOut">2.0</output>
+              <input id="res" type="range" min="0.1" max="24" step="0.1" value="2.0" />
+            </div>
+            <div class="small">LFO kan de cutoff moduleren.</div>
+          </div>
+
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">ENVELOPE</div>
+                <div class="mini">VCA</div>
+              </div>
+              <select id="envMode">
+                <option value="gate">gate</option>
+                <option value="adsr" selected>adsr</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Attack (ms)</label><output id="aOut">10</output>
+              <input id="a" type="range" min="0" max="2000" step="1" value="10" />
+            </div>
+            <div class="ctrl">
+              <label>Decay (ms)</label><output id="dOut">140</output>
+              <input id="d" type="range" min="0" max="4000" step="1" value="140" />
+            </div>
+            <div class="ctrl">
+              <label>Sustain</label><output id="sOut">0.55</output>
+              <input id="s" type="range" min="0" max="1" step="0.001" value="0.55" />
+            </div>
+            <div class="ctrl">
+              <label>Release (ms)</label><output id="rOut">220</output>
+              <input id="r" type="range" min="0" max="6000" step="1" value="220" />
+            </div>
+          </div>
+
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">LFO</div>
+                <div class="mini">mod</div>
+              </div>
+              <select id="lfoShape">
+                <option value="sine" selected>sine</option>
+                <option value="triangle">triangle</option>
+                <option value="square">square</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Rate (Hz)</label><output id="lfoRateOut">3.2</output>
+              <input id="lfoRate" type="range" min="0.05" max="18" step="0.01" value="3.2" />
+            </div>
+            <div class="ctrl">
+              <label>Depth → Cutoff</label><output id="lfoDepthOut">0.35</output>
+              <input id="lfoDepth" type="range" min="0" max="1" step="0.001" value="0.35" />
+            </div>
+            <div class="ctrl">
+              <label>Depth → Detune</label><output id="lfoDetuneOut">0.10</output>
+              <input id="lfoDetune" type="range" min="0" max="1" step="0.001" value="0.10" />
+            </div>
+            <div class="small">Cutoff-depth is “percentage” van cutoff range.</div>
+          </div>
+
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">DELAY</div>
+                <div class="mini">echo</div>
+              </div>
+              <select id="delayMode">
+                <option value="off">off</option>
+                <option value="on" selected>on</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Time (ms)</label><output id="dtOut">240</output>
+              <input id="dt" type="range" min="10" max="900" step="1" value="240" />
+            </div>
+            <div class="ctrl">
+              <label>Feedback</label><output id="fbOut">0.28</output>
+              <input id="fb" type="range" min="0" max="0.92" step="0.001" value="0.28" />
+            </div>
+            <div class="ctrl">
+              <label>Mix</label><output id="mixOut">0.22</output>
+              <input id="mix" type="range" min="0" max="1" step="0.001" value="0.22" />
+            </div>
+          </div>
+
+          
+          <div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">FX</div>
+                <div class="mini">extra</div>
+              </div>
+              <select id="fxPreset">
+                <option value="off" selected>off</option>
+                <option value="spacey">spacey</option>
+                <option value="grit">grit</option>
+                <option value="lush">lush</option>
+              </select>
+            </div>
+
+            <div class="ctrl">
+              <label>Distortion</label><output id="distMixOut">0.00</output>
+              <input id="distMix" type="range" min="0" max="1" step="0.001" value="0" />
+            </div>
+            <div class="ctrl">
+              <label>Drive</label><output id="distDriveOut">1.00</output>
+              <input id="distDrive" type="range" min="1" max="25" step="0.01" value="1" />
+            </div>
+
+            <div class="ctrl">
+              <label>Chorus</label><output id="chorMixOut">0.00</output>
+              <input id="chorMix" type="range" min="0" max="1" step="0.001" value="0" />
+            </div>
+            <div class="ctrl">
+              <label>Chorus rate (Hz)</label><output id="chorRateOut">0.80</output>
+              <input id="chorRate" type="range" min="0.05" max="6" step="0.01" value="0.80" />
+            </div>
+            <div class="ctrl">
+              <label>Chorus depth (ms)</label><output id="chorDepthOut">8</output>
+              <input id="chorDepth" type="range" min="0" max="25" step="1" value="8" />
+            </div>
+
+            <div class="ctrl">
+              <label>Reverb</label><output id="revMixOut">0.00</output>
+              <input id="revMix" type="range" min="0" max="1" step="0.001" value="0" />
+            </div>
+            <div class="ctrl">
+              <label>Reverb time (s)</label><output id="revTimeOut">1.8</output>
+              <input id="revTime" type="range" min="0.2" max="8" step="0.1" value="1.8" />
+            </div>
+
+            <div class="ctrl">
+              <label>Compressor</label><output id="compOut">off</output>
+              <input id="comp" type="range" min="0" max="1" step="1" value="0" />
+            </div>
+
+            <div class="ctrl">
+              <label>EQ low (dB)</label><output id="eqLowOut">0</output>
+              <input id="eqLow" type="range" min="-18" max="18" step="1" value="0" />
+            </div>
+            <div class="ctrl">
+              <label>EQ high (dB)</label><output id="eqHighOut">0</output>
+              <input id="eqHigh" type="range" min="-18" max="18" step="1" value="0" />
+            </div>
+
+            <div class="small">Alles staat standaard uit (zelfde sound). Gebruik presets of zet mixes open.</div>
+          </div>
+
+
+<div class="mod">
+            <div class="mh">
+              <div>
+                <div class="name">PLAY</div>
+                <div class="mini">keyboard</div>
+              </div>
+              <select id="scale">
+                <option value="chromatic">chromatic</option>
+                <option value="minor" selected>minor</option>
+                <option value="major">major</option>
+                <option value="pentatonic">pentatonic</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>Root (MIDI)</label><output id="rootOut">48 (C3)</output>
+              <input id="root" type="range" min="24" max="72" step="1" value="48" />
+            </div>
+            <div class="ctrl">
+              <label>Glide (ms)</label><output id="glideOut">12</output>
+              <input id="glide" type="range" min="0" max="300" step="1" value="12" />
+            </div>
+            <div class="small">
+              Toetsen: <code>A S D F G H J K L ;</code> (10 stappen). Sustain = ingedrukt houden.
+            </div>
+            <div class="kbd" id="kbd"></div>
+
+            <div class="pad" id="xyPad" aria-label="XY touch pad">
+              <div class="dot" id="xyDot"></div>
+<div class="recRow">
+              <button id="recBtn" class="good" title="Opnemen van de master output">● Record</button>
+              <span class="recDot" id="recDot" aria-hidden="true"></span>
+              <span class="recStat" id="recStat">niet aan het opnemen</span>
+              <a class="recLink" id="recDl" href="#" download="web-synth-recording.webm" aria-disabled="true">Download opname</a>
+            </div>
+
+            
+<div class="readout" id="xyReadout">X 0.50 · Y 0.50</div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer">
+    <div style="opacity:.9">
+      Werkt het niet? Gebruik bij voorkeur Chrome/Edge. Sommige browsers blokkeren audio tot je klikt op <b>Start Audio</b>.
+      Dit is 100% client-side (geen server nodig). Open <code>index.html</code>.
+    </div>
+  </div>
+
+  <!-- Vertex shader -->
+  <script id="vs" type="x-shader/x-vertex">
+  #version 300 es
+  precision highp float;
+  layout(location=0) in vec2 aPos;
+  out vec2 vUv;
+  void main(){
+    vUv = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
+  }
+  </script>
+
+  <!-- Fragment shader -->
+  <script id="fs" type="x-shader/x-fragment">
+  #version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 outColor;
+
+  uniform float uTime;
+  uniform float uLevel;
+  uniform float uBins[64];
+  uniform vec2  uRes;
+
+  // tiny hash
+  float hash(vec2 p){
+    p = fract(p*vec2(123.34, 456.21));
+    p += dot(p, p+45.32);
+    return fract(p.x*p.y);
+  }
+
+  float smoothPulse(float x, float a, float b, float s){
+    return smoothstep(a, a+s, x) * (1.0 - smoothstep(b-s, b, x));
+  }
+
+  void main(){
+    vec2 uv = vUv;
+    vec2 p = (uv*2.0-1.0);
+    p.x *= uRes.x / uRes.y;
+
+    // FFT energy bands
+    float bass = uBins[2]*0.7 + uBins[4]*0.3;
+    float mid  = uBins[16]*0.5 + uBins[24]*0.5;
+    float high = uBins[40]*0.4 + uBins[55]*0.6;
+
+    float t = uTime;
+    float wob = sin(t*1.5 + bass*6.0) * 0.35;
+
+    // field
+    float r = length(p);
+    float a = atan(p.y, p.x);
+
+    float rings = sin(10.0*r - t*2.0 + bass*5.0);
+    float swirl = sin(3.0*a + t*0.7 + mid*3.0);
+
+    float n = hash(uv*vec2(220.0,140.0) + t*0.2);
+    float glow = exp(-2.2*r) * (0.35 + 0.95*uLevel);
+
+    // waveform-ish stripes using bins
+    float stripe = 0.0;
+    for(int i=0;i<64;i++){
+      float fi = float(i)/63.0;
+      float x = abs(uv.x - fi);
+      float h = uBins[i];
+      stripe += smoothPulse(uv.y, 0.5 - 0.35*h, 0.5 + 0.35*h, 0.01) * exp(-x*55.0) * 0.9;
+    }
+
+    float core = 0.5 + 0.5*(rings*0.65 + swirl*0.55);
+    core = pow(max(core,0.0), 1.2);
+    core += stripe*0.9;
+
+    // color palette
+    vec3 colA = vec3(0.48, 0.36, 1.00);
+    vec3 colB = vec3(0.16, 0.95, 0.55);
+    vec3 colC = vec3(1.00, 0.80, 0.40);
+
+    vec3 col = mix(colA, colB, clamp(0.25 + 0.75*mid + wob, 0.0, 1.0));
+    col = mix(col, colC, clamp(high*0.8, 0.0, 1.0));
+
+    float vign = smoothstep(1.25, 0.15, r);
+    col *= (0.35 + 1.35*core) * vign;
+    col += vec3(n)*0.05;
+    col += glow*colB*0.45;
+
+    // subtle scanline
+    col *= 0.96 + 0.04*sin((uv.y*uRes.y)*0.08);
+
+    outColor = vec4(col, 1.0);
+  }
+  </script>
+
+  <script>
+  // -----------------------------
+  // Utilities
+  // -----------------------------
+  const $ = (q) => document.querySelector(q);
+  const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+  const lerp  = (a,b,t) => a + (b-a)*t;
+
+  const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  function midiToFreq(m){ return 440 * Math.pow(2, (m-69)/12); }
+  function midiName(m){
+    const n = NOTE_NAMES[m%12];
+    const o = Math.floor(m/12)-1;
+    return `${n}${o}`;
+  }
+
+  // scales in semitones
+  const SCALES = {
+    chromatic: [0,1,2,3,4,5,6,7,8,9,10,11],
+    minor:     [0,2,3,5,7,8,10],
+    major:     [0,2,4,5,7,9,11],
+    pentatonic:[0,3,5,7,10]
+  };
+
+  // -----------------------------
+  // Audio Engine (WebAudio)
+  // -----------------------------
+  class Voice {
+    constructor(ctx, engine){
+      this.ctx = ctx;
+      this.engine = engine;
+
+      // Oscillators
+      this.osc = ctx.createOscillator();
+      this.osc.type = engine.params.wave;
+
+      this.sub = ctx.createOscillator();
+      this.sub.type = "sine";
+
+      // mix
+      this.oscGain = ctx.createGain();
+      this.subGain = ctx.createGain();
+
+      this.mix = ctx.createGain();
+
+      // filter
+      this.filt = ctx.createBiquadFilter();
+      this.filt.type = engine.params.filterType;
+
+      // VCA with envelope
+      this.vca = ctx.createGain();
+      this.vca.gain.value = 0;
+
+      // connections: osc+sub -> mix -> filter -> vca -> engine.preFX
+      this.osc.connect(this.oscGain);
+      this.sub.connect(this.subGain);
+      this.oscGain.connect(this.mix);
+      this.subGain.connect(this.mix);
+      this.mix.connect(this.filt);
+      this.filt.connect(this.vca);
+      this.vca.connect(engine.preFX);
+      // DC blocker (prevents low‑freq clicks when sliding pitch)
+      this.dcBlock = ctx.createBiquadFilter();
+      this.dcBlock.type = "highpass";
+      this.dcBlock.frequency.value = 20;
+      this.vca.disconnect();
+      this.vca.connect(this.dcBlock);
+      this.dcBlock.connect(engine.preFX);
+
+      // start
+      this.osc.start();
+      this.sub.start();
+
+      this.note = 60;
+      this.isOn = false;
+    }
+
+    setParams(){
+      const p = this.engine.params;
+      this.osc.type = p.wave;
+      this.filt.type = p.filterType;
+      this.osc.detune.setValueAtTime(p.detune, this.ctx.currentTime);
+      this.subGain.gain.setValueAtTime(p.subMix, this.ctx.currentTime);
+      this.oscGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+    }
+
+    trigger(midi, velocity=1.0){
+      const ctx = this.ctx;
+      const p = this.engine.params;
+      const now = ctx.currentTime;
+
+      this.note = midi;
+      const freq = midiToFreq(midi);
+      const glide = p.glideMs / 1000;
+
+      // pitch with glide
+      const tgt = freq;
+      this.osc.frequency.cancelScheduledValues(now);
+      this.sub.frequency.cancelScheduledValues(now);
+      const cur = this.osc.frequency.value || tgt;
+      this.osc.frequency.setValueAtTime(cur, now);
+      this.sub.frequency.setValueAtTime(cur/2, now);
+      this.osc.frequency.linearRampToValueAtTime(tgt, now + glide);
+      this.sub.frequency.linearRampToValueAtTime(tgt/2, now + glide);
+
+      // filter base cutoff
+      this.filt.frequency.cancelScheduledValues(now);
+      this.filt.frequency.setValueAtTime(p.cutoffHz, now);
+      this.filt.Q.setValueAtTime(p.resQ, now);
+
+      // envelope
+      this.vca.gain.cancelScheduledValues(now);
+      const a = p.attackMs/1000, d = p.decayMs/1000, r = p.releaseMs/1000;
+      const s = p.sustain;
+      if(p.envMode === "gate"){
+        this.vca.gain.setValueAtTime(0, now);
+        this.vca.gain.linearRampToValueAtTime(velocity, now + Math.max(0.002, a));
+      } else {
+        this.vca.gain.setValueAtTime(0, now);
+        this.vca.gain.linearRampToValueAtTime(velocity, now + Math.max(0.002, a));
+        this.vca.gain.linearRampToValueAtTime(velocity*s, now + a + Math.max(0.002, d));
+      }
+
+      this.isOn = true;
+    }
+
+    release(){
+      if(!this.isOn) return;
+      const ctx = this.ctx;
+      const p = this.engine.params;
+      const now = ctx.currentTime;
+
+      const r = p.releaseMs/1000;
+      this.vca.gain.cancelScheduledValues(now);
+      const cur = this.vca.gain.value;
+      this.vca.gain.setValueAtTime(cur, now);
+      this.vca.gain.linearRampToValueAtTime(0.0001, now + Math.max(0.002, r));
+
+      this.isOn = false;
+    }
+
+
+    releaseWith(ms){
+      // Quick release used for click-free crossfade between notes
+      const ctx = this.ctx;
+      const now = ctx.currentTime;
+      const r = Math.max(0.002, ms);
+      this.vca.gain.cancelScheduledValues(now);
+      const cur = this.vca.gain.value;
+      this.vca.gain.setValueAtTime(cur, now);
+      this.vca.gain.linearRampToValueAtTime(0.0001, now + r);
+      this.isOn = false;
+    }
+
+    stop(){
+      try{
+        this.osc.stop();
+        this.sub.stop();
+      }catch(e){}
+      try{
+        this.osc.disconnect();
+        this.sub.disconnect();
+      }catch(e){}
+    }
+  }
+
+  class Engine {
+    constructor(){
+      this.ctx = null;
+      this.master = null;
+
+      this.preFX = null; // vca out before FX
+      this.postFX = null;
+
+      this.delay = null;
+      this.delayFb = null;
+      this.delayWet = null;
+      this.delayDry = null;
+
+      this.analyser = null;
+      this.meter = { level: 0 };
+
+      this.voices = [];
+      this.activeKey = null;
+
+      this.lfo = null;
+      this.lfoGainCut = null;
+      this.lfoGainDet = null;
+
+      this.params = {
+        wave: "sawtooth",
+        detune: 0,
+        subMix: 0.2,
+
+        filterType: "lowpass",
+        cutoffHz: 1200,
+        resQ: 2.0,
+
+        envMode: "adsr",
+        attackMs: 10,
+        decayMs: 140,
+        sustain: 0.55,
+        releaseMs: 220,
+
+        lfoShape: "sine",
+        lfoRate: 3.2,
+        lfoDepth: 0.35,     // to cutoff
+        lfoDetuneDepth: 0.10, // to detune
+
+        delayOn: true,
+        delayTimeMs: 240,
+        delayFeedback: 0.28,
+        delayMix: 0.22,
+
+        rootMidi: 48,
+        scale: "minor",
+        glideMs: 12,
+      };
+    }
+
+    async start(){
+      if(this.ctx) return;
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx = ctx;
+
+      // pre-FX bus
+      this.preFX = ctx.createGain();
+
+      // delay network
+      this.delay = ctx.createDelay(2.5);
+      this.delay.delayTime.value = this.params.delayTimeMs/1000;
+
+      this.delayFb = ctx.createGain();
+      this.delayFb.gain.value = this.params.delayFeedback;
+
+      this.delayWet = ctx.createGain();
+      this.delayDry = ctx.createGain();
+      this.delayWet.gain.value = this.params.delayMix;
+      this.delayDry.gain.value = 1 - this.params.delayMix;
+
+      // feedback loop
+      this.delay.connect(this.delayFb);
+      this.delayFb.connect(this.delay);      // route
+      // preFX -> FX chain -> (dry+delay) -> post
+      try{
+      this.fxIn = ctx.createGain();
+      this.fxOut = ctx.createGain();
+      this.preFX.connect(this.fxIn);
+
+      // --- Distortion (waveshaper) ---
+      this.distIn = ctx.createGain();
+      this.distShaper = ctx.createWaveShaper();
+      this.distOut = ctx.createGain();
+      this.distDry = ctx.createGain();
+      this.distWet = ctx.createGain();
+
+      // --- Chorus (short delay mod) ---
+      this.chorDelay = ctx.createDelay(0.05);
+      this.chorLfo = ctx.createOscillator();
+      this.chorLfo.type = "sine";
+      this.chorLfoGain = ctx.createGain();
+      this.chorDry = ctx.createGain();
+      this.chorWet = ctx.createGain();
+
+      // --- Reverb (convolver) ---
+      this.revConv = ctx.createConvolver();
+      this.revDry = ctx.createGain();
+      this.revWet = ctx.createGain();
+
+      // --- EQ ---
+      this.eqLow = ctx.createBiquadFilter();
+      this.eqLow.type = "lowshelf";
+      this.eqLow.frequency.value = 180;
+
+      this.eqHigh = ctx.createBiquadFilter();
+      this.eqHigh.type = "highshelf";
+      this.eqHigh.frequency.value = 4500;
+
+      // --- Compressor ---
+      this.comp = ctx.createDynamicsCompressor();
+
+      // Build chain with per-effect wet/dry (default wet=0 => identical)
+      // fxIn -> Dist (parallel) -> Chorus (parallel) -> Reverb (parallel) -> EQ -> (optional Comp) -> fxOut
+      // Dist parallel
+      this.fxIn.connect(this.distDry);
+      this.fxIn.connect(this.distShaper);
+      this.distShaper.connect(this.distWet);
+
+      const distMix = this.params.distMix;
+      this.distDry.gain.value = 1 - distMix;
+      this.distWet.gain.value = distMix;
+
+      this.distDry.connect(this.distIn);
+      this.distWet.connect(this.distIn);
+
+      // Chorus parallel (applied to distOut)
+      this.distIn.connect(this.chorDry);
+      this.distIn.connect(this.chorDelay);
+      this.chorDelay.connect(this.chorWet);
+
+      const chorMix = this.params.chorMix;
+      this.chorDry.gain.value = 1 - chorMix;
+      this.chorWet.gain.value = chorMix;
+
+      // chorus LFO modulates delayTime
+      this.chorLfo.frequency.value = this.params.chorRate;
+      this.chorLfoGain.gain.value = this.params.chorDepthMs / 1000;
+      this.chorLfo.connect(this.chorLfoGain);
+      this.chorLfoGain.connect(this.chorDelay.delayTime);
+      this.chorLfo.start();
+
+      this.chorDry.connect(this.revDry);
+      this.chorWet.connect(this.revDry); // sum into revDry node as "pre-reverb mix in"
+      // We'll apply reverb as parallel from that sum below.
+      this.revSum = ctx.createGain();
+      // connect chorus sum into reverb input
+      this.chorDry.connect(this.revSum);
+      this.chorWet.connect(this.revSum);
+
+      // Reverb parallel
+      this.revSum.connect(this.revDry);
+      this.revSum.connect(this.revConv);
+      this.revConv.connect(this.revWet);
+
+      const revMix = this.params.revMix;
+      this.revDry.gain.value = 1 - revMix;
+      this.revWet.gain.value = revMix;
+
+      // Sum reverb
+      this.revDry.connect(this.eqLow);
+      this.revWet.connect(this.eqLow);
+
+      // EQ -> comp -> fxOut (comp can be bypassed via gain)
+      this.eqLow.connect(this.eqHigh);
+
+      // Create bypassable compressor
+      this.compDry = ctx.createGain();
+      this.compWet = ctx.createGain();
+      this.eqHigh.connect(this.compDry);
+      this.eqHigh.connect(this.comp);
+      this.comp.connect(this.compWet);
+
+      const compOn = this.params.compOn ? 1 : 0;
+      this.compDry.gain.value = 1 - compOn;
+      this.compWet.gain.value = compOn;
+
+      this.compDry.connect(this.fxOut);
+      this.compWet.connect(this.fxOut);
+
+      // Connect FX out to delay/dry paths
+      this.fxOut.connect(this.delayDry);
+
+      this.fxOut.connect(this.delay);
+      this.delay.connect(this.delayWet);
+      }catch(e){
+        console.warn("FX init failed, bypassing FX", e);
+        this.preFX.connect(this.delayDry);
+        this.preFX.connect(this.delay);
+      }
+      this.postFX = ctx.createGain();
+      this.delayDry.connect(this.postFX);
+      this.delayWet.connect(this.postFX);
+
+
+      // Reverb impulse generator (fast noise IR)
+      const makeImpulseResponse = (timeS=1.8, decay=2.2) => {
+        const rate = ctx.sampleRate;
+        const length = Math.max(1, Math.floor(rate * timeS));
+        const ir = ctx.createBuffer(2, length, rate);
+        for(let ch=0; ch<2; ch++){
+          const data = ir.getChannelData(ch);
+          for(let i=0; i<length; i++){
+            const t = i/length;
+            const env = Math.pow(1 - t, decay);
+            data[i] = (Math.random()*2 - 1) * env;
+          }
+        }
+        return ir;
+      };
+      this._makeIR = makeImpulseResponse;
+      this.revConv.buffer = makeImpulseResponse(this.params.revTimeS, 2.2);
+
+      // Distortion curve
+      const makeCurve = (drive=1.0) => {
+        const n = 2048;
+        const curve = new Float32Array(n);
+        const k = Math.max(1e-3, drive);
+        for(let i=0;i<n;i++){
+          const x = (i/(n-1))*2 - 1;
+          // soft clip
+          curve[i] = Math.tanh(x * k);
+        }
+        return curve;
+      };
+      this._makeCurve = makeCurve;
+      this.distShaper.curve = makeCurve(this.params.distDrive);
+      this.distShaper.oversample = "2x";
+      // analyser + master
+      this.analyser = ctx.createAnalyser();
+      this.analyser.fftSize = 2048;
+      this.postFX.connect(this.analyser);
+
+      this.master = ctx.createGain();
+      this.master.gain.value = parseFloat($("#master").value);
+      this.analyser.connect(this.master);
+      this.master.connect(ctx.destination);
+      // Recording tap (master -> MediaStreamDestination) for live capture
+      this.recDest = ctx.createMediaStreamDestination();
+      this.master.connect(this.recDest);
+      this.recorder = null;
+      this.recChunks = [];
+
+      // LFO -> mod cutoff & detune via AudioParams
+      this.lfo = ctx.createOscillator();
+      this.lfo.type = this.params.lfoShape;
+      this.lfo.frequency.value = this.params.lfoRate;
+
+      this.lfoGainCut = ctx.createGain();
+      this.lfoGainDet = ctx.createGain();
+
+      // Cutoff modulation: map depth to Hz range relative to cutoff
+      this.lfo.connect(this.lfoGainCut);
+      this.lfo.connect(this.lfoGainDet);
+
+      // We'll connect per-voice in updateRouting()
+      this.lfo.start();
+
+      // allocate a small voice pool (mono-ish: we'll steal 1 voice)
+      this.voices = [new Voice(ctx, this), new Voice(ctx, this)];
+      this.voices.forEach(v => v.setParams());
+      this.updateRouting();
+
+      // meter loop (RMS-ish)
+      const meterBuf = new Float32Array(this.analyser.fftSize);
+      const meterTick = () => {
+        if(!this.ctx) return;
+        const a = this.analyser;
+        // time-domain snapshot
+        const td = new Uint8Array(a.fftSize);
+        a.getByteTimeDomainData(td);
+        let sum = 0;
+        for(let i=0;i<td.length;i++){
+          const x = (td[i]-128)/128;
+          sum += x*x;
+        }
+        const rms = Math.sqrt(sum/td.length);
+        this.meter.level = lerp(this.meter.level, rms, 0.2);
+        requestAnimationFrame(meterTick);
+      };
+      meterTick();
+    }
+
+    updateRouting(){
+      if(!this.ctx) return;
+      const ctx = this.ctx;
+      const p = this.params;
+
+      // --- Extra FX ---
+      // Distortion
+      this.distDry.gain.setValueAtTime(1 - p.distMix, ctx.currentTime);
+      this.distWet.gain.setValueAtTime(p.distMix, ctx.currentTime);
+      this.distShaper.curve = this._makeCurve ? this._makeCurve(p.distDrive) : this.distShaper.curve;
+
+      // Chorus
+      this.chorDry.gain.setValueAtTime(1 - p.chorMix, ctx.currentTime);
+      this.chorWet.gain.setValueAtTime(p.chorMix, ctx.currentTime);
+      this.chorLfo.frequency.setValueAtTime(p.chorRate, ctx.currentTime);
+      this.chorLfoGain.gain.setValueAtTime(p.chorDepthMs / 1000, ctx.currentTime);
+
+      // Reverb
+      this.revDry.gain.setValueAtTime(1 - p.revMix, ctx.currentTime);
+      this.revWet.gain.setValueAtTime(p.revMix, ctx.currentTime);
+      if(this._makeIR && this._lastRevTime !== p.revTimeS){
+        this.revConv.buffer = this._makeIR(p.revTimeS, 2.2);
+        this._lastRevTime = p.revTimeS;
+      }
+
+      // EQ
+      this.eqLow.gain.setValueAtTime(p.eqLowDb, ctx.currentTime);
+      this.eqHigh.gain.setValueAtTime(p.eqHighDb, ctx.currentTime);
+
+      // Compressor (bypassable)
+      const compOn = p.compOn ? 1 : 0;
+      this.compDry.gain.setValueAtTime(1 - compOn, ctx.currentTime);
+      this.compWet.gain.setValueAtTime(compOn, ctx.currentTime);
+      // sane defaults
+      this.comp.threshold.setValueAtTime(-24, ctx.currentTime);
+      this.comp.ratio.setValueAtTime(6, ctx.currentTime);
+      this.comp.attack.setValueAtTime(0.004, ctx.currentTime);
+      this.comp.release.setValueAtTime(0.12, ctx.currentTime);
+
+      // delay
+      const delayOn = !!p.delayOn;
+      this.delayWet.gain.setValueAtTime(delayOn ? p.delayMix : 0, ctx.currentTime);
+      this.delayDry.gain.setValueAtTime(delayOn ? (1-p.delayMix) : 1, ctx.currentTime);
+      this.delay.delayTime.setValueAtTime(p.delayTimeMs/1000, ctx.currentTime);
+      this.delayFb.gain.setValueAtTime(p.delayFeedback, ctx.currentTime);
+
+      // lfo basics
+      this.lfo.type = p.lfoShape;
+      this.lfo.frequency.setValueAtTime(p.lfoRate, ctx.currentTime);
+
+      // lfo depth: cutoff
+      // We'll set gain in Hz: depth * cutoff range (here 0..12000)
+      const cutSpan = 12000 - 40;
+      this.lfoGainCut.gain.setValueAtTime(p.lfoDepth * cutSpan, ctx.currentTime);
+
+      // lfo detune depth in cents (0..1200)
+      this.lfoGainDet.gain.setValueAtTime(p.lfoDetuneDepth * 1200, ctx.currentTime);
+
+      // per voice params + mod connections
+      this.voices.forEach(v => {
+        v.setParams();
+
+        // ensure clean connections for modulation
+        try{ this.lfoGainCut.disconnect(); }catch(e){}
+        try{ this.lfoGainDet.disconnect(); }catch(e){}
+      });
+
+      // Connect mod busses to ALL voices' filter freq & osc detune
+      // (AudioParam can accept multiple connections)
+      this.voices.forEach(v => {
+        this.lfoGainCut.connect(v.filt.frequency);
+        this.lfoGainDet.connect(v.osc.detune);
+      });
+
+      // base values
+      this.voices.forEach(v => {
+        v.filt.frequency.setValueAtTime(p.cutoffHz, ctx.currentTime);
+        v.filt.Q.setValueAtTime(p.resQ, ctx.currentTime);
+        v.osc.detune.setValueAtTime(p.detune, ctx.currentTime);
+      });
+    }
+
+    noteOn(midi, velocity=1.0){
+      if(!this.ctx) return;
+      const v = this.voices[0];
+      v.trigger(midi, velocity);
+    }
+
+    noteOff(){
+      if(!this.ctx) return;
+      this.voices[0].release();
+    }
+
+
+    // Option A: touchpad-driven playing with click-free crossfade between 2 voices
+    noteOnPad(midi, velocity=1.0){
+      if(!this.ctx) return;
+      // Choose which voice to use
+      if(this._padVoiceIdx === undefined) this._padVoiceIdx = 0;
+      if(this._padLastMidi === undefined) this._padLastMidi = null;
+
+      const nextIdx = (this._padVoiceIdx === 0) ? 1 : 0;
+      const curIdx = this._padVoiceIdx;
+
+      // If first note, just use current voice
+      if(this._padLastMidi === null){
+        this.voices[curIdx].trigger(midi, velocity);
+        this._padLastMidi = midi;
+        return;
+      }
+
+      // If same note, do nothing
+      if(midi === this._padLastMidi) return;
+
+      // Crossfade: trigger next voice, quickly release current
+      const vNew = this.voices[nextIdx];
+      const vOld = this.voices[curIdx];
+
+      // Ensure params updated (wave/filter/etc.)
+      vNew.setParams();
+      vOld.setParams();
+
+      vNew.trigger(midi, velocity);
+      vOld.releaseWith(0.05); // 50ms release to avoid clicks
+
+      this._padVoiceIdx = nextIdx;
+      this._padLastMidi = midi;
+    }
+
+    noteOffPad(){
+      if(!this.ctx) return;
+      if(this._padVoiceIdx === undefined) this._padVoiceIdx = 0;
+      const v = this.voices[this._padVoiceIdx];
+      v.release();
+      this._padLastMidi = null;
+    }
+
+    panic(){
+      if(!this.ctx) return;
+      this.voices.forEach(v => {
+        v.vca.gain.cancelScheduledValues(this.ctx.currentTime);
+        v.vca.gain.setValueAtTime(0, this.ctx.currentTime);
+      });
+    }
+  }
+
+  const engine = new Engine();
+
+  // Smooth AudioParam changes to avoid clicks/crackle
+  function smoothParam(param, value, timeConstant=0.03){
+    if(!engine.ctx || !param) return;
+    const now = engine.ctx.currentTime;
+    try{
+      param.setTargetAtTime(value, now, timeConstant);
+    }catch(e){
+      try{ param.setValueAtTime(value, now); }catch(_){}
+    }
+  }
+
+  // Map 0..1 -> cutoff in Hz (log-ish), keeps musical feel
+  function xToCutoff(x){
+    const minHz = 60, maxHz = 12000;
+    const t = clamp(x, 0, 1);
+    const hz = minHz * Math.pow(maxHz/minHz, t);
+    return hz;
+  }
+
+  // Map 0..1 -> resonance Q (smooth range)
+  function yToResQ(y){
+    const minQ = 0.25, maxQ = 18.0;
+    const t = clamp(y, 0, 1);
+    return lerp(minQ, maxQ, t);
+  }
+
+  // Build a quantized pitch map across ~2 octaves for the current scale
+  function buildPadNotes(){
+    const scale = SCALES[engine.params.scale] || SCALES.minor;
+    const notes = [];
+    // 2 octaves + 1 note (so it feels continuous)
+    const octaves = 2;
+    for(let oct=0; oct<=octaves; oct++){
+      for(let i=0;i<scale.length;i++){
+        notes.push(engine.params.rootMidi + scale[i] + 12*oct);
+      }
+    }
+    return notes;
+  }
+
+  function padXToMidi(x){
+    const notes = buildPadNotes(); // already quantized, no hard jumps
+    const t = clamp(x, 0, 1);
+    const i = Math.round(t * (notes.length - 1));
+    return notes[clamp(i, 0, notes.length - 1)];
+  }
+
+
+  function setSliderQuiet(id, value, outId, fmt){
+    const el = $("#"+id);
+    el.value = String(value);
+    if(outId){
+      const out = $("#"+outId);
+      if(out) out.textContent = fmt ? fmt(parseFloat(value)) : String(value);
+    }
+  }
+
+  // Apply XY (Option A): pad plays notes itself
+  // X = pitch (quantized to selected scale), Y = cutoff (smooth), resonance stays as-is (slider/LFO)
+  function applyXY(x, y){
+    const xn = clamp(x, 0, 1);
+    const yn = clamp(y, 0, 1);
+
+    // Y -> cutoff (up = brighter)
+    const cutoff = xToCutoff(1.0 - yn);
+    engine.params.cutoffHz = cutoff;
+
+    if(engine.ctx){
+      // smooth filter
+      engine.voices.forEach(v => smoothParam(v.filt.frequency, cutoff, 0.02));
+
+      // while pad is down: update pitch click-free (quantized steps crossfaded)
+      if(engine._padDown){
+        const midi = padXToMidi(xn);
+
+        // If note changed, do a tiny crossfade between two voices (prevents clicks on note steps)
+        if(engine._padMidi === null || midi !== engine._padMidi){
+          engine.noteOnPad(midi, 1.0);
+          engine._padMidi = midi;
+        } else {
+          // Same note: just keep it gently steered
+          const freq = midiToFreq(midi);
+          const vi = (engine._padVoiceIdx === undefined) ? 0 : engine._padVoiceIdx;
+          const v = engine.voices[vi];
+          smoothParam(v.osc.frequency, freq, 0.03);
+          smoothParam(v.sub.frequency, freq/2, 0.03);
+        }
+      }
+    }
+
+    // Keep cutoff UI in sync (quietly)
+    setSliderQuiet("cut", Math.round(cutoff), "cutOut", v=>String(v|0));
+  }
+
+
+  // -----------------------------
+  // UI Wiring
+  // -----------------------------
+  function bindRange(id, outId, fmt=(v)=>v){
+    const el = $("#"+id);
+    const out = $("#"+outId);
+    const set = () => out.textContent = fmt(parseFloat(el.value));
+    el.addEventListener("input", () => { set(); pullParams(); });
+    set();
+  }
+
+  function pullParams(){
+    engine.params.wave = $("#wave").value;
+    engine.params.detune = parseFloat($("#detune").value);
+    engine.params.subMix = parseFloat($("#sub").value);
+
+    engine.params.filterType = $("#filterType").value;
+    engine.params.cutoffHz = parseFloat($("#cut").value);
+    engine.params.resQ = parseFloat($("#res").value);
+
+    engine.params.envMode = $("#envMode").value;
+    engine.params.attackMs = parseFloat($("#a").value);
+    engine.params.decayMs = parseFloat($("#d").value);
+    engine.params.sustain = parseFloat($("#s").value);
+    engine.params.releaseMs = parseFloat($("#r").value);
+
+    engine.params.lfoShape = $("#lfoShape").value;
+    engine.params.lfoRate = parseFloat($("#lfoRate").value);
+    engine.params.lfoDepth = parseFloat($("#lfoDepth").value);
+    engine.params.lfoDetuneDepth = parseFloat($("#lfoDetune").value);
+
+    engine.params.delayOn = $("#delayMode").value === "on";
+    engine.params.delayTimeMs = parseFloat($("#dt").value);
+    engine.params.delayFeedback = parseFloat($("#fb").value);
+    engine.params.delayMix = parseFloat($("#mix").value);
+
+    // FX
+    engine.params.fxPreset = $("#fxPreset") ? $("#fxPreset").value : "off";
+    engine.params.distMix = $("#distMix") ? parseFloat($("#distMix").value) : 0;
+    engine.params.distDrive = $("#distDrive") ? parseFloat($("#distDrive").value) : 1;
+
+    engine.params.chorMix = $("#chorMix") ? parseFloat($("#chorMix").value) : 0;
+    engine.params.chorRate = $("#chorRate") ? parseFloat($("#chorRate").value) : 0.8;
+    engine.params.chorDepthMs = $("#chorDepth") ? parseFloat($("#chorDepth").value) : 8;
+
+    engine.params.revMix = $("#revMix") ? parseFloat($("#revMix").value) : 0;
+    engine.params.revTimeS = $("#revTime") ? parseFloat($("#revTime").value) : 1.8;
+
+    engine.params.compOn = $("#comp") ? parseInt($("#comp").value, 10) : 0;
+
+    engine.params.eqLowDb = $("#eqLow") ? parseFloat($("#eqLow").value) : 0;
+    engine.params.eqHighDb = $("#eqHigh") ? parseFloat($("#eqHigh").value) : 0;
+
+    engine.params.rootMidi = parseInt($("#root").value, 10);
+    engine.params.scale = $("#scale").value;
+    engine.params.glideMs = parseFloat($("#glide").value);
+
+    $("#rootOut").textContent = `${engine.params.rootMidi} (${midiName(engine.params.rootMidi)})`;
+
+    if(engine.ctx){
+      engine.master.gain.setValueAtTime(parseFloat($("#master").value), engine.ctx.currentTime);
+      engine.updateRouting();
+    }
+  }
+
+  // outputs
+  bindRange("detune","detuneOut", v=>String(v|0));
+  bindRange("sub","subOut", v=>v.toFixed(2));
+
+  bindRange("cut","cutOut", v=>String(v|0));
+  bindRange("res","resOut", v=>v.toFixed(1));
+
+  bindRange("a","aOut", v=>String(v|0));
+  bindRange("d","dOut", v=>String(v|0));
+  bindRange("s","sOut", v=>v.toFixed(2));
+  bindRange("r","rOut", v=>String(v|0));
+
+  bindRange("lfoRate","lfoRateOut", v=>v.toFixed(2));
+  bindRange("lfoDepth","lfoDepthOut", v=>v.toFixed(2));
+  bindRange("lfoDetune","lfoDetuneOut", v=>v.toFixed(2));
+
+  bindRange("dt","dtOut", v=>String(v|0));
+  bindRange("fb","fbOut", v=>v.toFixed(2));
+  bindRange("mix","mixOut", v=>v.toFixed(2));
+
+  // FX
+  bindRange("distMix","distMixOut", v=>v.toFixed(2));
+  bindRange("distDrive","distDriveOut", v=>v.toFixed(2));
+
+  bindRange("chorMix","chorMixOut", v=>v.toFixed(2));
+  bindRange("chorRate","chorRateOut", v=>v.toFixed(2));
+  bindRange("chorDepth","chorDepthOut", v=>String(v|0));
+
+  bindRange("revMix","revMixOut", v=>v.toFixed(2));
+  bindRange("revTime","revTimeOut", v=>v.toFixed(1));
+
+  bindRange("comp","compOut", v=> (v|0) ? "on" : "off");
+
+  bindRange("eqLow","eqLowOut", v=>String(v|0));
+  bindRange("eqHigh","eqHighOut", v=>String(v|0));
+
+  bindRange("glide","glideOut", v=>String(v|0));
+
+  ["wave","filterType","envMode","lfoShape","delayMode","scale"].forEach(id=>{
+    $("#"+id).addEventListener("change", pullParams);
+  });
+  $("#master").addEventListener("input", pullParams);
+  $("#root").addEventListener("input", pullParams);
+
+  // start
+  $("#startBtn").addEventListener("click", async ()=>{
+    await engine.start();
+    pullParams();
+    $("#statusPill").textContent = "Audio: aan";
+    $("#statusPill").style.borderColor = "rgba(43,213,118,.55)";
+  });
+
+  $("#panicBtn").addEventListener("click", ()=>{
+    engine.panic();
+    clearKeyUI();
+  });
+
+  $("#randomBtn").addEventListener("click", ()=>{
+    // A fun but sane randomizer
+    const rnd = (a,b)=>a+(b-a)*Math.random();
+    $("#wave").value = ["sawtooth","square","triangle","sine"][Math.floor(Math.random()*4)];
+    $("#filterType").value = ["lowpass","bandpass","highpass"][Math.floor(Math.random()*3)];
+    $("#cut").value = String(Math.floor(rnd(120, 6000)));
+    $("#res").value = String(rnd(0.4, 14).toFixed(1));
+
+    $("#a").value = String(Math.floor(rnd(0, 80)));
+    $("#d").value = String(Math.floor(rnd(40, 900)));
+    $("#s").value = String(rnd(0.2, 0.85).toFixed(2));
+    $("#r").value = String(Math.floor(rnd(40, 1200)));
+
+    $("#lfoShape").value = ["sine","triangle","square"][Math.floor(Math.random()*3)];
+    $("#lfoRate").value = String(rnd(0.2, 10).toFixed(2));
+    $("#lfoDepth").value = String(rnd(0, 0.85).toFixed(2));
+    $("#lfoDetune").value = String(rnd(0, 0.45).toFixed(2));
+
+    $("#delayMode").value = Math.random() < 0.85 ? "on" : "off";
+    $("#dt").value = String(Math.floor(rnd(70, 520)));
+    $("#fb").value = String(rnd(0.05, 0.65).toFixed(2));
+    $("#mix").value = String(rnd(0.05, 0.55).toFixed(2));
+
+    $("#sub").value = String(rnd(0, 0.45).toFixed(2));
+    $("#detune").value = String(Math.floor(rnd(-40, 40)));
+
+    pullParams();
+  });
+
+  function applyFxPreset(name){
+    // defaults = off (identical sound)
+    const set = (id,val)=>{ const el=$("#"+id); if(el){ el.value=String(val); } };
+    if(name === "off"){
+      set("distMix", 0); set("distDrive", 1);
+      set("chorMix", 0); set("chorRate", 0.8); set("chorDepth", 8);
+      set("revMix", 0);  set("revTime", 1.8);
+      set("comp", 0);
+      set("eqLow", 0); set("eqHigh", 0);
+    } else if(name === "spacey"){
+      set("distMix", 0.05); set("distDrive", 2.5);
+      set("chorMix", 0.25); set("chorRate", 0.35); set("chorDepth", 12);
+      set("revMix", 0.28);  set("revTime", 4.2);
+      set("comp", 1);
+      set("eqLow", 2); set("eqHigh", 3);
+    } else if(name === "grit"){
+      set("distMix", 0.35); set("distDrive", 9.5);
+      set("chorMix", 0.05); set("chorRate", 1.8); set("chorDepth", 6);
+      set("revMix", 0.08);  set("revTime", 1.0);
+      set("comp", 1);
+      set("eqLow", 4); set("eqHigh", -2);
+    } else if(name === "lush"){
+      set("distMix", 0.10); set("distDrive", 3.2);
+      set("chorMix", 0.42); set("chorRate", 0.55); set("chorDepth", 16);
+      set("revMix", 0.40);  set("revTime", 5.6);
+      set("comp", 0);
+      set("eqLow", 1); set("eqHigh", 6);
+    }
+    pullParams();
+  }
+
+  const fxPresetEl = $("#fxPreset");
+  if(fxPresetEl){
+    fxPresetEl.addEventListener("change", ()=> applyFxPreset(fxPresetEl.value));
+  }
+
+
+  // -----------------------------
+  // Keyboard -> notes
+  // -----------------------------
+  const keyOrder = ["a","s","d","f","g","h","j","k","l",";"];
+  const keyEls = new Map();
+
+  function buildKeyboard(){
+    const wrap = $("#kbd");
+    wrap.innerHTML = "";
+    keyOrder.forEach((k, i)=>{
+      const el = document.createElement("div");
+      el.className = "key";
+      el.textContent = k.toUpperCase();
+      el.dataset.k = k;
+      el.addEventListener("pointerdown", ()=>handleKeyDown(k));
+      el.addEventListener("pointerup", ()=>handleKeyUp(k));
+      el.addEventListener("pointerleave", ()=>handleKeyUp(k));
+      wrap.appendChild(el);
+      keyEls.set(k, el);
+    });
+  }
+  buildKeyboard();
+
+  // -----------------------------
+  // XY Touch Pad (finger-friendly)
+  // -----------------------------
+  const xyPad = $("#xyPad");
+  const xyDot = $("#xyDot");
+  const xyReadout = $("#xyReadout");
+
+  let xyActive = false;
+
+  function padUpdateFromEvent(e){
+    const rect = xyPad.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const xn = clamp(x, 0, 1);
+    const yn = clamp(y, 0, 1);
+
+    // Visual dot
+    xyDot.style.left = (xn*100).toFixed(2) + "%";
+    xyDot.style.top  = (yn*100).toFixed(2) + "%";
+    xyReadout.textContent = `X ${xn.toFixed(2)} · Y ${yn.toFixed(2)}`;
+
+    // Only apply when audio is running (but keep dot responsive)
+    if(engine.ctx){
+      applyXY(xn, yn);
+    }
+  }
+
+  xyPad.addEventListener("pointerdown", (e)=>{
+    xyActive = true;
+    xyPad.setPointerCapture(e.pointerId);
+
+    if(engine._padDown){ return; }
+    if(!engine.ctx){
+      $("#statusPill").textContent = "Klik eerst: Start Audio";
+      $("#statusPill").style.borderColor = "rgba(255,204,102,.55)";
+      padUpdateFromEvent(e);
+      e.preventDefault();
+      return;
+    }
+
+    // Start note on pad (Option A)
+    engine._padDown = true;
+    const rect = xyPad.getBoundingClientRect();
+    const xn = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const midi = padXToMidi(xn);
+    engine._padMidi = midi;
+
+    // Trigger envelope once, then move is legato (no retrigger)
+    engine.noteOnPad(midi, 1.0);
+
+    padUpdateFromEvent(e);
+    e.preventDefault();
+  });
+
+  xyPad.addEventListener("pointermove", (e)=>{
+    if(!xyActive) return;
+    padUpdateFromEvent(e);
+    e.preventDefault();
+  });
+
+  function padUp(e){
+    xyActive = false;
+    try{ xyPad.releasePointerCapture(e.pointerId); }catch(_){}
+    if(engine.ctx){
+      engine._padDown = false;
+      engine._padMidi = null;
+      engine.noteOffPad();
+    }
+    e.preventDefault();
+  }
+  xyPad.addEventListener("pointerup", padUp);
+  xyPad.addEventListener("pointercancel", padUp);
+
+  // Default pad position = current filter settings
+  // (keeps your "perfect" initial sound intact)
+  (function initPad(){
+    // Default pad position: center X, and Y mapped from current cutoff (keeps your initial sound intact)
+    const minHz = 60, maxHz = 12000;
+    const y = 1.0 - (Math.log(engine.params.cutoffHz/minHz) / Math.log(maxHz/minHz));
+    const xn = 0.5;
+    const yn = clamp(y, 0, 1);
+    xyDot.style.left = (xn*100).toFixed(2) + "%";
+    xyDot.style.top  = (yn*100).toFixed(2) + "%";
+    xyReadout.textContent = `X ${xn.toFixed(2)} · Y ${yn.toFixed(2)}`;
+  })();
+
+  function scaleStep(i){
+    const scale = SCALES[engine.params.scale] || SCALES.minor;
+    // wrap across octaves
+    const degree = i % scale.length;
+    const oct = Math.floor(i / scale.length);
+    return scale[degree] + 12*oct;
+  }
+
+  function handleKeyDown(k){
+    if(!engine.ctx){
+      // encourage click
+      $("#statusPill").textContent = "Klik eerst: Start Audio";
+      $("#statusPill").style.borderColor = "rgba(255,204,102,.55)";
+      return;
+    }
+    const idx = keyOrder.indexOf(k);
+    if(idx < 0) return;
+
+    const midi = engine.params.rootMidi + scaleStep(idx);
+    engine.noteOnPad(midi, 1.0);
+    engine.activeKey = k;
+
+    const el = keyEls.get(k);
+    if(el) el.classList.add("on");
+  }
+
+  function handleKeyUp(k){
+    if(engine.activeKey !== k) return;
+    engine.noteOff();
+    engine.activeKey = null;
+
+    const el = keyEls.get(k);
+    if(el) el.classList.remove("on");
+  }
+
+  function clearKeyUI(){
+    keyEls.forEach(el => el.classList.remove("on"));
+  }
+
+  window.addEventListener("keydown", (e)=>{
+    const k = e.key.toLowerCase();
+    if(keyOrder.includes(k) && !e.repeat) handleKeyDown(k);
+  });
+  window.addEventListener("keyup", (e)=>{
+    const k = e.key.toLowerCase();
+    if(keyOrder.includes(k)) handleKeyUp(k);
+  });
+
+  // -----------------------------
+  // WebGL2 Visualizer
+  // -----------------------------
+  const canvas = $("#gl");
+  const gl = canvas.getContext("webgl2", { antialias:true, premultipliedAlpha:false });
+  if(!gl){
+    console.warn("WebGL2 niet beschikbaar.");
+  }
+
+  function compile(type, src){
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+      const info = gl.getShaderInfoLog(sh);
+      gl.deleteShader(sh);
+      throw new Error(info);
+    }
+    return sh;
+  }
+
+  function makeProgram(vsSrc, fsSrc){
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p, gl.LINK_STATUS)){
+      throw new Error(gl.getProgramInfoLog(p));
+    }
+    return p;
+  }
+
+  let prog=null, vao=null;
+  let uTime=null, uLevel=null, uBins=null, uRes=null;
+
+  function initGL(){
+    if(!gl) return;
+    const vs = document.getElementById("vs").textContent.trim();
+    const fs = document.getElementById("fs").textContent.trim();
+    prog = makeProgram(vs, fs);
+    gl.useProgram(prog);
+
+    vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    // full-screen triangle strip
+    const verts = new Float32Array([
+      -1,-1,  1,-1,
+      -1, 1,  1, 1
+    ]);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    uTime = gl.getUniformLocation(prog, "uTime");
+    uLevel = gl.getUniformLocation(prog, "uLevel");
+    uBins = gl.getUniformLocation(prog, "uBins");
+    uRes = gl.getUniformLocation(prog, "uRes");
+  }
+  initGL();
+
+  function resizeCanvas(){
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    if(canvas.width !== w || canvas.height !== h){
+      canvas.width = w; canvas.height = h;
+      if(gl) gl.viewport(0,0,w,h);
+    }
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  const bins = new Float32Array(64);
+  const fft = new Uint8Array(1024);
+
+  function tick(tms){
+    const t = tms * 0.001;
+    resizeCanvas();
+
+    // audio -> bins
+    let level = 0;
+    if(engine.analyser){
+      engine.analyser.getByteFrequencyData(fft);
+      // compress to 64 bins (log-ish-ish)
+      for(let i=0;i<64;i++){
+        // sample higher freq more sparsely
+        const idx = Math.floor(Math.pow(i/63, 1.7) * (fft.length-1));
+        bins[i] = (fft[idx] / 255);
+      }
+      level = clamp(engine.meter.level * 2.2, 0, 1);
+    } else {
+      // idle animation
+      for(let i=0;i<64;i++) bins[i] = 0.12 + 0.08*Math.sin(t*0.7 + i*0.35);
+      level = 0.08 + 0.06*Math.sin(t*1.3);
+    }
+
+    // UI level bar
+    $("#levelBar").style.width = (level*100).toFixed(1) + "%";
+
+    // draw
+    if(gl && prog){
+      gl.useProgram(prog);
+      gl.bindVertexArray(vao);
+
+      gl.uniform1f(uTime, t);
+      gl.uniform1f(uLevel, level);
+      gl.uniform1fv(uBins, bins);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  
+  // -----------------------------
+  // Live Recording (WAV export)
+  // -----------------------------
+  function setupRecordingUI(){
+    const recBtn = $("#recBtn");
+    const recDot = $("#recDot");
+    const recStat = $("#recStat");
+    const recDl = $("#recDl");
+    if(!recBtn) return;
+
+    let recording = false;
+    let buffersL = [];
+    let buffersR = [];
+    let recNode = null;
+
+    const setIdle = ()=>{
+      recDot.classList.remove("on");
+      recStat.textContent = "niet aan het opnemen";
+      recBtn.textContent = "● Record";
+    };
+    const setRec = ()=>{
+      recDot.classList.add("on");
+      recStat.textContent = "aan het opnemen…";
+      recBtn.textContent = "■ Stop";
+    };
+
+    setIdle();
+
+    function encodeWAV(left, right, sampleRate){
+      const length = left.length;
+      const buffer = new ArrayBuffer(44 + length * 4);
+      const view = new DataView(buffer);
+
+      function writeString(o,s){ for(let i=0;i<s.length;i++) view.setUint8(o+i,s.charCodeAt(i)); }
+      let o=0;
+      writeString(o,"RIFF"); o+=4;
+      view.setUint32(o,36+length*4,true); o+=4;
+      writeString(o,"WAVE"); o+=4;
+      writeString(o,"fmt "); o+=4;
+      view.setUint32(o,16,true); o+=4;
+      view.setUint16(o,1,true); o+=2;
+      view.setUint16(o,2,true); o+=2;
+      view.setUint32(o,sampleRate,true); o+=4;
+      view.setUint32(o,sampleRate*4,true); o+=4;
+      view.setUint16(o,4,true); o+=2;
+      view.setUint16(o,16,true); o+=2;
+      writeString(o,"data"); o+=4;
+      view.setUint32(o,length*4,true); o+=4;
+
+      for(let i=0;i<length;i++){
+        view.setInt16(o, Math.max(-1,Math.min(1,left[i]))*0x7fff,true); o+=2;
+        view.setInt16(o, Math.max(-1,Math.min(1,right[i]))*0x7fff,true); o+=2;
+      }
+      return new Blob([view], {type:"audio/wav"});
+    }
+
+    recBtn.addEventListener("click", ()=>{
+      if(!engine.ctx){
+        $("#statusPill").textContent = "Klik eerst: Start Audio";
+        return;
+      }
+
+      if(recording){
+        recording=false;
+        recNode.disconnect();
+        engine.master.disconnect(recNode);
+        const left = Float32Array.from(buffersL.flat());
+        const right = Float32Array.from(buffersR.flat());
+        const wav = encodeWAV(left, right, engine.ctx.sampleRate);
+        const url = URL.createObjectURL(wav);
+        recDl.href = url;
+        recDl.download = "web-synth-recording.wav";
+        recDl.setAttribute("aria-disabled","false");
+        recStat.textContent = "opname klaar ✓";
+        setIdle();
+        return;
+      }
+
+      // start
+      buffersL=[]; buffersR=[];
+      recNode = engine.ctx.createScriptProcessor(4096,2,2);
+      recNode.onaudioprocess = e=>{
+        buffersL.push(Array.from(e.inputBuffer.getChannelData(0)));
+        buffersR.push(Array.from(e.inputBuffer.getChannelData(1)));
+      };
+      engine.master.connect(recNode);
+      recNode.connect(engine.ctx.destination);
+      recording=true;
+      setRec();
+      recDl.setAttribute("aria-disabled","true");
+    });
+  }
+
+  setupRecordingUI();
+
+  // init outputs + params
+  pullParams();
+  </script>
+</body>
+</html>

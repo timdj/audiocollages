@@ -1,0 +1,2416 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Sampler Sequencer + WAV export + Video export (FFT pixels)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; color-scheme: dark; }
+    body { margin:0; background:#0b0f17; color:#e8eefc; }
+    header { padding:18px 18px 10px; border-bottom:1px solid #1d2740; }
+    h1 { margin:0 0 6px; font-size:18px; font-weight:650; }
+    .sub { opacity:.75; font-size:13px; }
+    main { padding:18px; max-width:1100px; margin:0 auto; display:grid; gap:14px; }
+    .grid { display:grid; gap:14px; grid-template-columns:repeat(12, 1fr); }
+    .card { grid-column:span 12; background:#0f1626; border:1px solid #1d2740; border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+    @media (min-width:980px){ .half{grid-column:span 6;} .third{grid-column:span 4;} }
+    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    label{ font-size:12px; opacity:.85; display:block; margin-bottom:6px; }
+    .ctl{ flex:1 1 240px; min-width:240px; }
+    .line{ display:flex; gap:10px; align-items:center; }
+    input[type="range"]{ width:100%; }
+    input[type="number"]{ width:92px; padding:8px 10px; border-radius:10px; border:1px solid #263257; background:#0b1222; color:#e8eefc; }
+    select, button, input[type="file"]{ padding:10px 12px; border-radius:12px; border:1px solid #263257; background:#0b1222; color:#e8eefc; }
+    button{ cursor:pointer; }
+    button.primary{ background:#1a2a55; border-color:#2f4aa0; }
+    button.danger{ background:#3a1520; border-color:#8a2a49; }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+    .small{ font-size:12px; opacity:.75; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .pill{ padding:6px 10px; border:1px solid #263257; border-radius:999px; background:#0b1222; }
+    textarea{ width:100%; min-height:140px; resize:vertical; padding:10px 12px; border-radius:12px; border:1px solid #263257; background:#0b1222; color:#e8eefc; }
+    .split{ display:grid; gap:10px; grid-template-columns:1fr; }
+    @media(min-width:980px){ .split{ grid-template-columns:1fr 1fr; } }
+    .check{ display:flex; gap:8px; align-items:center; }
+    .check input{ transform:scale(1.1); }
+    .warn { color:#ffcc88; }
+    canvas { width:100%; height:auto; border-radius:12px; border:1px solid #263257; background:#000; }
+  </style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>Live Sampler Sequencer</h1>
+  <div class="sub">Originele versie (<span class="mono">live_sampler_sequencer_with_wav_export_length.html</span>) + <b>Video export MP4/WebM</b> met FFT-pixels. WAV export met instelbare lengte blijft.</div>
+</header>
+
+<main class="grid">
+
+  <section class="card half">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Transport</h2>
+
+    <div class="ctl">
+      <label>BPM</label>
+      <div class="line">
+        <input id="bpmRange" type="range" min="40" max="220" step="1" value="120"/>
+        <input id="bpmNum" type="number" min="40" max="220" step="1" value="120"/>
+      </div>
+      <div class="small">Beatduur: <span id="beatMs" class="mono"></span> ms</div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="playLive" class="primary" disabled>▶ Play Live</button>
+      <button id="stopLive" class="danger" disabled>■ Stop</button>
+      <button id="tap" disabled>Tap</button>
+      <span class="pill small">Ctx: <span id="ctxState" class="mono">—</span></span>
+      <span class="pill small">Step: <span id="stepInfo" class="mono">—</span></span>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div class="check">
+        <input id="mono" type="checkbox" checked />
+        <label for="mono" style="margin:0;">Mono (aanrader)</label>
+      </div>
+      <div class="check">
+        <input id="syncSliceToStep" type="checkbox" checked />
+        <label for="syncSliceToStep" style="margin:0;">Slice lengte = step</label>
+      </div>
+      <span class="pill small">Ahead: <span id="schedInfo" class="mono">—</span></span>
+    </div>
+  </section>
+
+  <section class="card half">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Audio</h2>
+
+    <div class="row">
+      <input id="file" type="file" accept="audio/*"/>
+      <button id="preview" class="primary" disabled>▶ Preview</button>
+      <button id="previewStop" class="danger" disabled>■ Stop preview</button>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <span class="pill small">Bestand: <span id="fileName" class="mono">—</span></span>
+      <span class="pill small">Duur: <span id="fileDur" class="mono">—</span></span>
+      <span class="pill small">SR: <span id="fileSr" class="mono">—</span></span>
+    </div>
+
+    <div class="small" style="margin-top:10px;">
+      Tip: “Preview” is alleen luisteren; “Play Live” is de sequencer.
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Export WAV (live opname) + lengte</h2>
+    <div class="row">
+      <div class="ctl">
+        <label>Lengte (seconden)</label>
+        <div class="line">
+          <input id="recLenRange" type="range" min="1" max="300" step="1" value="30"/>
+          <input id="recLenNum" type="number" min="1" max="300" step="1" value="30"/>
+        </div>
+        <div class="small">Opname stopt automatisch na deze lengte (je kunt ook handmatig stoppen).</div>
+      </div>
+
+      <div class="ctl">
+        <label>Actie</label>
+        <div class="line">
+          <button id="recStart" class="primary" disabled>● Record WAV</button>
+          <button id="recStop" class="danger" disabled>■ Stop + Download WAV</button>
+        </div>
+      </div>
+
+      <span class="pill small">Status: <span id="recStatus" class="mono">idle</span></span>
+      <span class="pill small">Opname: <span id="recTime" class="mono">0.00s</span></span>
+      <span class="pill small">SR: <span id="recSr" class="mono">—</span></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Video export MP4 (fallback WebM) + FFT pixels + lengte</h2>
+    <div class="row">
+      <div class="ctl">
+        <label>Lengte (seconden)</label>
+        <div class="line">
+          <input id="vidLenRange" type="range" min="1" max="600" step="1" value="60"/>
+          <input id="vidLenNum" type="number" min="1" max="600" step="1" value="60"/>
+        </div>
+        <div class="small">Neemt canvas + master-audio op. Stopt automatisch.</div>
+      </div>
+
+      <div class="ctl">
+        <label>Actie</label>
+        <div class="line">
+          <button id="vidStart" class="primary" disabled>🎥 Export Video</button>
+        </div>
+        <div class="small warn">MP4 hangt af van je browser. Als MP4 niet kan, krijg je automatisch WebM.</div>
+      </div>
+
+      <div class="check">
+        <input id="autoStartPlay" type="checkbox" checked />
+        <label for="autoStartPlay" style="margin:0;">Auto-start Play Live</label>
+      </div>
+
+      <span class="pill small">Status: <span id="vidStatus" class="mono">idle</span></span>
+    </div>
+
+    <div style="margin-top:12px;">
+      <canvas id="viz" width="960" height="540"></canvas>
+  <canvas id="vizGL" style="display:none; width:100%; height:auto; border-radius:12px;"></canvas>
+      <div class="small" style="margin-top:8px;">
+        Mapping: <b>bijna zwart → middelgrijs</b> = lage tonen • <b>middelgrijs</b> = midden • <b>grijs → wit</b> = hoge tonen.
+        Pixels zijn <b>willekeurig verspreid</b> per frame op basis van FFT.
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div class="ctl">
+        <label>Pixel grootte</label>
+        <div class="line">
+          <input id="pxSizeRange" type="range" min="1" max="12" step="1" value="3"/>
+          <input id="pxSizeNum" type="number" min="1" max="12" step="1" value="3"/>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Pixels per frame</label>
+        <div class="line">
+          <input id="pxCountRange" type="range" min="200" max="6000" step="50" value="1800"/>
+          <input id="pxCountNum" type="number" min="200" max="6000" step="50" value="1800"/>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Fade (trail) (0..1)</label>
+        <div class="line">
+          <input id="fadeRange" type="range" min="0" max="1" step="0.01" value="0.15"/>
+          <input id="fadeNum" type="number" min="0" max="1" step="0.01" value="0.15"/>
+        </div>
+
+      <div class="ctl">
+        <label>Sensitivity (0.1..5)</label>
+        <div class="line">
+          <input id="sensRange" type="range" min="0.1" max="5" step="0.01" value="1.25"/>
+          <input id="sensNum" type="number" min="0.1" max="5" step="0.01" value="1.25"/>
+        </div>
+        <div class="small">Hoger = feller/sneller reageren.</div>
+      </div>
+      <div class="ctl">
+        <label>Gamma (0.3..3)</label>
+        <div class="line">
+          <input id="gamRange" type="range" min="0.3" max="3" step="0.01" value="1.35"/>
+          <input id="gamNum" type="number" min="0.3" max="3" step="0.01" value="1.35"/>
+        </div>
+
+      <div class="ctl">
+        <label>Render</label>
+        <div class="line">
+          <select id="renderMode">
+            <option value="2d" selected>Canvas pixels (2D)</option>
+            <option value="glsl">Three.js GLSL shader</option>
+            <option value="mix">Pixels + GLSL (combined)</option>
+          </select>
+        </div>
+      </div>
+      <div class="check" style="margin-top:6px;">
+        <input id="bandExplode" type="checkbox" checked />
+        <label for="bandExplode" style="margin:0;">Per-band kleur-explosie</label>
+      </div>
+      <div class="ctl">
+        <label>Shader gain</label>
+        <div class="line">
+          <input id="shaderGainRange" type="range" min="0" max="3" step="0.01" value="1.0"/>
+          <input id="shaderGainNum" type="number" min="0" max="3" step="0.01" value="1.0"/>
+        </div>
+      </div>
+
+        <div class="small">Lager = meer laag volume zichtbaar.</div>
+      </div>
+
+</div>
+</section>
+
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">ADSR (stappen) — lineaire ramps</h2>
+    <div class="grid">
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Attack (ms)</label>
+          <div class="line">
+            <input id="aRange" type="range" min="0" max="2000" step="1" value="10"/>
+            <input id="aNum" type="number" min="0" max="2000" step="1" value="10"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Decay (ms)</label>
+          <div class="line">
+            <input id="dRange" type="range" min="0" max="2000" step="1" value="80"/>
+            <input id="dNum" type="number" min="0" max="2000" step="1" value="80"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Sustain level (0..1)</label>
+          <div class="line">
+            <input id="sRange" type="range" min="0" max="1" step="0.01" value="0.6"/>
+            <input id="sNum" type="number" min="0" max="1" step="0.01" value="0.6"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Release (ms)</label>
+          <div class="line">
+            <input id="rRange" type="range" min="0" max="4000" step="1" value="140"/>
+            <input id="rNum" type="number" min="0" max="4000" step="1" value="140"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Gate (beats)</label>
+          <div class="line">
+            <input id="gRange" type="range" min="0.05" max="2.0" step="0.01" value="0.35"/>
+            <input id="gNum" type="number" min="0.05" max="2.0" step="0.01" value="0.35"/>
+          </div>
+        </div>
+        <div class="small">Gate bepaalt hoelang sustain aan blijft vóór release.</div>
+      </div>
+
+      <div class="card third" style="padding:12px;">
+        <div class="ctl">
+          <label>Master gain (0..1)</label>
+          <div class="line">
+            <input id="mRange" type="range" min="0" max="1" step="0.01" value="0.9"/>
+            <input id="mNum" type="number" min="0" max="1" step="0.01" value="0.9"/>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Sample gebruik: heel bestand / telkens nieuw stuk / willekeurige volgorde</h2>
+
+    <div class="row">
+      <div class="ctl">
+        <label>Play mode</label>
+        <div class="line">
+          <select id="playMode">
+            <option value="slice-seq">Slices: telkens nieuw stuk (sequentieel)</option>
+            <option value="slice-rand">Slices: willekeurig per trigger</option>
+            <option value="slice-shuffle">Slices: willekeurige volgorde (shuffle lijst)</option>
+            <option value="whole">Heel bestand (start=0, volledige duur)</option>
+            <option value="oneshot">One-shot (start=0, slice-lengte)</option>
+          </select>
+          <button id="shuffleBtn" class="primary" disabled>↻ Shuffle lijst</button>
+        </div>
+        <div class="small">Shuffle: maakt een lijst met slice-starts en speelt die in random volgorde af.</div>
+      </div>
+
+      <div class="ctl">
+        <label>Slice length (ms)</label>
+        <div class="line">
+          <input id="sliceLenRange" type="range" min="20" max="5000" step="1" value="250"/>
+          <input id="sliceLenNum" type="number" min="20" max="5000" step="1" value="250"/>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <label>Slice step (ms) (voor seq/shuffle)</label>
+        <div class="line">
+          <input id="sliceStepRange" type="range" min="10" max="2000" step="1" value="125"/>
+          <input id="sliceStepNum" type="number" min="10" max="2000" step="1" value="125"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <span class="pill small">Slice start: <span id="sliceStart" class="mono">—</span></span>
+      <span class="pill small">Shuffle count: <span id="sliceCount" class="mono">—</span></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:0 0 10px;font-size:14px;opacity:.9;">Compositie: afstand t.o.v. beats + algoritme</h2>
+
+    <div class="split">
+      <div>
+        <div class="row">
+          <div class="ctl">
+            <label>Steps per bar</label>
+            <div class="line">
+              <input id="stepsRange" type="range" min="4" max="64" step="1" value="16"/>
+              <input id="stepsNum" type="number" min="4" max="64" step="1" value="16"/>
+            </div>
+          </div>
+
+          <div class="ctl">
+            <label>Bar length (beats)</label>
+            <div class="line">
+              <input id="barBeatsRange" type="range" min="1" max="16" step="1" value="4"/>
+              <input id="barBeatsNum" type="number" min="1" max="16" step="1" value="4"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <div class="ctl">
+            <label>Offset range (ms)</label>
+            <div class="line">
+              <input id="offRange" type="range" min="0" max="250" step="1" value="20"/>
+              <input id="offNum" type="number" min="0" max="250" step="1" value="20"/>
+            </div>
+          </div>
+
+          <div class="ctl">
+            <label>Variatie (0..1)</label>
+            <div class="line">
+              <input id="varRange" type="range" min="0" max="1" step="0.01" value="0.35"/>
+              <input id="varNum" type="number" min="0" max="1" step="0.01" value="0.35"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <div class="ctl">
+            <label>Algoritme</label>
+            <div class="line">
+              <select id="algo">
+                <option value="straight">Straight</option>
+                <option value="swing">Swing</option>
+                <option value="random">Random</option>
+                <option value="euclid">Euclidean pulses</option>
+                <option value="accel">Accelerando</option>
+              </select>
+              <button id="regen" class="primary" disabled>↻ Regen bar</button>
+            </div>
+          </div>
+
+          <div class="ctl">
+            <label>Euclid pulses</label>
+            <div class="line">
+              <input id="pulseRange" type="range" min="1" max="64" step="1" value="7"/>
+              <input id="pulseNum" type="number" min="1" max="64" step="1" value="7"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <div class="ctl">
+            <label>Playback rate (0.5..2.0)</label>
+            <div class="line">
+              <input id="rateRange" type="range" min="0.5" max="2" step="0.01" value="1"/>
+              <input id="rateNum" type="number" min="0.5" max="2" step="0.01" value="1"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="small" style="margin-top:10px;">
+          Als je wél overlap wil: zet “Mono” uit. Als het “door elkaar” klinkt: zet “Slice lengte = step” aan.
+        </div>
+      </div>
+
+      <div>
+        <label>Pattern + offsets</label>
+        <textarea id="patternText" class="mono" readonly></textarea>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+
+  function bindRangeNumber(rangeEl, numEl, onChange) {
+    const syncFromRange = () => { numEl.value = rangeEl.value; onChange?.(); };
+    const syncFromNum   = () => { rangeEl.value = numEl.value; onChange?.(); };
+    rangeEl.addEventListener('input', syncFromRange);
+    numEl.addEventListener('input', syncFromNum);
+    syncFromRange();
+  }
+
+  // ---- Audio core ----
+  let ctx = null;
+  let buffer = null;
+  let master = null;
+  let previewSource = null;
+  let activeSources = [];
+
+  // FFT analyser (tap only)
+  let analyser = null;
+  let fftData = null;
+
+    let timeData = null;
+// Recorder tap nodes (WAV)
+  let recTapGain = null;
+  let recProc = null;
+  let recSilent = null;
+  let recActive = false;
+  let recL = [];
+  let recR = [];
+  let recSamples = 0;
+  let recTargetSamples = 0;
+
+  // Video recorder
+  const canvas = $('viz');
+  const g2 = canvas.getContext('2d', { alpha: false });
+
+  // --- MIX mode helper: keep a transparent pixel-layer we can overlay on top of GLSL ---
+  const vizGL = $('vizGL');
+  const pxLayer = document.createElement('canvas');
+  const px2 = pxLayer.getContext('2d', { alpha: true });
+
+  function ensurePxLayerSize() {
+    if (pxLayer.width !== canvas.width) pxLayer.width = canvas.width;
+    if (pxLayer.height !== canvas.height) pxLayer.height = canvas.height;
+  }
+  let vizRAF = 0;
+  let vidRec = null;
+  let vidChunks = [];
+  let vidStopTimer = null;
+  let vidAudioDest = null;
+
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = parseFloat($('mNum').value);
+      master.connect(ctx.destination);
+
+      // FFT analyser tap
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.75;
+      fftData = new Uint8Array(analyser.frequencyBinCount);
+            timeData = new Uint8Array(analyser.fftSize);
+// Tap master into analyser WITHOUT routing analyser to output (no double audio)
+      master.connect(analyser);
+
+      // WAV recorder tap (no audio change)
+      recTapGain = ctx.createGain();
+      recTapGain.gain.value = 1.0;
+
+      // ScriptProcessor (deprecated but widely supported)
+      const bufSize = 4096;
+      recProc = ctx.createScriptProcessor(bufSize, 2, 2);
+      recProc.onaudioprocess = (e) => {
+        if (!recActive) return;
+        const inBuf = e.inputBuffer;
+        const ch0 = inBuf.getChannelData(0);
+        const ch1 = inBuf.numberOfChannels > 1 ? inBuf.getChannelData(1) : ch0;
+
+        recL.push(new Float32Array(ch0));
+        recR.push(new Float32Array(ch1));
+        recSamples += ch0.length;
+
+        const secs = recSamples / ctx.sampleRate;
+        $('recTime').textContent = secs.toFixed(2) + 's';
+
+        if (recTargetSamples > 0 && recSamples >= recTargetSamples) {
+          stopRecording(true);
+        }
+      };
+
+      // keep processor running silently
+      recSilent = ctx.createGain();
+      recSilent.gain.value = 0;
+      recProc.connect(recSilent);
+      recSilent.connect(ctx.destination);
+
+      master.connect(recTapGain);
+      recTapGain.connect(recProc);
+
+      $('recSr').textContent = String(ctx.sampleRate);
+    }
+    $('ctxState').textContent = ctx.state;
+    return ctx;
+  }
+
+  async function resumeCtxIfNeeded() {
+    ensureCtx();
+    if (ctx.state !== 'running') await ctx.resume();
+    $('ctxState').textContent = ctx.state;
+  }
+
+  function stopPreview() {
+    if (previewSource) {
+      try { previewSource.stop(); } catch {}
+      try { previewSource.disconnect?.(); } catch {}
+      previewSource = null;
+    }
+    $('previewStop').disabled = true;
+  }
+
+  function stopAllVoices() {
+    for (const s of activeSources) {
+      try { s.stop(); } catch {}
+      try { s.disconnect?.(); } catch {}
+    }
+    activeSources = [];
+  }
+
+  // ADSR "stappen": explicit segments with linear ramps
+  function scheduleADSR(gainNode, t0, gateSec) {
+    const A = parseFloat($('aNum').value) / 1000;
+    const D = parseFloat($('dNum').value) / 1000;
+    const S = parseFloat($('sNum').value);
+    const R = parseFloat($('rNum').value) / 1000;
+
+    const tA = t0 + Math.max(0, A);
+    const tD = tA + Math.max(0, D);
+    const tOff = t0 + Math.max(0.001, gateSec);
+    const tRelEnd = tOff + Math.max(0, R);
+
+    const g = gainNode.gain;
+    g.cancelScheduledValues(t0);
+    g.setValueAtTime(0.0, t0);
+
+    g.linearRampToValueAtTime(1.0, tA);
+    g.linearRampToValueAtTime(S, tD);
+    g.setValueAtTime(S, Math.max(tD, tOff - 0.0001));
+    g.linearRampToValueAtTime(0.0, tRelEnd);
+
+    return tRelEnd;
+  }
+
+  // ---- Slice selection / order ----
+  let seqStartSec = 0;
+  let sliceOrder = [];
+  let sliceOrderIdx = 0;
+
+  function buildSliceOrder() {
+    if (!buffer) return;
+    const stepSec = Math.max(0.001, parseFloat($('sliceStepNum').value) / 1000);
+    const sliceLenSec = parseFloat($('sliceLenNum').value) / 1000;
+    const maxStart = Math.max(0, buffer.duration - Math.max(0.02, sliceLenSec));
+
+    const list = [];
+    for (let s = 0; s <= maxStart; s += stepSec) list.push(s);
+
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+
+    sliceOrder = list;
+    sliceOrderIdx = 0;
+    $('sliceCount').textContent = String(sliceOrder.length);
+  }
+
+  function nextSliceStart(mode) {
+    if (!buffer) return 0;
+
+    const sliceLenSec = parseFloat($('sliceLenNum').value) / 1000;
+    const stepSec = Math.max(0.001, parseFloat($('sliceStepNum').value) / 1000);
+    const maxStart = Math.max(0, buffer.duration - Math.max(0.02, sliceLenSec));
+
+    let start = 0;
+
+    if (mode === 'whole' || mode === 'oneshot') {
+      start = 0;
+    } else if (mode === 'slice-seq') {
+      start = seqStartSec;
+      seqStartSec += stepSec;
+      if (seqStartSec > maxStart) seqStartSec = 0;
+    } else if (mode === 'slice-rand') {
+      start = Math.random() * maxStart;
+    } else if (mode === 'slice-shuffle') {
+      if (sliceOrder.length === 0) buildSliceOrder();
+      if (sliceOrder.length === 0) start = 0;
+      else {
+        start = sliceOrder[sliceOrderIdx % sliceOrder.length];
+        sliceOrderIdx++;
+      }
+    }
+
+    start = Math.min(Math.max(0, start), maxStart);
+    $('sliceStart').textContent = start.toFixed(3) + 's';
+    return start;
+  }
+
+  // ---- Pattern / offsets ----
+  function euclideanPattern(steps, pulses) {
+    pulses = clamp(pulses, 0, steps);
+    if (pulses === 0) return Array(steps).fill(0);
+    if (pulses === steps) return Array(steps).fill(1);
+
+    let counts = [], remainders = [];
+    let divisor = steps - pulses;
+    remainders.push(pulses);
+    let level = 0;
+
+    while (true) {
+      counts.push(Math.floor(divisor / remainders[level]));
+      remainders.push(divisor % remainders[level]);
+      divisor = remainders[level];
+      level++;
+      if (remainders[level] <= 1) break;
+    }
+    counts.push(divisor);
+
+    function build(lvl) {
+      if (lvl === -1) return [0];
+      if (lvl === -2) return [1];
+      let res = [];
+      for (let i=0;i<counts[lvl];i++) res = res.concat(build(lvl-1));
+      if (remainders[lvl] !== 0) res = res.concat(build(lvl-2));
+      return res;
+    }
+    let pat = build(level);
+    const firstHit = pat.indexOf(1);
+    if (firstHit > 0) pat = pat.slice(firstHit).concat(pat.slice(0, firstHit));
+    return pat;
+  }
+
+  function makeBarPattern() {
+    const steps = parseInt($('stepsNum').value, 10);
+    const algo = $('algo').value;
+    const offsetMax = parseFloat($('offNum').value) / 1000;
+    const variation = parseFloat($('varNum').value);
+
+    let hits = new Array(steps).fill(1);
+    if (algo === 'euclid') {
+      const pulses = clamp(parseInt($('pulseNum').value, 10), 1, steps);
+      hits = euclideanPattern(steps, pulses);
+    }
+
+    const offsets = new Array(steps).fill(0);
+    for (let i=0;i<steps;i++) {
+      let off = 0;
+      if (algo === 'straight') off = 0;
+      if (algo === 'swing') off = (i % 2) ? +offsetMax : -offsetMax * 0.25;
+      if (algo === 'random') off = (Math.random()*2 - 1) * offsetMax;
+      if (algo === 'euclid') off = ((i % 3) - 1) * (offsetMax * 0.33);
+      if (algo === 'accel') {
+        const t = i / Math.max(1, steps - 1);
+        off = (t * 2 - 1) * offsetMax;
+      }
+      off += (Math.random()*2 - 1) * offsetMax * variation;
+      offsets[i] = off;
+    }
+
+    const lines = [];
+    for (let i=0;i<steps;i++) lines.push(`${String(i).padStart(2,'0')}: hit=${hits[i]}  off=${offsets[i].toFixed(4)}s`);
+    $('patternText').value = lines.join('\n');
+
+    return { steps, hits, offsets };
+  }
+
+  // ---- Live scheduler ----
+  let isPlaying = false;
+  let timerId = null;
+
+  const LOOKAHEAD_MS = 35;
+  const SCHEDULE_AHEAD = 0.12;
+
+  let bar = null;
+  let nextStepTime = 0;
+  let stepIndex = 0;
+
+  const beatSec = () => 60 / parseFloat($('bpmNum').value);
+  const currentStepSec = () => {
+    const barBeats = parseInt($('barBeatsNum').value, 10);
+    const steps = parseInt($('stepsNum').value, 10);
+    return (barBeats * beatSec()) / steps;
+  };
+
+  function triggerSample(atTime) {
+    if (!buffer) return;
+
+    const mode = $('playMode').value;
+    const rate = parseFloat($('rateNum').value);
+
+    if ($('mono').checked) stopAllVoices();
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+
+    const g = ctx.createGain();
+    g.gain.value = 0.0;
+
+    source.connect(g);
+    g.connect(master);
+
+    const bpm = parseFloat($('bpmNum').value);
+    const bSec = 60 / bpm;
+    const gateBeats = parseFloat($('gNum').value);
+    const gateSec = bSec * gateBeats;
+
+    const startInBuf = nextSliceStart(mode);
+
+    let dur;
+    if (mode === 'whole') {
+      dur = Math.max(0.02, buffer.duration - startInBuf);
+    } else {
+      const sliceLenSec = parseFloat($('sliceLenNum').value) / 1000;
+      dur = Math.max(0.02, Math.min(sliceLenSec, buffer.duration - startInBuf));
+    }
+
+    if (mode !== 'whole' && $('syncSliceToStep').checked) {
+      dur = Math.max(0.02, Math.min(dur, currentStepSec()));
+    }
+
+    const envGate = Math.max(0.01, Math.min(gateSec, dur));
+    const envEnd = scheduleADSR(g, atTime, envGate);
+
+    source.start(atTime, startInBuf, dur);
+
+    const stopT = Math.max(atTime + dur, envEnd) + 0.02;
+    source.stop(stopT);
+
+    activeSources.push(source);
+    source.onended = () => { activeSources = activeSources.filter(s => s !== source); };
+  }
+
+  function schedulerTick() {
+    if (!isPlaying || !ctx) return;
+
+    const now = ctx.currentTime;
+    while (nextStepTime < now + SCHEDULE_AHEAD) {
+      const steps = bar.steps;
+      const i = stepIndex % steps;
+
+      if (bar.hits[i] === 1 && buffer) {
+        const t = Math.max(now, nextStepTime + bar.offsets[i]);
+        triggerSample(t);
+      }
+
+      $('stepInfo').textContent = `${i+1}/${steps}`;
+      nextStepTime += currentStepSec();
+      stepIndex++;
+    }
+
+    $('schedInfo').textContent = `${SCHEDULE_AHEAD.toFixed(2)}s`;
+  }
+
+  function startLive() {
+    if (!buffer) return;
+    ensureCtx();
+    isPlaying = true;
+
+    bar = makeBarPattern();
+    stepIndex = 0;
+    nextStepTime = ctx.currentTime + 0.06;
+
+    timerId = setInterval(schedulerTick, LOOKAHEAD_MS);
+
+    $('stopLive').disabled = false;
+    $('playLive').disabled = true;
+    $('regen').disabled = false;
+    $('shuffleBtn').disabled = false;
+  }
+
+  function stopLive() {
+    isPlaying = false;
+    if (timerId) clearInterval(timerId);
+    timerId = null;
+    $('stopLive').disabled = true;
+    $('playLive').disabled = false;
+    $('stepInfo').textContent = '—';
+    stopAllVoices();
+  }
+
+  // ---- WAV encode helpers ----
+  function mergeFloat32(chunks, totalLength) {
+    const out = new Float32Array(totalLength);
+    let offset = 0;
+    for (const c of chunks) { out.set(c, offset); offset += c.length; }
+    return out;
+  }
+  function interleave(left, right) {
+    const len = Math.min(left.length, right.length);
+    const out = new Float32Array(len * 2);
+    let j = 0;
+    for (let i=0;i<len;i++) { out[j++] = left[i]; out[j++] = right[i]; }
+    return out;
+  }
+  function writeString(view, offset, str) { for (let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+  function floatTo16BitPCM(view, offset, input) {
+    for (let i=0;i<input.length;i++, offset+=2) {
+      let s = Math.max(-1, Math.min(1, input[i]));
+      s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      view.setInt16(offset, s, true);
+    }
+  }
+  function encodeWAV(interleaved, sampleRate, numChannels=2) {
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const ab = new ArrayBuffer(44 + interleaved.length * bytesPerSample);
+    const view = new DataView(ab);
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + interleaved.length * bytesPerSample, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, interleaved.length * bytesPerSample, true);
+    floatTo16BitPCM(view, 44, interleaved);
+    return new Blob([view], { type: 'audio/wav' });
+  }
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  // ---- WAV Recording control ----
+  function startRecording() {
+    if (!ctx) return;
+    recL = []; recR = []; recSamples = 0;
+    const seconds = parseInt($('recLenNum').value, 10) || 1;
+    recTargetSamples = Math.max(1, seconds) * ctx.sampleRate;
+    recActive = true;
+    $('recStatus').textContent = 'recording';
+    $('recTime').textContent = '0.00s';
+    $('recStart').disabled = true;
+    $('recStop').disabled = false;
+  }
+
+  function stopRecording(auto) {
+    if (!recActive) return;
+    recActive = false;
+
+    const left = mergeFloat32(recL, recSamples);
+    const right = mergeFloat32(recR, recSamples);
+    const inter = interleave(left, right);
+    const wav = encodeWAV(inter, ctx.sampleRate, 2);
+
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    const seconds = (recSamples / ctx.sampleRate).toFixed(2);
+    downloadBlob(wav, `export_${ts}_${seconds}s.wav`);
+
+    $('recStatus').textContent = auto ? 'auto-stopped + downloaded' : 'stopped + downloaded';
+    $('recStart').disabled = false;
+    $('recStop').disabled = true;
+  }
+
+  // ---- FFT pixel viz ----
+  function clearViz() {
+    g2.fillStyle = 'rgb(0,0,0)';
+    g2.fillRect(0,0,canvas.width,canvas.height);
+    // also clear pixel overlay buffer (for MIX mode)
+    ensurePxLayerSize();
+    px2.clearRect(0,0,pxLayer.width,pxLayer.height);
+  }
+
+  function fftToGray(binIndex, mag01) {
+    // low: near-black -> mid gray
+    // mid: mid gray
+    // high: gray -> white
+    const n = fftData.length;
+    if (binIndex < n * 0.33) {
+      const g = mag01 * 0.55; // 0..0.55
+      return Math.floor(g * 255);
+    } else if (binIndex < n * 0.66) {
+      const g = 0.45 + mag01 * 0.15; // ~0.45..0.60 (mid gray)
+      return Math.floor(g * 255);
+    } else {
+      const g = 0.60 + mag01 * 0.40; // 0.60..1.00 (gray->white)
+      return Math.floor(g * 255);
+    }
+  }
+
+
+  function fftToRGB(binIndex, mag01) {
+    // Low = red/orange, Mid = green, High = blue/purple
+    const n = fftData.length;
+    let r=0,g=0,b=0;
+    if (binIndex < n * 0.33) {
+      r = 255 * (0.6 + 0.4 * mag01);
+      g = 255 * (0.2 + 0.5 * mag01);
+      b = 255 * (0.1 * mag01);
+    } else if (binIndex < n * 0.66) {
+      r = 255 * (0.2 * mag01);
+      g = 255 * (0.6 + 0.4 * mag01);
+      b = 255 * (0.2 * mag01);
+    } else {
+      r = 255 * (0.3 * mag01);
+      g = 255 * (0.2 * mag01);
+      b = 255 * (0.6 + 0.4 * mag01);
+    }
+
+    return [
+      Math.floor(Math.min(255, r)),
+      Math.floor(Math.min(255, g)),
+      Math.floor(Math.min(255, b)),
+    ];
+  }
+
+
+  // HSV helper for vivid "explosie" kleuren
+  function hsvToRgb(h, s, v) {
+    h = ((h % 360) + 360) % 360;
+    s = Math.min(1, Math.max(0, s));
+    v = Math.min(1, Math.max(0, v));
+    const c = v * s;
+    const hh = h / 60;
+    const x = c * (1 - Math.abs((hh % 2) - 1));
+    let r1 = 0, g1 = 0, b1 = 0;
+    if      (hh >= 0 && hh < 1) { r1 = c; g1 = x; b1 = 0; }
+    else if (hh >= 1 && hh < 2) { r1 = x; g1 = c; b1 = 0; }
+    else if (hh >= 2 && hh < 3) { r1 = 0; g1 = c; b1 = x; }
+    else if (hh >= 3 && hh < 4) { r1 = 0; g1 = x; b1 = c; }
+    else if (hh >= 4 && hh < 5) { r1 = x; g1 = 0; b1 = c; }
+    else                        { r1 = c; g1 = 0; b1 = x; }
+    const m = v - c;
+    return [
+      Math.round((r1 + m) * 255),
+      Math.round((g1 + m) * 255),
+      Math.round((b1 + m) * 255),
+    ];
+  }
+
+  // Per-band kleur-explosie:
+  // - Low: warm (oranje/rood)
+  // - Mid: neon groen/cyaan
+  // - High: paars/blauw
+  // Met meer hue-spread en saturatie wanneer RMS/energy stijgt.
+  function fftToRGBExplode(binIndex, mag01, bands, energy) {
+    const n = fftData.length;
+    const t = binIndex / Math.max(1, n - 1);
+
+    let baseHue = 28;   // warm
+    let bandE = bands.low;
+    if (t >= 0.33 && t < 0.66) { baseHue = 150; bandE = bands.mid; }
+    else if (t >= 0.66)        { baseHue = 275; bandE = bands.high; }
+
+    // Meer "explosie" als het harder is + als deze bin harder is
+    const spread = 30 + 140 * Math.pow(energy, 0.95);
+    const jitter = (Math.random() * 2 - 1) * spread * (0.18 + 0.82 * Math.pow(mag01, 0.55));
+
+    // subtiele hue drift binnen band voor extra beweging
+    const drift = (t * 34 - 17);
+
+    const hue = baseHue + jitter + drift;
+
+    // saturatie omhoog met mag + energy
+    const sat = Math.min(1, 0.55 + 0.55 * Math.pow(mag01, 0.50) + 0.35 * energy);
+
+    // value: mag + band-energy + energy
+    const val = Math.min(1, 0.05 + Math.pow(mag01, 0.72) * (0.78 + 0.95 * bandE) + 0.28 * energy);
+
+    return hsvToRgb(hue, sat, val);
+  }
+
+  function drawPixelsFrame() {
+    if (!analyser) { vizRAF = requestAnimationFrame(drawPixelsFrame); return; }
+    analyser.getByteFrequencyData(fftData);
+
+    // RMS loudness (0..1) from time-domain samples
+    if (!timeData || timeData.length !== analyser.fftSize) timeData = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(timeData);
+    let sumsq = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      const v = (timeData[i] - 128) / 128; // -1..1
+      sumsq += v * v;
+    }
+    const rms = Math.sqrt(sumsq / Math.max(1, timeData.length));
+
+    const sens = parseFloat($('sensNum').value);
+    const gamma = parseFloat($('gamNum').value);
+
+    // Convert RMS to a nicer response curve (log-ish)
+    const energy = Math.min(1, Math.pow(rms * sens, 0.65));
+
+    
+    // Low/Mid/High energies (0..1)
+    const nBins = fftData.length;
+    const bb0 = Math.floor(nBins * 0.33);
+    const bb1 = Math.floor(nBins * 0.66);
+    let sL=0,sM=0,sH=0;
+    for (let ii=0;ii<bb0;ii++) sL += fftData[ii];
+    for (let ii=bb0;ii<bb1;ii++) sM += fftData[ii];
+    for (let ii=bb1;ii<nBins;ii++) sH += fftData[ii];
+    const eLow  = (sL / (Math.max(1,bb0) * 255));
+    const eMid  = (sM / (Math.max(1,bb1-bb0) * 255));
+    const eHigh = (sH / (Math.max(1,nBins-bb1) * 255));
+
+    // expose bands for export warm-up / external hooks
+    window.__bands = { low: eLow, mid: eMid, high: eHigh };
+
+    const rmEl = $('renderMode');
+    const mode = rmEl ? rmEl.value : '2d';
+    const useGL  = (mode === 'glsl');
+    const useMix = (mode === 'mix');
+
+    // Render GLSL when needed (GLSL-only or MIX background)
+    if (useGL || useMix) {
+      try {
+        initGL();
+        resizeGL();
+        const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+        gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow(eLow  * sens, 0.75));
+        gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow(eMid  * sens, 0.75));
+        gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow(eHigh * sens, 0.75));
+        gl.mat.uniforms.uGain.value = gain;
+        gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+        gl.renderer.render(gl.scene, gl.camera);
+      } catch(e) { console.warn('GL render error', e); }
+    }
+
+    if (useGL) {
+      // GLSL-only mode: nothing else to draw here
+      vizRAF = requestAnimationFrame(drawPixelsFrame);
+      return;
+    }
+
+    // MIX mode: compose GLSL (background) + pixel layer (foreground) onto the 2D canvas
+    if (useMix) {
+      try {
+        if (vizGL) g2.drawImage(vizGL, 0, 0, canvas.width, canvas.height);
+      } catch(e) {}
+    }
+const fade = parseFloat($('fadeNum').value);
+
+    // Choose where pixels are drawn:
+    // - 2D mode: draw directly on the visible 2D canvas
+    // - MIX mode: draw into a transparent overlay, then composite over GLSL background
+    const drawCtx = useMix ? px2 : g2;
+    if (useMix) ensurePxLayerSize();
+
+    if (fade > 0) {
+      if (useMix) {
+        // fade pixels without darkening the GLSL background
+        drawCtx.save();
+        drawCtx.globalCompositeOperation = 'destination-out';
+        drawCtx.fillStyle = `rgba(0,0,0,${fade})`;
+        drawCtx.fillRect(0, 0, pxLayer.width, pxLayer.height);
+        drawCtx.restore();
+      } else {
+        // fade to black each frame
+        drawCtx.fillStyle = `rgba(0,0,0,${fade})`;
+        drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    const px = parseInt($('pxSizeNum').value, 10);
+    const baseCount = parseInt($('pxCountNum').value, 10);
+
+    // More pixels when louder (reactive density)
+    const count = Math.max(30, Math.floor(baseCount * (0.15 + energy)));
+
+    const w = canvas.width, h = canvas.height;
+    const n = fftData.length;
+    // Draw pixels sampled from FFT bins; brightness uses magnitude with gamma + band mapping
+    // Use additive blending so peaks get brighter instead of just covering the background
+    drawCtx.save();
+    drawCtx.globalCompositeOperation = 'lighter';
+    const rmsBoost = 1.0 + rms * 1.8;
+    for (let k = 0; k < count; k++) {
+      const i = (Math.random() * n) | 0;
+
+      // magnitude 0..1 with gamma shaping (more visible at low volume when gamma < 1)
+      let mag = fftData[i] / 255;
+      mag = Math.min(1, Math.pow(mag * sens, 1 / Math.max(0.01, gamma)));
+
+      // If very quiet, skip most pixels
+      if (mag < 0.02 && Math.random() > energy) continue;
+
+      const explode = ($('bandExplode') ? $('bandExplode').checked : true);
+      const [cr,cg,cb] = explode ? fftToRGBExplode(i, mag, {low:eLow, mid:eMid, high:eHigh}, energy) : fftToRGB(i, mag);
+      // RMS-based color boost (brighter when louder)
+      const br = Math.min(255, Math.pow(cr / 255, 0.78) * 255 * rmsBoost) | 0;
+      const bg = Math.min(255, Math.pow(cg / 255, 0.78) * 255 * rmsBoost) | 0;
+      const bb = Math.min(255, Math.pow(cb / 255, 0.78) * 255 * rmsBoost) | 0;
+
+      // random position
+      const x = (Math.random() * (w - px)) | 0;
+      const y = (Math.random() * (h - px)) | 0;
+
+      drawCtx.fillStyle = `rgb(${br},${bg},${bb})`;
+      drawCtx.fillRect(x, y, px, px);
+    }
+    drawCtx.restore();
+
+    // A subtle global flash proportional to energy (helps "feel" the beat)
+    if (energy > 0.02) {
+      const g = Math.floor((0.02 + energy * 0.08) * 255);
+      drawCtx.fillStyle = `rgba(${g},${g},${g},${0.08 + energy * 0.08})`;
+      drawCtx.fillRect(0, 0, w, h);
+    }
+
+    // Composite overlay pixels onto GLSL background
+    if (useMix) {
+      try { g2.drawImage(pxLayer, 0, 0, canvas.width, canvas.height); } catch(e) {}
+    }
+vizRAF = requestAnimationFrame(drawPixelsFrame);
+  }
+
+  function startViz() {
+    cancelAnimationFrame(vizRAF);
+    // reset to black
+    clearViz();
+    vizRAF = requestAnimationFrame(drawPixelsFrame);
+  }
+
+  function stopViz() {
+    cancelAnimationFrame(vizRAF);
+    vizRAF = 0;
+  }
+
+  // ---- Video Export ----
+  async function exportVideo() {
+  if (!ctx) return;
+
+  // Ensure viz running (this drives the GLSL renderer too)
+  startViz();
+
+  // Decide which canvas to record (2D or GLSL)
+  const rmEl = $('renderMode');
+  const mode = rmEl ? rmEl.value : '2d';
+  const useGL  = (mode === 'glsl');
+  const useMix = (mode === 'mix');
+
+  if (useGL) {
+    try { setRenderMode('glsl'); } catch(e){}
+    try { initGL(); resizeGL(); } catch(e){}
+    // Warm-up a few frames so the WebGL drawing buffer is populated before captureStream()
+    try {
+      for (let k = 0; k < 5; k++) {
+        try { resizeGL(); } catch(e){}
+        try {
+          const sens = parseFloat($('sensNum')?.value || '1');
+          const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+          const bands = window.__bands || { low: 0, mid: 0, high: 0 };
+          gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low  || 0) * sens, 0.75));
+          gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid  || 0) * sens, 0.75));
+          gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high || 0) * sens, 0.75));
+          gl.mat.uniforms.uGain.value = gain;
+          gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+          gl.renderer.render(gl.scene, gl.camera);
+        } catch(e){}
+        await new Promise(r => setTimeout(r, 16));
+      }
+    } catch(e){}
+  } else if (useMix) {
+    // MIX exports the composed 2D canvas (GLSL background + pixels overlay)
+    try { setRenderMode('mix'); } catch(e){}
+    try { initGL(); resizeGL(); } catch(e){}
+    // Warm-up GLSL a few frames so the first capture frame isn't black
+    try {
+      for (let k = 0; k < 5; k++) {
+        try { resizeGL(); } catch(e){}
+        try {
+          const sens = parseFloat($('sensNum')?.value || '1');
+          const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+          const bands = window.__bands || { low: 0, mid: 0, high: 0 };
+          gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low  || 0) * sens, 0.75));
+          gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid  || 0) * sens, 0.75));
+          gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high || 0) * sens, 0.75));
+          gl.mat.uniforms.uGain.value = gain;
+          gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+          gl.renderer.render(gl.scene, gl.camera);
+        } catch(e){}
+        await new Promise(r => setTimeout(r, 16));
+      }
+    } catch(e){}
+  } else {
+    try { setRenderMode('2d'); } catch(e){}
+  }
+
+    const recordCanvas = useGL ? $('vizGL') : $('viz');
+  if (!recordCanvas) { alert('Canvas niet gevonden.'); return; }
+
+  // Some browsers stop captureStream when canvas is display:none; force visible during recording
+  const prevDisplay = recordCanvas.style.display;
+  if (prevDisplay === 'none') recordCanvas.style.display = 'block';
+
+  // Create audio destination for the video (tap master)
+  if (vidAudioDest) {
+    try { vidAudioDest.disconnect?.(); } catch {}
+    vidAudioDest = null;
+  }
+  vidAudioDest = ctx.createMediaStreamDestination();
+  try { master.connect(vidAudioDest); } catch(e){}
+
+  // Capture canvas at 60fps (or fallback)
+  let vStream;
+  try {
+    vStream = recordCanvas.captureStream(60);
+  } catch (e) {
+    console.warn(e);
+    alert('captureStream faalde in deze browser.');
+    try { master.disconnect(vidAudioDest); } catch(e2){}
+    recordCanvas.style.display = prevDisplay;
+    return;
+  }
+
+  const mixed = new MediaStream([
+    ...vStream.getVideoTracks(),
+    ...vidAudioDest.stream.getAudioTracks()
+  ]);
+
+  // Prefer MP4, fallback WebM
+  let mime = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2';
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) mime = 'video/mp4';
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp9,opus';
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+
+  $('vidStatus').textContent = 'recording… (' + mime + (useGL ? ', GLSL' : ', 2D') + ')';
+  vidChunks = [];
+
+  try {
+    vidRec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 160_000 });
+  } catch (e) {
+    // last resort without mimeType
+    vidRec = new MediaRecorder(mixed);
+  }
+
+  vidRec.ondataavailable = (e) => { if (e.data && e.data.size) vidChunks.push(e.data); };
+
+  const stopAndSave = () => {
+    if (!vidRec) return;
+    try { vidRec.stop(); } catch {}
+  };
+
+  vidRec.onstop = () => {
+    const type = vidRec.mimeType || mime || 'video/webm';
+    const blob = new Blob(vidChunks, { type });
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    const seconds = parseInt($('vidLenNum').value, 10) || 1;
+    downloadBlob(blob, `video_${ts}_${seconds}s.${ext}`);
+
+    // cleanup
+    $('vidStatus').textContent = 'done';
+    try { master.disconnect(vidAudioDest); } catch(e){}
+    try { vidAudioDest.disconnect?.(); } catch(e){}
+    vidAudioDest = null;
+
+    // restore canvas display if we forced it visible
+    try { recordCanvas.style.display = prevDisplay; } catch(e){}
+
+    vidRec = null;
+    vidChunks = [];
+    if (vidStopTimer) { clearTimeout(vidStopTimer); vidStopTimer = null; }
+    // keep viz running for live view; don't stop automatically
+  };
+
+  vidRec.start(250);
+
+  const seconds = parseInt($('vidLenNum').value, 10) || 1;
+  vidStopTimer = setTimeout(stopAndSave, Math.max(1, seconds) * 1000);
+
+  // Optionally start playback
+  if ($('autoStartPlay').checked && !isPlaying) {
+    startLive();
+  }
+}
+
+  // ---- UI wiring ----
+  const updateBeatMs = () => $('beatMs').textContent = (beatSec()*1000).toFixed(2);
+
+  bindRangeNumber($('bpmRange'), $('bpmNum'), updateBeatMs);
+  bindRangeNumber($('aRange'), $('aNum'));
+  bindRangeNumber($('dRange'), $('dNum'));
+  bindRangeNumber($('sRange'), $('sNum'));
+  bindRangeNumber($('rRange'), $('rNum'));
+  bindRangeNumber($('gRange'), $('gNum'));
+  bindRangeNumber($('mRange'), $('mNum'), () => { if (master) master.gain.value = parseFloat($('mNum').value); });
+
+  bindRangeNumber($('sliceLenRange'), $('sliceLenNum'), () => { sliceOrder = []; sliceOrderIdx = 0; });
+  bindRangeNumber($('sliceStepRange'), $('sliceStepNum'), () => { sliceOrder = []; sliceOrderIdx = 0; });
+
+  bindRangeNumber($('stepsRange'), $('stepsNum'), () => { if (bar) bar = makeBarPattern(); });
+  bindRangeNumber($('barBeatsRange'), $('barBeatsNum'));
+  bindRangeNumber($('offRange'), $('offNum'), () => { if (bar) bar = makeBarPattern(); });
+  bindRangeNumber($('varRange'), $('varNum'), () => { if (bar) bar = makeBarPattern(); });
+  bindRangeNumber($('pulseRange'), $('pulseNum'), () => { if ($('algo').value==='euclid' && bar) bar = makeBarPattern(); });
+  bindRangeNumber($('rateRange'), $('rateNum'));
+
+  bindRangeNumber($('recLenRange'), $('recLenNum'));
+  bindRangeNumber($('vidLenRange'), $('vidLenNum'));
+  bindRangeNumber($('pxSizeRange'), $('pxSizeNum'));
+  bindRangeNumber($('pxCountRange'), $('pxCountNum'));
+  bindRangeNumber($('fadeRange'), $('fadeNum'));
+  bindRangeNumber($('sensRange'), $('sensNum'));
+  bindRangeNumber($('gamRange'), $('gamNum'));
+  if ($('shaderGainRange') && $('shaderGainNum')) bindRangeNumber($('shaderGainRange'), $('shaderGainNum'));
+
+  updateBeatMs();
+  clearViz();
+  startViz();
+
+  $('algo').addEventListener('change', () => { if (bar) bar = makeBarPattern(); });
+  $('regen').addEventListener('click', () => { if (!buffer) return; bar = makeBarPattern(); });
+
+  $('playMode').addEventListener('change', () => {
+    seqStartSec = 0;
+    sliceOrder = []; sliceOrderIdx = 0;
+    if ($('playMode').value === 'slice-shuffle' && buffer) buildSliceOrder();
+  });
+
+  $('shuffleBtn').addEventListener('click', () => { if (!buffer) return; buildSliceOrder(); });
+
+  $('recStart').addEventListener('click', async () => { await resumeCtxIfNeeded(); startRecording(); });
+  $('recStop').addEventListener('click', () => stopRecording(false));
+
+  $('vidStart').addEventListener('click', async () => { await resumeCtxIfNeeded(); await exportVideo(); });
+
+  $('file').addEventListener('change', async (e) => {
+    stopLive(); stopPreview();
+    buffer = null;
+    seqStartSec = 0; sliceOrder = []; sliceOrderIdx = 0;
+
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    await resumeCtxIfNeeded();
+    const arr = await f.arrayBuffer();
+    buffer = await ctx.decodeAudioData(arr);
+
+    $('fileName').textContent = f.name;
+    $('fileDur').textContent = buffer.duration.toFixed(2) + 's';
+    $('fileSr').textContent = String(buffer.sampleRate);
+    $('recSr').textContent = String(ctx.sampleRate);
+
+    $('preview').disabled = false;
+    $('playLive').disabled = false;
+    $('tap').disabled = false;
+    $('regen').disabled = false;
+    $('shuffleBtn').disabled = false;
+    $('recStart').disabled = false;
+    $('vidStart').disabled = false;
+
+    bar = makeBarPattern();
+    buildSliceOrder();
+  });
+
+  $('preview').addEventListener('click', async () => {
+    if (!buffer) return;
+    await resumeCtxIfNeeded();
+    stopPreview();
+
+    previewSource = ctx.createBufferSource();
+    previewSource.buffer = buffer;
+    previewSource.playbackRate.value = parseFloat($('rateNum').value);
+    previewSource.connect(master);
+    previewSource.start();
+
+    $('previewStop').disabled = false;
+    previewSource.onended = () => { previewSource = null; $('previewStop').disabled = true; };
+  });
+
+  $('previewStop').addEventListener('click', () => stopPreview());
+
+  $('playLive').addEventListener('click', async () => {
+    if (!buffer) return;
+    await resumeCtxIfNeeded();
+    startLive();
+  });
+
+  $('stopLive').addEventListener('click', () => stopLive());
+
+  // Tap tempo
+  let tapTimes = [];
+  $('tap').addEventListener('click', () => {
+    const t = performance.now();
+    tapTimes.push(t);
+    tapTimes = tapTimes.slice(-6);
+    if (tapTimes.length >= 2) {
+      const diffs = [];
+      for (let i=1;i<tapTimes.length;i++) diffs.push(tapTimes[i]-tapTimes[i-1]);
+      const avg = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+      const bpm = clamp(Math.round(60000/avg), 40, 220);
+      $('bpmNum').value = bpm; $('bpmRange').value = bpm; updateBeatMs();
+    }
+  });
+
+  setInterval(() => { if (ctx) $('ctxState').textContent = ctx.state; }, 500);
+})();
+</script>
+
+<script>
+// --- Three.js GLSL renderer (optional) ---
+let gl = { renderer:null, scene:null, camera:null, mat:null, mesh:null, inited:false, lastW:0, lastH:0 };
+
+const FRAG = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform float uLow;
+uniform float uMid;
+uniform float uHigh;
+uniform float uGain;
+
+float hash11(float p){ return fract(sin(p)*43758.5453123); }
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+mat2 rot(float a){ float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
+
+// 2D value noise (cheap)
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0,0.0));
+  float c = hash21(i + vec2(0.0,1.0));
+  float d = hash21(i + vec2(1.0,1.0));
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+}
+
+// Fractal Brownian Motion (adds non-repeating detail)
+float fbm(vec2 p){
+  float v = 0.0;
+  float a = 0.5;
+  for(int i=0;i<3;i++){ // reduced for performance
+    v += a * noise(p);
+    p = p*2.02 + vec2(17.3, 9.2);
+    a *= 0.5;
+  }
+  return v;
+}
+
+// distance to nearest random point in a jittered lattice, heavily warped + time-jittered
+float worleyLike(vec2 p, vec2 j, float tj){
+  // big domain warp (kills any lattice feel)
+  vec2 q = p;
+  q += (vec2(noise(p*1.7 + 10.0 + j*2.0), noise(p*1.9 - 7.0 + j*2.0)) - 0.5) * 1.8;
+  q += (vec2(noise(p*3.1 - 4.0 + j*3.0), noise(p*2.7 + 3.0 + j*3.0)) - 0.5) * 0.9;
+
+  // extra fast micro-warp
+  float w = fbm(p*2.4 + j*5.0 + tj*0.6);
+  q += (vec2(noise(p*8.0 + 1.7 + tj), noise(p*7.0 - 2.1 - tj)) - 0.5) * (0.35 + 0.65*w);
+
+  vec2 i = floor(q);
+  vec2 f = fract(q);
+  float md = 10.0;
+  for(int y=-1;y<=1;y++){
+    for(int x=-1;x<=1;x++){
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = vec2(hash21(i+g + j*11.0), hash21(i+g+23.17 + j*11.0));
+      vec2 r = g + o - f;
+      float d = dot(r,r);
+      md = min(md, d);
+    }
+  }
+  return sqrt(md);
+}
+
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes.xy;
+
+  float low  = clamp(uLow  * uGain, 0.0, 1.0);
+  float mid  = clamp(uMid  * uGain, 0.0, 1.0);
+  float high = clamp(uHigh * uGain, 0.0, 1.0);
+
+  float beat   = clamp(0.75*low + 0.25*mid, 0.0, 1.0);
+  float energy = clamp(0.40*low + 0.30*mid + 0.30*high, 0.0, 1.0);
+
+  // --- TIME JITTER (breaks predictability) ---
+  // a "random" seed that jumps several times per second
+  float tj = uTime * (2.2 + 2.4*energy);
+  float tStep = floor(tj * (2.5 + 3.5*beat));
+  float j0 = hash11(tStep*91.7 + 0.13);
+  vec2  j  = vec2(hash11(tStep*12.3 + 1.7), hash11(tStep*45.6 + 9.1)) - 0.5;
+
+  // Global motion: whole field shifts with beat (wrap) — faster than before
+  vec2 dir = normalize(vec2(0.9, 0.55));
+  float spd = mix(1.6, 7.8, beat);
+  float amp = mix(0.02, 0.24, beat);
+  vec2 shift = dir * sin((uTime*1.4 + j0*2.0) * spd * 6.2831) * amp;
+  vec2 uvm = fract(uv + shift + j*0.06);
+
+  // Work in continuous space (no grid)
+  vec2 p = (uvm - 0.5) * vec2(uRes.x/uRes.y, 1.0);
+
+  // Random "camera" kicks (subtle, but kills loops)
+  p += j * mix(0.05, 0.45, energy);
+  p = rot((j0-0.5) * 6.2831) * p;
+
+  // multi-layer warp that evolves quickly
+  float warpA = fbm(p*1.8 + uTime*0.35 + j*3.0);
+  float warpB = fbm(p*3.6 - uTime*0.28 - j*4.0);
+  p += (vec2(warpA, warpB) - 0.5) * (0.35 + 0.85*mid);
+
+  // "many random pixels": sparse bright specks where worley distance is tiny
+  float scale = mix(7.0, 22.0, clamp(mid + 0.45*high, 0.0, 1.0));
+  scale *= mix(0.85, 1.25, j0); // jumpy scale changes
+  float d = worleyLike(p*scale + vec2(uTime*0.65, -uTime*0.52), j, tj);
+
+  // threshold controls sparsity (more energy -> more dots)
+  float thr = mix(0.12, 0.028, energy);
+  float dots = smoothstep(thr, 0.0, d);
+
+  // Extra secondary "bursts" (fast-changing blobs)
+  float blobs = fbm(p*5.0 + j*7.0 + uTime*1.2);
+  blobs = smoothstep(0.78 - 0.25*high, 1.0, blobs);
+
+  // micro-random flicker (time-jittered)
+  float flick = fbm(p*40.0 + uTime*(3.5 + 3.0*high) + j*9.0);
+  flick = smoothstep(0.55 - 0.25*high, 1.0, flick);
+
+  // RGB mapping by band: random per-pixel selection influenced by energies, *also* time-jittered
+  float rsel = fbm(p*8.5 + j*6.0 + uTime*0.22);
+  float wL = 0.30 + 0.95*low;
+  float wM = 0.30 + 0.95*mid;
+  float wH = 0.30 + 0.95*high;
+  float ws = wL+wM+wH;
+  wL/=ws; wM/=ws; wH/=ws;
+
+  vec3 base;
+  float inten;
+  if (rsel < wL){ base = vec3(1.0, 0.10, 0.10); inten = low; }
+  else if (rsel < wL+wM){ base = vec3(0.10, 1.0, 0.12); inten = mid; }
+  else { base = vec3(0.18, 0.22, 1.0); inten = high; }
+
+  float v = pow(clamp(inten, 0.0, 1.0), 0.55);
+
+  // final brightness: dots * flicker + extra blob bursts + a mist of noise
+  float spark = dots * (0.20 + 0.80*flick);
+  spark += 0.55 * blobs * (0.10 + 0.90*v) * (0.2 + 0.8*beat);
+
+  vec3 col = base * spark * (0.30 + 0.95*v);
+
+  // non-grid mist layer — ONLY where there is activity (keeps background black)
+  float mist = fbm(p*2.0 + uTime*0.22 + j*2.0) * fbm(p*3.3 - uTime*0.18 - j*2.0);
+  col += vec3(0.06,0.06,0.07) * mist * (0.12 + 0.45*mid) * spark;
+
+  // Keep background truly black
+  col = max(col, vec3(0.0));
+gl_FragColor = vec4(col * 3.0, 1.0); // 3x color intensity
+}
+`;
+
+function initGL() {
+  if (gl.inited) return;
+  const cvs = document.getElementById('vizGL');
+  if (!cvs || !window.THREE) return;
+
+  gl.renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, alpha: false, preserveDrawingBuffer: true });
+  gl.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  gl.scene = new THREE.Scene();
+  gl.camera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+  gl.mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uRes: { value: new THREE.Vector2(640, 360) },
+      uTime: { value: 0 },
+      uLow: { value: 0 },
+      uMid: { value: 0 },
+      uHigh: { value: 0 },
+      uGain: { value: 1.0 },
+    },
+    vertexShader: `void main(){ gl_Position = vec4(position, 1.0); }`,
+    fragmentShader: FRAG
+  });
+
+  const geo = new THREE.PlaneGeometry(2,2);
+  gl.mesh = new THREE.Mesh(geo, gl.mat);
+  gl.scene.add(gl.mesh);
+  gl.inited = true;
+  resizeGL();
+}
+
+function resizeGL() {
+  if (!gl.inited) return;
+  const cvs2d = document.getElementById('viz');
+  const wCss = (cvs2d ? cvs2d.width : 640) || 640;
+  const hCss = (cvs2d ? cvs2d.height : 360) || 360;
+  if (wCss === gl.lastW && hCss === gl.lastH) {
+    // still refresh uRes from drawing buffer in case DPR changed
+    try {
+      const db = new THREE.Vector2();
+      gl.renderer.getDrawingBufferSize(db);
+      gl.mat.uniforms.uRes.value.set(db.x, db.y);
+    } catch(e){}
+    return;
+  }
+  gl.lastW = wCss; gl.lastH = hCss;
+  gl.renderer.setSize(wCss, hCss, false);
+  try {
+    const db = new THREE.Vector2();
+    gl.renderer.getDrawingBufferSize(db);
+    gl.mat.uniforms.uRes.value.set(db.x, db.y);
+  } catch(e) {
+    // fallback
+    gl.mat.uniforms.uRes.value.set(wCss, hCss);
+  }
+}
+
+function setRenderMode(mode) {
+  const c2d = document.getElementById('viz');
+  const cgl = document.getElementById('vizGL');
+  if (!c2d || !cgl) return;
+
+  if (mode === 'glsl') {
+    // GLSL only
+    initGL();
+    c2d.style.display = 'none';
+    cgl.style.display = 'block';
+  } else if (mode === 'mix') {
+    // MIX: keep 2D visible (it will composite GLSL + pixels), but ensure GL is initialized
+    initGL();
+    cgl.style.display = 'none';
+    c2d.style.display = 'block';
+  } else {
+    // 2D pixels only
+    cgl.style.display = 'none';
+    c2d.style.display = 'block';
+  }
+}
+
+window.addEventListener('resize', ()=>{ try{ resizeGL(); }catch(e){} });
+document.addEventListener('DOMContentLoaded', ()=>{
+  const rm = document.getElementById('renderMode');
+  if (rm) rm.addEventListener('change', ()=> setRenderMode(rm.value));
+});
+</script>
+
+
+<script>
+// --- WEBM video export (records current render canvas + audio) ---
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  window.__forceExportGLSL = false;
+  const dbg = (msg)=>{
+    try{
+      const el = $('exportDebug');
+      if(!el) return;
+      el.style.display='block';
+      el.textContent = msg;
+    }catch(e){}
+  };
+  function bestMp4Mime(){
+    const cand = [
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs=avc1.4D401E,mp4a.40.2',
+      'video/mp4;codecs=avc1,mp4a.40.2',
+      'video/mp4'
+    ];
+    for (const m of cand){
+      try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch(e){}
+    }
+    return '';
+  }
+
+  function bestWebmMime(){
+    const cand = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+    for (const m of cand){ try{ if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; }catch(e){} }
+    return '';
+  }
+
+  async function exportVideoWebm(){
+    const st = $('webmState');
+    const setState = (t)=>{ try{ if(st) st.textContent = t; }catch(e){} };
+
+    if (!window.MediaRecorder){ alert('MediaRecorder ontbreekt in deze browser.'); return; }
+    const mime = bestWebmMime();
+    if (!mime){ alert('WebM recording niet ondersteund.'); return; }
+
+    const rm = $('renderMode');
+    const mode = rm ? rm.value : '2d';
+    const useGL = (window.__forceExportGLSL === true) || (mode === 'glsl');
+    const useMix = (mode === 'mix');
+
+    // MIX exports the composed 2D canvas, but still needs GLSL rendering alive in the background
+    if (useMix) { try { setRenderMode('mix'); initGL(); resizeGL(); } catch(e){} }
+    if (useGL) { try { setRenderMode('glsl'); } catch(e){} }
+    const canvas = useGL ? $('vizGL') : $('viz');
+    if (!canvas){ alert('Canvas niet gevonden.'); return; }
+
+    // Some browsers stop captureStream when canvas is display:none; ensure visible while recording
+    const prevDisplay = canvas.style.display;
+    if (prevDisplay === 'none') canvas.style.display = 'block';
+
+    const fps = parseInt($('expFpsNum')?.value || '30', 10);
+    const seconds = parseInt($('expLenNum')?.value || '10', 10);
+
+    // Warm-up: ensure at least a few frames are rendered before captureStream
+    if (useGL) {
+      try { setRenderMode('glsl'); initGL(); resizeGL(); } catch(e){}
+      // draw a few frames to populate drawing buffer
+      try {
+        for (let i=0;i<5;i++){
+          try{ resizeGL(); }catch(e){}
+          try{
+            const bands = window.__bands || {low:0,mid:0,high:0};
+            const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+            gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high||0) * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uGain.value = gain;
+            gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+            gl.renderer.render(gl.scene, gl.camera);
+          }catch(e){}
+          await new Promise(r=>setTimeout(r, 16));
+        }
+      } catch(e){}
+    }
+    let vStream;
+    try {
+      vStream = canvas.captureStream(Math.max(15, Math.min(60, fps)));
+    } catch(e){
+      console.warn(e);
+      alert('captureStream faalde in deze browser.');
+      return;
+    }
+    const vTracks = vStream.getVideoTracks();
+    if (!vTracks || !vTracks.length){
+      alert('Geen video track beschikbaar (captureStream). Dit is een beperking van jouw Android Chrome/WebGL. Gebruik in dat geval de Android schermopname (dat wordt MP4 en bevat wél beeld).');
+      return;
+    }
+
+    // audio stream from master out if available
+    let aStream = null;
+    try {
+      if (window.ctx && window.masterOut) {
+        const dest = ctx.createMediaStreamDestination();
+        // connect once for this export
+        masterOut.connect(dest);
+        aStream = dest.stream;
+      }
+    } catch(e){ console.warn('Audio capture failed', e); }
+
+    const stream = new MediaStream([
+      ...vStream.getVideoTracks(),
+      ...(aStream ? aStream.getAudioTracks() : [])
+    ]);
+
+    const chunks = [];
+    let mr;
+    try {
+      mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 160_000 });
+    } catch(e){
+      console.warn(e);
+      alert('Recorder init error: ' + (e?.message || e));
+      return;
+    }
+
+    // Keep GLSL animating during recording even if audio loop stalls
+    let glTimer = null;
+    if (useGL) {
+      try {
+        initGL();
+        resizeGL();
+        const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+        glTimer = setInterval(()=>{
+          try{
+            resizeGL();
+            const bands = window.__bands || {low:0,mid:0,high:0};
+            gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high||0) * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uGain.value = gain;
+            gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+            gl.renderer.render(gl.scene, gl.camera);
+          }catch(e){}
+        }, Math.max(15, Math.floor(1000/Math.max(15, Math.min(60, fps)))));
+      } catch(e){}
+    }
+
+    mr.ondataavailable = (e)=>{ if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onerror = (e)=>{ console.warn('MediaRecorder error', e); setState('error'); };
+    mr.onstop = ()=> {
+      try { if (glTimer) clearInterval(glTimer); } catch(e){}
+      try { canvas.style.display = prevDisplay; } catch(e) {}
+
+      if (!chunks.length){
+        setState('0 bytes');
+        alert('Geen data opgenomen (0 bytes). Probeer een andere FPS (30) en zorg dat er animatie is.');
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: mr.mimeType || 'video/webm' });
+      if (blob.size < 1024){
+        setState('tiny');
+        alert('Opname is te klein. Probeer FPS 30 en langere duur.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'export_video.webm';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      setState('done');
+    };
+
+    setState('recording…');
+    try {
+      mr.start(250);
+    } catch(e){
+      console.warn(e);
+      setState('start error');
+      alert('Kon opname niet starten.');
+      try { if (glTimer) clearInterval(glTimer); } catch(e2){}
+      return;
+    }
+
+    setTimeout(()=>{ try{ mr.stop(); }catch(e){} }, Math.max(1,seconds)*1000);
+  }
+  
+  async function exportVideoMp4(){
+    const st = $('webmState');
+    const setState = (t)=>{ try{ if(st) st.textContent = t; }catch(e){} };
+
+    if (!window.MediaRecorder){ alert('MediaRecorder ontbreekt in deze browser.'); return; }
+    const mime = bestMp4Mime();
+    if (!mime){
+      alert('MP4 opnemen wordt niet ondersteund door jouw Android Chrome. Gebruik WEBM export.');
+      return;
+    }
+
+    const rm = $('renderMode');
+    const mode = rm ? rm.value : '2d';
+    const useGL = (window.__forceExportGLSL === true) || (mode === 'glsl');
+    const useMix = (mode === 'mix');
+
+    // MIX exports the composed 2D canvas, but still needs GLSL rendering alive in the background
+    if (useMix) { try { setRenderMode('mix'); initGL(); resizeGL(); } catch(e){} }
+    if (useGL) { try { setRenderMode('glsl'); } catch(e){} }
+    const canvas = useGL ? $('vizGL') : $('viz');
+    if (!canvas){ alert('Canvas niet gevonden.'); return; }
+
+    const prevDisplay = canvas.style.display;
+    if (prevDisplay === 'none') canvas.style.display = 'block';
+
+    const fps = parseInt($('expFpsNum')?.value || '30', 10);
+    const seconds = parseInt($('expLenNum')?.value || '10', 10);
+
+    let vStream;
+    try {
+      vStream = canvas.captureStream(Math.max(15, Math.min(60, fps)));
+    } catch(e){
+      console.warn(e);
+      alert('captureStream faalde in deze browser.');
+      return;
+    }
+    const vTracks = vStream.getVideoTracks();
+    if (!vTracks || !vTracks.length){
+      alert('Geen video track beschikbaar (captureStream). Dit is een beperking van jouw Android Chrome/WebGL. Gebruik in dat geval de Android schermopname (dat wordt MP4 en bevat wél beeld).');
+      return;
+    }
+
+    let aStream = null;
+    try {
+      if (window.ctx && window.masterOut) {
+        const dest = ctx.createMediaStreamDestination();
+        masterOut.connect(dest);
+        aStream = dest.stream;
+      }
+    } catch(e){ console.warn('Audio capture failed', e); }
+
+    const stream = new MediaStream([
+      ...vStream.getVideoTracks(),
+      ...(aStream ? aStream.getAudioTracks() : [])
+    ]);
+
+    const chunks = [];
+    let mr;
+    try {
+      mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 160_000 });
+    } catch(e){
+      console.warn(e);
+      alert('Recorder init error: ' + (e?.message || e));
+      return;
+    }
+
+    // Keep GLSL animating during recording
+    let glTimer = null;
+    if (useGL) {
+      try {
+        initGL();
+        resizeGL();
+        const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+        glTimer = setInterval(()=>{
+          try{
+            resizeGL();
+            const bands = window.__bands || {low:0,mid:0,high:0};
+            gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high||0) * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uGain.value = gain;
+            gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+            gl.renderer.render(gl.scene, gl.camera);
+          }catch(e){}
+        }, Math.max(15, Math.floor(1000/Math.max(15, Math.min(60, fps)))));
+      } catch(e){}
+    }
+
+    mr.ondataavailable = (e)=>{ if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onerror = (e)=>{ console.warn('MediaRecorder error', e); setState('error'); };
+    mr.onstop = ()=>{
+      try { if (glTimer) clearInterval(glTimer); } catch(e){}
+      try { canvas.style.display = prevDisplay; } catch(e) {}
+
+      if (!chunks.length){
+        setState('0 bytes');
+        alert('Geen data opgenomen (0 bytes). Probeer FPS 30 en langere duur.');
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: mr.mimeType || 'video/mp4' });
+      if (blob.size < 1024){
+        setState('tiny');
+        alert('Opname is te klein. Probeer FPS 30 en langere duur.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'export_video.mp4';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      setState('done');
+    };
+
+    setState('recording…');
+    try {
+      mr.start(250);
+    } catch(e){
+      console.warn(e);
+      setState('start error');
+      alert('Kon opname niet starten.');
+      try { if (glTimer) clearInterval(glTimer); } catch(e2){}
+      return;
+    }
+
+    setTimeout(()=>{ try{ mr.stop(); }catch(e){} }, Math.max(1,seconds)*1000);
+  }
+
+    } catch(e){ console.warn('Audio capture failed', e); }
+
+    const stream = new MediaStream([
+      ...vStream.getVideoTracks(),
+      ...(aStream ? aStream.getAudioTracks() : [])
+    ]);
+
+    const chunks = [];
+    let mr;
+    try {
+      mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 160_000 });
+    } catch(e){
+      console.warn(e);
+      alert('Recorder init error: ' + (e?.message || e));
+      return;
+    }
+
+    mr.ondataavailable = (e)=>{ if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onstop = ()=>{
+      const blob = new Blob(chunks, { type: mr.mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'export_video.webm';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      if (st) st.textContent = 'done';
+    };
+
+    if (st) st.textContent = 'recording…';
+    mr.start(250);
+    setTimeout(()=>{ try{ mr.stop(); }catch(e){} }, Math.max(1,seconds)*1000);
+  }
+  
+  async function exportVideoMp4(){
+    const st = $('webmState');
+    const setState = (t)=>{ try{ if(st) st.textContent = t; }catch(e){} };
+
+    if (!window.MediaRecorder){ alert('MediaRecorder ontbreekt in deze browser.'); return; }
+    const mime = bestMp4Mime();
+    if (!mime){
+      alert('MP4 opnemen wordt niet ondersteund door jouw Android Chrome. Gebruik WEBM export.');
+      return;
+    }
+
+    const rm = $('renderMode');
+    const mode = rm ? rm.value : '2d';
+    const useGL = (window.__forceExportGLSL === true) || (mode === 'glsl');
+    const useMix = (mode === 'mix');
+
+    // MIX exports the composed 2D canvas, but still needs GLSL rendering alive in the background
+    if (useMix) { try { setRenderMode('mix'); initGL(); resizeGL(); } catch(e){} }
+    if (useGL) { try { setRenderMode('glsl'); } catch(e){} }
+    const canvas = useGL ? $('vizGL') : $('viz');
+    if (!canvas){ alert('Canvas niet gevonden.'); return; }
+
+    const prevDisplay = canvas.style.display;
+    if (prevDisplay === 'none') canvas.style.display = 'block';
+
+    const fps = parseInt($('expFpsNum')?.value || '30', 10);
+    const seconds = parseInt($('expLenNum')?.value || '10', 10);
+
+    let vStream;
+    try {
+      vStream = canvas.captureStream(Math.max(15, Math.min(60, fps)));
+    } catch(e){
+      console.warn(e);
+      alert('captureStream faalde in deze browser.');
+      return;
+    }
+    const vTracks = vStream.getVideoTracks();
+    if (!vTracks || !vTracks.length){
+      alert('Geen video track beschikbaar (captureStream). Dit is een beperking van jouw Android Chrome/WebGL. Gebruik in dat geval de Android schermopname (dat wordt MP4 en bevat wél beeld).');
+      return;
+    }
+
+    let aStream = null;
+    try {
+      if (window.ctx && window.masterOut) {
+        const dest = ctx.createMediaStreamDestination();
+        masterOut.connect(dest);
+        aStream = dest.stream;
+      }
+    } catch(e){ console.warn('Audio capture failed', e); }
+
+    const stream = new MediaStream([
+      ...vStream.getVideoTracks(),
+      ...(aStream ? aStream.getAudioTracks() : [])
+    ]);
+
+    const chunks = [];
+    let mr;
+    try {
+      mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 160_000 });
+    } catch(e){
+      console.warn(e);
+      alert('Recorder init error: ' + (e?.message || e));
+      return;
+    }
+
+    // Keep GLSL animating during recording
+    let glTimer = null;
+    if (useGL) {
+      try {
+        initGL();
+        resizeGL();
+        const gain = parseFloat($('shaderGainNum')?.value || '1.0');
+        glTimer = setInterval(()=>{
+          try{
+            resizeGL();
+            const bands = window.__bands || {low:0,mid:0,high:0};
+            gl.mat.uniforms.uLow.value  = Math.min(1, Math.pow((bands.low||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uMid.value  = Math.min(1, Math.pow((bands.mid||0)  * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uHigh.value = Math.min(1, Math.pow((bands.high||0) * parseFloat($('sensNum')?.value||'1'), 0.75));
+            gl.mat.uniforms.uGain.value = gain;
+            gl.mat.uniforms.uTime.value = (performance.now()/2000) /* 0.5x speed */;
+            gl.renderer.render(gl.scene, gl.camera);
+          }catch(e){}
+        }, Math.max(15, Math.floor(1000/Math.max(15, Math.min(60, fps)))));
+      } catch(e){}
+    }
+
+    mr.ondataavailable = (e)=>{ if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onerror = (e)=>{ console.warn('MediaRecorder error', e); setState('error'); };
+    mr.onstop = ()=>{
+      try { if (glTimer) clearInterval(glTimer); } catch(e){}
+      try { canvas.style.display = prevDisplay; } catch(e) {}
+
+      if (!chunks.length){
+        setState('0 bytes');
+        alert('Geen data opgenomen (0 bytes). Probeer FPS 30 en langere duur.');
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: mr.mimeType || 'video/mp4' });
+      if (blob.size < 1024){
+        setState('tiny');
+        alert('Opname is te klein. Probeer FPS 30 en langere duur.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'export_video.mp4';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      setState('done');
+    };
+
+    setState('recording…');
+    try {
+      mr.start(250);
+    } catch(e){
+      console.warn(e);
+      setState('start error');
+      alert('Kon opname niet starten.');
+      try { if (glTimer) clearInterval(glTimer); } catch(e2){}
+      return;
+    }
+
+    setTimeout(()=>{ try{ mr.stop(); }catch(e){} }, Math.max(1,seconds)*1000);
+  }
+
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const btn = $('exportVideoWebm');
+    if (btn) btn.addEventListener('click', exportVideoWebm);
+    const btn2 = $('exportVideoMp4');
+    if (btn2) btn2.addEventListener('click', exportVideoMp4);
+    const btn3 = $('exportGlslWebm');
+    if (btn3) btn3.addEventListener('click', async ()=>{
+      window.__forceExportGLSL = true;
+      try { await exportVideoWebm(); } finally { window.__forceExportGLSL = false; }
+    });
+  });
+})();
+</script>
+
+
+<div id="exportDebug" style="position:fixed;left:10px;bottom:10px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:6px 10px;border-radius:10px;font:12px/1.3 monospace;display:none;"></div>
+
+<script>
+// --- Whammy (pure JS WebM encoder) fallback for "always export" ---
+// Based on Whammy.js by @antimatter15 (public domain). Minimal subset.
+(function(){
+  function toWebM(frames, outputAsArray){
+    const info = checkFrames(frames);
+    const EBML = [
+      {id:0x1a45dfa3, data:[
+        {data:1, id:0x4286},{data:1, id:0x42f7},{data:4, id:0x42f2},{data:8, id:0x42f3},
+        {data:"webm", id:0x4282},{data:2, id:0x4287},{data:2, id:0x4285}
+      ]},
+      {id:0x18538067, data:[
+        {id:0x1549a966, data:[
+          {data:1e6, id:0x2ad7b1},
+          {data:"whammy", id:0x4d80},
+          {data:"whammy", id:0x5741},
+          {data:info.duration, id:0x4489}
+        ]},
+        {id:0x1654ae6b, data:[
+          {id:0xae, data:[
+            {data:1, id:0xd7},
+            {data:1, id:0x73c5},
+            {data:0, id:0x9c},
+            {data:"und", id:0x22b59c},
+            {data:"V_VP8", id:0x86},
+            {data:"VP8", id:0x258688},
+            {data:1, id:0x83},
+            {id:0xe0, data:[
+              {data:info.width, id:0xb0},
+              {data:info.height, id:0xba}
+            ]}
+          ]}
+        ]},
+        {id:0x1f43b675, data: toCluster(frames, info)}
+      ]}
+    ];
+    return generateEBML(EBML, outputAsArray);
+  }
+
+  function checkFrames(frames){
+    if(!frames.length) throw "no frames";
+    const width = frames[0].width, height = frames[0].height;
+    let duration = 0;
+    for(let i=0;i<frames.length;i++){
+      if(frames[i].width !== width) throw "frame size mismatch";
+      if(frames[i].height !== height) throw "frame size mismatch";
+      if(typeof frames[i].duration !== "number") throw "frame duration missing";
+      duration += frames[i].duration;
+    }
+    return {width, height, duration};
+  }
+
+  function toCluster(frames, info){
+    let clusterTimecode = 0;
+    const clusters = [];
+    let frameNumber = 0;
+    while(frameNumber < frames.length){
+      const clusterFrames = [];
+      let clusterDuration = 0;
+      while(frameNumber < frames.length && clusterDuration < 30000){
+        clusterFrames.push(frames[frameNumber]);
+        clusterDuration += frames[frameNumber].duration;
+        frameNumber++;
+      }
+      const clusterData = [{data: Math.round(clusterTimecode), id:0xe7}];
+      let timecode = 0;
+      for(let i=0;i<clusterFrames.length;i++){
+        const frame = clusterFrames[i];
+        const block = makeSimpleBlock({
+          discardable:0, trackNum:1, timecode: Math.round(timecode),
+          keyframe:1, invisible:0, lacing:0,
+          data: frame.data
+        });
+        clusterData.push({data:block, id:0xa3});
+        timecode += frame.duration;
+      }
+      clusters.push({id:0x1f43b675, data: clusterData});
+      clusterTimecode += clusterDuration;
+    }
+    // return array of cluster elements (without extra nesting)
+    return clusters.map(c=>c.data ? c.data : c);
+  }
+
+  function makeSimpleBlock(data){
+    let flags = 0;
+    if(data.keyframe) flags |= 128;
+    if(data.invisible) flags |= 8;
+    if(data.lacing) flags |= (data.lacing<<1);
+    if(data.discardable) flags |= 1;
+    const trackNum = data.trackNum;
+    const timecode = data.timecode;
+    const header = [
+      (trackNum | 0x80), // assume trackNum < 127
+      (timecode >> 8) & 0xff,
+      timecode & 0xff,
+      flags
+    ];
+    return new Uint8Array(header.concat(data.data));
+  }
+
+  function generateEBML(json, outputAsArray){
+    const ebml = [];
+    for(let i=0;i<json.length;i++){
+      const item = json[i];
+      if(typeof item === "undefined") continue;
+      const data = item.data;
+      if(Array.isArray(data)){
+        const child = generateEBML(data, true);
+        ebml.push(numToBuffer(item.id));
+        ebml.push(numToBuffer(child.size));
+        ebml.push(child);
+      }else if(typeof data === "string"){
+        ebml.push(numToBuffer(item.id));
+        ebml.push(numToBuffer(data.length));
+        ebml.push(strToBuffer(data));
+      }else if(typeof data === "number"){
+        const buf = numToFixedBuffer(data);
+        ebml.push(numToBuffer(item.id));
+        ebml.push(numToBuffer(buf.length));
+        ebml.push(buf);
+      }else if(data instanceof Uint8Array){
+        ebml.push(numToBuffer(item.id));
+        ebml.push(numToBuffer(data.length));
+        ebml.push(data);
+      }else{
+        // clusterData arrays may already be in ebml form
+        ebml.push(generateEBML(data, true));
+      }
+    }
+    const blob = outputAsArray ? flattenArray(ebml) : new Blob(ebml, {type:"video/webm"});
+    if(outputAsArray){
+      blob.size = blob.length;
+      return blob;
+    }
+    return blob;
+  }
+
+  function numToBuffer(num){
+    const parts = [];
+    while(num > 0){
+      parts.push(num & 0xff);
+      num = num >> 8;
+    }
+    return new Uint8Array(parts.reverse());
+  }
+  function numToFixedBuffer(num){
+    // float64 for duration, otherwise uint32-ish
+    if(num % 1 !== 0 || num > 0xffffffff){
+      const buf = new ArrayBuffer(8);
+      new DataView(buf).setFloat64(0, num);
+      return new Uint8Array(buf);
+    }
+    let parts = [];
+    while(num > 0){
+      parts.push(num & 0xff);
+      num = num >> 8;
+    }
+    if(!parts.length) parts = [0];
+    return new Uint8Array(parts.reverse());
+  }
+  function strToBuffer(str){
+    return new Uint8Array(str.split("").map(c=>c.charCodeAt(0)));
+  }
+  function flattenArray(arr){
+    const out = [];
+    for(let i=0;i<arr.length;i++){
+      const a = arr[i];
+      if(a instanceof Uint8Array){
+        for(let j=0;j<a.length;j++) out.push(a[j]);
+      }else if(Array.isArray(a)){
+        const b = flattenArray(a);
+        for(let j=0;j<b.length;j++) out.push(b[j]);
+      }else if(a && typeof a.length === "number"){
+        for(let j=0;j<a.length;j++) out.push(a[j]);
+      }
+    }
+    return out;
+  }
+
+  // Decode a WebP dataURL into VP8 raw chunk
+  function parseWebP(riff){
+    // RIFF container in WebP. We need VP8 chunk data after "VP8 " header.
+    const VP8 = riff.RIFF[0].WEBP[0];
+    return VP8;
+  }
+  function parseRIFF(string){
+    let offset = 0;
+    const chunks = {};
+    while(offset < string.length){
+      const id = string.substr(offset, 4);
+      const len = parseInt(string.substr(offset+4, 4).split("").map(i=>('0'+i.charCodeAt(0).toString(16)).slice(-2)).reverse().join(""), 16);
+      const data = string.substr(offset+8, len);
+      offset += 8 + len;
+      chunks[id] = chunks[id] || [];
+      if(id === "RIFF" || id === "LIST"){
+        chunks[id].push(parseRIFF(data));
+      }else{
+        chunks[id].push(data);
+      }
+    }
+    return chunks;
+  }
+  function dataURLtoBinary(dataURL){
+    const base64 = dataURL.substring(dataURL.indexOf(',')+1);
+    const binary = atob(base64);
+    return binary;
+  }
+  function webpToVP8(dataURL){
+    const binary = dataURLtoBinary(dataURL);
+    const riff = parseRIFF(binary);
+    const webp = parseWebP(riff);
+    // convert string to bytes
+    const out = new Uint8Array(webp.length);
+    for(let i=0;i<webp.length;i++) out[i] = webp.charCodeAt(i);
+    return out;
+  }
+
+  function WhammyVideo(fps){
+    this.frames = [];
+    this.fps = fps || 30;
+    this.add = (canvas, duration)=>{
+      const dataURL = canvas.toDataURL("image/webp", 0.9);
+      const vp8 = webpToVP8(dataURL);
+      this.frames.push({data: vp8, duration: duration, width: canvas.width, height: canvas.height});
+    };
+    this.compile = ()=>{
+      return toWebM(this.frames, false);
+    };
+  }
+
+  window.Whammy = { Video: WhammyVideo };
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DSP Mega Rack – Alles-in-één (Loop + Effecten + WAV export)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.35}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start}
+    .card{border:1px solid #ddd;border-radius:14px;padding:12px}
+    .sep{height:1px;background:#eee;margin:10px 0}
+    label{display:grid;gap:6px;margin-top:8px}
+    input[type="range"]{width:100%}
+    input[type="number"],select{width:100%;padding:8px;border-radius:10px;border:1px solid #ddd}
+    button{padding:10px 12px;border-radius:12px;border:1px solid #ddd;background:#fafafa;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .small{font-size:12px;color:#555}
+    .pill{display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;font-size:12px;background:#fff}
+    .bypass{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    canvas{width:100%;height:180px;border:1px solid #eee;border-radius:12px}
+  </style>
+</head>
+<body>
+  <h1>DSP Mega Rack – Alles-in-één</h1>
+  <p class="small">
+    1 bestand • werkt offline • <b>auto-start</b> na audio laden • loop • alle effecten • FFT • <b>WAV export (offline render)</b>.
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h2>Audio</h2>
+      <label>Laad audio (mp3/wav/ogg)
+        <input id="file" type="file" accept="audio/*">
+      </label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button id="stop" disabled>Stop</button>
+        <button id="export" disabled>Export WAV (met effecten)</button>
+      </div>
+      <div class="sep"></div>
+      <div class="small">
+        Status: <span id="status">—</span> <span class="pill" id="state">idle</span><br>
+        Buffer: <span id="bufInfo">—</span>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="bypass">
+        <label style="display:flex;align-items:center;gap:8px;margin:0">
+          <input id="loopOn" type="checkbox"> Loop
+        </label>
+        <span class="small">Loop regio (s)</span>
+      </div>
+      <div class="row" style="grid-template-columns:1fr 1fr;gap:10px">
+        <label class="small">Start
+          <input id="loopStart" type="number" min="0" step="0.01" value="0" disabled>
+        </label>
+        <label class="small">Eind
+          <input id="loopEnd" type="number" min="0" step="0.01" value="0" disabled>
+        </label>
+      </div>
+      <p class="small">Wijziging van loopstart/eind herstart playback (stabiel).</p>
+    </div>
+
+    <div class="card">
+      <h2>FFT</h2>
+      <canvas id="fft" width="900" height="260"></canvas>
+      <div class="small">Realtime spectrum via <code>AnalyserNode</code>.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>Effecten</h2>
+
+    <div class="grid3">
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Gain</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="gainOn" type="checkbox" checked> Aan</label>
+        </div>
+        <label>Volume (0–2)
+          <input id="gain" type="range" min="0" max="2" step="0.01" value="1">
+          <span class="small">Waarde: <span id="gainV">1.00</span></span>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Distortion</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="distOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Drive
+          <input id="distDrive" type="range" min="0" max="1" step="0.001" value="0.25">
+          <span class="small"><span id="distDriveV">0.250</span></span>
+        </label>
+        <label>Wet %
+          <input id="distMix" type="range" min="0" max="100" step="1" value="50">
+          <span class="small"><span id="distMixV">50</span>%</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Compressor</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="compOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Threshold (dB)
+          <input id="compTh" type="range" min="-60" max="0" step="1" value="-24">
+          <span class="small"><span id="compThV">-24</span> dB</span>
+        </label>
+        <label>Ratio
+          <input id="compRatio" type="range" min="1" max="20" step="0.1" value="4">
+          <span class="small"><span id="compRatioV">4.0</span></span>
+        </label>
+        <div class="row" style="grid-template-columns:1fr 1fr;gap:10px">
+          <label class="small">Attack (s)
+            <input id="compAtk" type="range" min="0.001" max="0.3" step="0.001" value="0.01">
+            <span class="small"><span id="compAtkV">0.010</span></span>
+          </label>
+          <label class="small">Release (s)
+            <input id="compRel" type="range" min="0.01" max="1.0" step="0.01" value="0.25">
+            <span class="small"><span id="compRelV">0.25</span></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-top:12px">
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Modulatie</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="modOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Type
+          <select id="modType">
+            <option value="chorus">Chorus</option>
+            <option value="flanger">Flanger</option>
+            <option value="tremolo">Tremolo (AM)</option>
+            <option value="ring">Ring mod</option>
+          </select>
+        </label>
+        <label>Rate (Hz)
+          <input id="modRate" type="range" min="0.05" max="12" step="0.01" value="0.8">
+          <span class="small"><span id="modRateV">0.80</span></span>
+        </label>
+        <label>Depth
+          <input id="modDepth" type="range" min="0" max="1" step="0.001" value="0.35">
+          <span class="small"><span id="modDepthV">0.350</span></span>
+        </label>
+        <label>Feedback (chorus/flanger)
+          <input id="modFb" type="range" min="0" max="0.95" step="0.01" value="0.10">
+          <span class="small"><span id="modFbV">0.10</span></span>
+        </label>
+        <label>Wet %
+          <input id="modMix" type="range" min="0" max="100" step="1" value="35">
+          <span class="small"><span id="modMixV">35</span>%</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Delay / Echo</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="delayOn" type="checkbox" checked> Aan</label>
+        </div>
+        <label>Time (ms)
+          <input id="delayMs" type="range" min="0" max="1200" step="1" value="250">
+          <span class="small"><span id="delayMsV">250</span> ms</span>
+        </label>
+        <label>Feedback
+          <input id="delayFb" type="range" min="0" max="0.95" step="0.01" value="0.30">
+          <span class="small"><span id="delayFbV">0.30</span></span>
+        </label>
+        <label>Wet %
+          <input id="delayMix" type="range" min="0" max="100" step="1" value="30">
+          <span class="small"><span id="delayMixV">30</span>%</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">EQ (3-band)</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="eqOn" type="checkbox" checked> Aan</label>
+        </div>
+        <label>Low shelf (dB)
+          <input id="eqLow" type="range" min="-18" max="18" step="0.5" value="0">
+          <span class="small"><span id="eqLowV">0.0</span></span>
+        </label>
+        <label>Mid (dB)
+          <input id="eqMid" type="range" min="-18" max="18" step="0.5" value="0">
+          <span class="small"><span id="eqMidV">0.0</span></span>
+        </label>
+        <label>Mid freq (Hz)
+          <input id="eqMidF" type="range" min="200" max="6000" step="1" value="1200">
+          <span class="small"><span id="eqMidFV">1200</span></span>
+        </label>
+        <label>High shelf (dB)
+          <input id="eqHigh" type="range" min="-18" max="18" step="0.5" value="0">
+          <span class="small"><span id="eqHighV">0.0</span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-top:12px">
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">IIR filter</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="iirOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Type
+          <select id="iirType">
+            <option value="lowpass">Low-pass</option>
+            <option value="highpass">High-pass</option>
+            <option value="bandpass">Band-pass</option>
+            <option value="notch">Notch</option>
+          </select>
+        </label>
+        <label>Freq (Hz)
+          <input id="iirF" type="range" min="40" max="12000" step="1" value="1200">
+          <span class="small"><span id="iirFV">1200</span></span>
+        </label>
+        <label>Q
+          <input id="iirQ" type="range" min="0.1" max="18" step="0.1" value="0.7">
+          <span class="small"><span id="iirQV">0.7</span></span>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">FIR low-pass</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="firOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Cutoff (Hz)
+          <input id="firF" type="range" min="40" max="12000" step="1" value="1800">
+          <span class="small"><span id="firFV">1800</span></span>
+        </label>
+        <label>Taps (odd)
+          <input id="firT" type="range" min="31" max="2047" step="2" value="255">
+          <span class="small"><span id="firTV">255</span></span>
+        </label>
+        <label>Wet %
+          <input id="firMix" type="range" min="0" max="100" step="1" value="60">
+          <span class="small"><span id="firMixV">60</span>%</span>
+        </label>
+        <button id="firBuild" disabled>Rebuild FIR</button>
+      </div>
+
+      <div class="card">
+        <div class="bypass">
+          <h3 style="margin:0">Convolution Reverb</h3>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="revOn" type="checkbox"> Aan</label>
+        </div>
+        <label>Decay (s)
+          <input id="revDecay" type="range" min="0.1" max="8" step="0.1" value="2.5">
+          <span class="small"><span id="revDecayV">2.5</span></span>
+        </label>
+        <label>Pre-delay (ms)
+          <input id="revPre" type="range" min="0" max="200" step="1" value="20">
+          <span class="small"><span id="revPreV">20</span></span>
+        </label>
+        <label>Damping (0..1)
+          <input id="revDamp" type="range" min="0" max="1" step="0.01" value="0.35">
+          <span class="small"><span id="revDampV">0.35</span></span>
+        </label>
+        <label>Wet %
+          <input id="revMix" type="range" min="0" max="100" step="1" value="25">
+          <span class="small"><span id="revMixV">25</span>%</span>
+        </label>
+        <button id="revBuild" disabled>Rebuild IR</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+  const statusEl = $("status");
+  const stateEl = $("state");
+  const bufInfoEl = $("bufInfo");
+
+  function setStatus(s){ statusEl.textContent=s; }
+  function setState(s){ stateEl.textContent=s; }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
+
+  // UI
+  const fileEl = $("file");
+  const stopBtn = $("stop");
+  const exportBtn = $("export");
+
+  const loopOn = $("loopOn");
+  const loopStart = $("loopStart");
+  const loopEnd = $("loopEnd");
+
+  // Effect toggles + params
+  const gainOn = $("gainOn"), gain = $("gain"), gainV = $("gainV");
+
+  const distOn = $("distOn"), distDrive = $("distDrive"), distDriveV = $("distDriveV"),
+        distMix = $("distMix"), distMixV = $("distMixV");
+
+  const compOn = $("compOn"), compTh=$("compTh"), compThV=$("compThV"),
+        compRatio=$("compRatio"), compRatioV=$("compRatioV"),
+        compAtk=$("compAtk"), compAtkV=$("compAtkV"),
+        compRel=$("compRel"), compRelV=$("compRelV");
+
+  const modOn=$("modOn"), modType=$("modType"), modRate=$("modRate"), modRateV=$("modRateV"),
+        modDepth=$("modDepth"), modDepthV=$("modDepthV"),
+        modFb=$("modFb"), modFbV=$("modFbV"),
+        modMix=$("modMix"), modMixV=$("modMixV");
+
+  const delayOn=$("delayOn"), delayMs=$("delayMs"), delayMsV=$("delayMsV"),
+        delayFb=$("delayFb"), delayFbV=$("delayFbV"),
+        delayMix=$("delayMix"), delayMixV=$("delayMixV");
+
+  const eqOn=$("eqOn"), eqLow=$("eqLow"), eqLowV=$("eqLowV"),
+        eqMid=$("eqMid"), eqMidV=$("eqMidV"),
+        eqMidF=$("eqMidF"), eqMidFV=$("eqMidFV"),
+        eqHigh=$("eqHigh"), eqHighV=$("eqHighV");
+
+  const iirOn=$("iirOn"), iirType=$("iirType"), iirF=$("iirF"), iirFV=$("iirFV"),
+        iirQ=$("iirQ"), iirQV=$("iirQV");
+
+  const firOn=$("firOn"), firF=$("firF"), firFV=$("firFV"),
+        firT=$("firT"), firTV=$("firTV"),
+        firMix=$("firMix"), firMixV=$("firMixV"),
+        firBuild=$("firBuild");
+
+  const revOn=$("revOn"), revDecay=$("revDecay"), revDecayV=$("revDecayV"),
+        revPre=$("revPre"), revPreV=$("revPreV"),
+        revDamp=$("revDamp"), revDampV=$("revDampV"),
+        revMix=$("revMix"), revMixV=$("revMixV"),
+        revBuild=$("revBuild");
+
+  // Audio state
+  let ctx=null, buffer=null, src=null, isPlaying=false;
+  let analyser=null;
+
+  // Nodes
+  let pre=null;
+
+  // Gain bypass
+  let gNode=null, gBy=null, gMix=null;
+
+  // Dist dry/wet
+  let dPre=null, dShape=null, dWet=null, dDry=null, dOut=null;
+
+  // Comp bypass
+  let cNode=null, cBy=null, cMix=null;
+
+  // Mod dry/wet
+  let mIn=null, mDelayPath=null, mDelay=null, mFb=null, mAmpPath=null, mAmp=null, mWet=null, mDry=null, mOut=null;
+  let lfo=null, lfoGain=null;
+
+  // Delay dry/wet
+  let dlIn=null, dl=null, dlFb=null, dlWet=null, dlDry=null, dlOut=null;
+
+  // EQ bypass
+  let eIn=null, eLow=null, eMid=null, eHigh=null, eBy=null, eMix=null;
+
+  // IIR bypass
+  let iiIn=null, ii=null, iiBy=null, iiMix=null;
+
+  // FIR dry/wet
+  let fIn=null, fConv=null, fWet=null, fDry=null, fOut=null;
+
+  // Reverb dry/wet
+  let rvIn=null, rvPre=null, rvConv=null, rvWet=null, rvDry=null, rvOut=null;
+
+  function makeDistCurve(drive){
+    const n=44100, curve=new Float32Array(n), k=1+drive*50;
+    for(let i=0;i<n;i++){
+      const x=(i*2)/(n-1)-1;
+      curve[i]=Math.atan(k*x)/Math.atan(k);
+    }
+    return curve;
+  }
+
+  function buildWindowedSincLowpass(sampleRate, cutoffHz, taps){
+    const N=(taps%2===0)?taps+1:taps;
+    const M=(N-1)/2;
+    const fc=cutoffHz/sampleRate;
+    const h=new Float32Array(N);
+    function sinc(x){ if(x===0) return 1; const pix=Math.PI*x; return Math.sin(pix)/pix; }
+    for(let n=0;n<N;n++){
+      const k=n-M;
+      const ideal=2*fc*sinc(2*fc*k);
+      const w=0.54-0.46*Math.cos((2*Math.PI*n)/(N-1));
+      h[n]=ideal*w;
+    }
+    let sum=0; for(let i=0;i<N;i++) sum+=h[i];
+    if(sum!==0) for(let i=0;i<N;i++) h[i]/=sum;
+    return h;
+  }
+
+  function rebuildFIR(context, convolver){
+    const cut=parseInt(firF.value,10);
+    const taps=parseInt(firT.value,10);
+    const N=(taps%2===0)?taps+1:taps;
+    const irL=buildWindowedSincLowpass(context.sampleRate, cut, N);
+    const irR=buildWindowedSincLowpass(context.sampleRate, cut, N);
+    const buf=context.createBuffer(2, N, context.sampleRate);
+    buf.copyToChannel(irL,0); buf.copyToChannel(irR,1);
+    convolver.buffer=buf;
+  }
+
+  function rebuildReverbIR(context, convolver){
+    const sr=context.sampleRate;
+    const decaySec=parseFloat(revDecay.value);
+    const preMs=parseInt(revPre.value,10);
+    const damp=parseFloat(revDamp.value);
+
+    const preS=Math.floor((preMs/1000)*sr);
+    const irS=Math.max(1, Math.floor(decaySec*sr));
+    const total=preS+irS;
+
+    const buf=context.createBuffer(2,total,sr);
+    const a=Math.exp(-damp*6/sr);
+
+    function fill(ch){
+      const data=buf.getChannelData(ch);
+      let y=0;
+      for(let i=0;i<total;i++){
+        if(i<preS){ data[i]=0; continue; }
+        const n=(Math.random()*2-1);
+        const tt=(i-preS)/irS;
+        const env=Math.pow(1-tt,2.5);
+        y=a*y+(1-a)*n;
+        data[i]=y*env;
+      }
+    }
+    fill(0); fill(1);
+    convolver.buffer=buf;
+  }
+
+  function ensureCtx(){
+    if(ctx) return;
+    ctx = new (window.AudioContext||window.webkitAudioContext)();
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+
+    // --- Build chain (series) ---
+    pre = ctx.createGain();
+
+    // Gain module (bypass mix)
+    gNode = ctx.createGain();
+    gBy = ctx.createGain();
+    gMix = ctx.createGain();
+    pre.connect(gNode);
+    pre.connect(gBy);
+    gNode.connect(gMix);
+    gBy.connect(gMix);
+
+    // Dist module
+    dPre = ctx.createGain();
+    dShape = ctx.createWaveShaper();
+    dWet = ctx.createGain();
+    dDry = ctx.createGain();
+    dOut = ctx.createGain();
+    gMix.connect(dDry);
+    gMix.connect(dPre);
+    dPre.connect(dShape);
+    dShape.connect(dWet);
+    dDry.connect(dOut);
+    dWet.connect(dOut);
+
+    // Compressor module (bypass)
+    cNode = ctx.createDynamicsCompressor();
+    cBy = ctx.createGain();
+    cMix = ctx.createGain();
+    dOut.connect(cNode);
+    dOut.connect(cBy);
+    cNode.connect(cMix);
+    cBy.connect(cMix);
+
+    // Mod module (dry/wet)
+    mIn = ctx.createGain();
+    mDelayPath = ctx.createGain();
+    mDelay = ctx.createDelay(0.05);
+    mFb = ctx.createGain();
+    mAmpPath = ctx.createGain();
+    mAmp = ctx.createGain();
+    mWet = ctx.createGain();
+    mDry = ctx.createGain();
+    mOut = ctx.createGain();
+
+    cMix.connect(mIn);
+
+    mIn.connect(mDelayPath);
+    mDelayPath.connect(mDelay);
+    mDelay.connect(mWet);
+    mDelay.connect(mFb);
+    mFb.connect(mDelay);
+
+    mIn.connect(mAmpPath);
+    mAmpPath.connect(mAmp);
+    mAmp.connect(mWet);
+
+    mIn.connect(mDry);
+    mDry.connect(mOut);
+    mWet.connect(mOut);
+
+    lfo = ctx.createOscillator(); lfo.type="sine";
+    lfoGain = ctx.createGain();
+    lfo.connect(lfoGain);
+    lfo.start();
+
+    // Delay module (dry/wet)
+    dlIn = ctx.createGain();
+    dl = ctx.createDelay(2.0);
+    dlFb = ctx.createGain();
+    dlWet = ctx.createGain();
+    dlDry = ctx.createGain();
+    dlOut = ctx.createGain();
+    mOut.connect(dlIn);
+    dlIn.connect(dlDry);
+    dlIn.connect(dl);
+    dl.connect(dlWet);
+    dl.connect(dlFb);
+    dlFb.connect(dl);
+    dlDry.connect(dlOut);
+    dlWet.connect(dlOut);
+
+    // EQ module (bypass)
+    eIn = ctx.createGain();
+    eLow = ctx.createBiquadFilter(); eLow.type="lowshelf"; eLow.frequency.value=200;
+    eMid = ctx.createBiquadFilter(); eMid.type="peaking"; eMid.Q.value=1.0;
+    eHigh = ctx.createBiquadFilter(); eHigh.type="highshelf"; eHigh.frequency.value=4000;
+    eBy = ctx.createGain();
+    eMix = ctx.createGain();
+    dlOut.connect(eIn);
+    eIn.connect(eBy);
+    eIn.connect(eLow);
+    eLow.connect(eMid);
+    eMid.connect(eHigh);
+    eBy.connect(eMix);
+    eHigh.connect(eMix);
+
+    // IIR module (bypass)
+    iiIn = ctx.createGain();
+    ii = ctx.createBiquadFilter(); ii.type="lowpass";
+    iiBy = ctx.createGain();
+    iiMix = ctx.createGain();
+    eMix.connect(iiIn);
+    iiIn.connect(iiBy);
+    iiIn.connect(ii);
+    iiBy.connect(iiMix);
+    ii.connect(iiMix);
+
+    // FIR module (dry/wet via convolver kernel)
+    fIn = ctx.createGain();
+    fConv = ctx.createConvolver();
+    fWet = ctx.createGain();
+    fDry = ctx.createGain();
+    fOut = ctx.createGain();
+    iiMix.connect(fIn);
+    fIn.connect(fDry);
+    fIn.connect(fConv);
+    fConv.connect(fWet);
+    fDry.connect(fOut);
+    fWet.connect(fOut);
+
+    // Reverb module (dry/wet + predelay)
+    rvIn = ctx.createGain();
+    rvPre = ctx.createDelay(0.3);
+    rvConv = ctx.createConvolver();
+    rvWet = ctx.createGain();
+    rvDry = ctx.createGain();
+    rvOut = ctx.createGain();
+
+    fOut.connect(rvIn);
+    rvIn.connect(rvDry);
+    rvIn.connect(rvPre);
+    rvPre.connect(rvConv);
+    rvConv.connect(rvWet);
+    rvDry.connect(rvOut);
+    rvWet.connect(rvOut);
+
+    // output + analyser
+    rvOut.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    // build initial IRs
+    rebuildFIR(ctx, fConv);
+    rebuildReverbIR(ctx, rvConv);
+    firBuild.disabled=false;
+    revBuild.disabled=false;
+
+    startFFT();
+    syncAll();
+  }
+
+  function stop(){
+    if(src){ try{src.stop();}catch{} try{src.disconnect();}catch{} src=null; }
+    isPlaying=false;
+    setState("stopped");
+  }
+
+  function play(){
+    if(!ctx || !buffer) return;
+    stop();
+    src = ctx.createBufferSource();
+    src.buffer = buffer;
+
+    src.loop = !!loopOn.checked;
+    if(src.loop){
+      const ls=clamp(parseFloat(loopStart.value||"0"),0,buffer.duration);
+      const le=clamp(parseFloat(loopEnd.value||String(buffer.duration)),0,buffer.duration);
+      const a=Math.min(ls,le), b=Math.max(ls,le);
+      src.loopStart = a;
+      src.loopEnd = Math.max(a+0.001, b);
+    }
+    src.connect(pre);
+    src.start();
+    isPlaying=true;
+    setState("playing");
+    setStatus("playing");
+  }
+
+  // --- Sync functions ---
+  function syncGain(){
+    const g=parseFloat(gain.value);
+    gainV.textContent=g.toFixed(2);
+    if(!gNode) return;
+    gNode.gain.value = gainOn.checked ? g : 0;
+    gBy.gain.value = gainOn.checked ? 0 : 1;
+  }
+
+  function syncDist(){
+    const d=parseFloat(distDrive.value);
+    const mix=parseInt(distMix.value,10);
+    distDriveV.textContent=d.toFixed(3);
+    distMixV.textContent=String(mix);
+    if(!dShape) return;
+    dShape.curve = makeDistCurve(d);
+    dShape.oversample="4x";
+    dPre.gain.value = 1 + d*1.5;
+    const wet=(mix/100) * (distOn.checked?1:0);
+    dWet.gain.value = wet;
+    dDry.gain.value = 1-wet;
+  }
+
+  function syncComp(){
+    const th=parseInt(compTh.value,10);
+    const ra=parseFloat(compRatio.value);
+    const a=parseFloat(compAtk.value);
+    const r=parseFloat(compRel.value);
+    compThV.textContent=String(th);
+    compRatioV.textContent=ra.toFixed(1);
+    compAtkV.textContent=a.toFixed(3);
+    compRelV.textContent=r.toFixed(2);
+    if(!cNode) return;
+    cNode.threshold.value=th;
+    cNode.ratio.value=ra;
+    cNode.attack.value=a;
+    cNode.release.value=r;
+    cBy.gain.value = compOn.checked ? 0 : 1;
+  }
+
+  function disconnectLfo(){
+    try{ lfoGain.disconnect(); }catch{}
+  }
+
+  function syncMod(){
+    const rate=parseFloat(modRate.value);
+    const depth=parseFloat(modDepth.value);
+    const fb=parseFloat(modFb.value);
+    const mix=parseInt(modMix.value,10);
+    modRateV.textContent=rate.toFixed(2);
+    modDepthV.textContent=depth.toFixed(3);
+    modFbV.textContent=fb.toFixed(2);
+    modMixV.textContent=String(mix);
+
+    if(!mOut) return;
+    const wet=(mix/100) * (modOn.checked?1:0);
+    mWet.gain.value=wet;
+    mDry.gain.value=1-wet;
+
+    lfo.frequency.value=rate;
+    disconnectLfo();
+
+    // defaults
+    mDelayPath.gain.value=0;
+    mAmpPath.gain.value=0;
+    mFb.gain.value=0;
+    mAmp.gain.value=1;
+
+    if(!modOn.checked) return;
+
+    const type=modType.value;
+    if(type==="chorus" || type==="flanger"){
+      mDelayPath.gain.value=1;
+      const base=(type==="flanger")?0.004:0.020;
+      const maxDepth=(type==="flanger")?0.003:0.010;
+      mDelay.delayTime.value=base;
+      lfoGain.gain.value=depth*maxDepth;
+      lfoGain.connect(mDelay.delayTime);
+      mFb.gain.value=fb;
+    } else if(type==="tremolo"){
+      mAmpPath.gain.value=1;
+      const base=1-depth*0.5;
+      const amp=depth*0.5;
+      mAmp.gain.value=base;
+      lfoGain.gain.value=amp;
+      lfoGain.connect(mAmp.gain);
+    } else { // ring
+      mAmpPath.gain.value=1;
+      mAmp.gain.value=0;
+      lfoGain.gain.value=depth;
+      lfoGain.connect(mAmp.gain);
+    }
+  }
+
+  function syncDelay(){
+    const ms=parseInt(delayMs.value,10);
+    const fb=parseFloat(delayFb.value);
+    const mix=parseInt(delayMix.value,10);
+    delayMsV.textContent=String(ms);
+    delayFbV.textContent=fb.toFixed(2);
+    delayMixV.textContent=String(mix);
+    if(!dl) return;
+    dl.delayTime.value=ms/1000;
+    const wet=(mix/100) * (delayOn.checked?1:0);
+    dlWet.gain.value=wet;
+    dlDry.gain.value=1-wet;
+    dlFb.gain.value=delayOn.checked ? fb : 0;
+  }
+
+  function syncEQ(){
+    const lo=parseFloat(eqLow.value);
+    const mi=parseFloat(eqMid.value);
+    const mf=parseInt(eqMidF.value,10);
+    const hi=parseFloat(eqHigh.value);
+    eqLowV.textContent=lo.toFixed(1);
+    eqMidV.textContent=mi.toFixed(1);
+    eqMidFV.textContent=String(mf);
+    eqHighV.textContent=hi.toFixed(1);
+    if(!eLow) return;
+    eBy.gain.value = eqOn.checked ? 0 : 1;
+    eLow.gain.value=lo;
+    eMid.gain.value=mi;
+    eMid.frequency.value=mf;
+    eHigh.gain.value=hi;
+  }
+
+  function syncIIR(){
+    const f=parseInt(iirF.value,10);
+    const q=parseFloat(iirQ.value);
+    iirFV.textContent=String(f);
+    iirQV.textContent=q.toFixed(1);
+    if(!ii) return;
+    iiBy.gain.value = iirOn.checked ? 0 : 1;
+    ii.type = iirType.value;
+    ii.frequency.value = f;
+    ii.Q.value = q;
+  }
+
+  function syncFIR(){
+    const f=parseInt(firF.value,10);
+    const t=parseInt(firT.value,10);
+    const mix=parseInt(firMix.value,10);
+    firFV.textContent=String(f);
+    firTV.textContent=String(t);
+    firMixV.textContent=String(mix);
+    if(!fConv) return;
+    const wet=(mix/100) * (firOn.checked?1:0);
+    fWet.gain.value=wet;
+    fDry.gain.value=1-wet;
+  }
+
+  function syncReverb(){
+    const dec=parseFloat(revDecay.value);
+    const preMs=parseInt(revPre.value,10);
+    const damp=parseFloat(revDamp.value);
+    const mix=parseInt(revMix.value,10);
+    revDecayV.textContent=dec.toFixed(1);
+    revPreV.textContent=String(preMs);
+    revDampV.textContent=damp.toFixed(2);
+    revMixV.textContent=String(mix);
+    if(!rvConv) return;
+    rvPre.delayTime.value = preMs/1000;
+    const wet=(mix/100) * (revOn.checked?1:0);
+    rvWet.gain.value=wet;
+    rvDry.gain.value=1-wet;
+  }
+
+  function syncLoopUI(){
+    const en = !!loopOn.checked;
+    loopStart.disabled = !en;
+    loopEnd.disabled = !en;
+    if(buffer){
+      if(!loopEnd.value || parseFloat(loopEnd.value)<=0) loopEnd.value = buffer.duration.toFixed(2);
+    }
+  }
+
+  function syncAll(){
+    syncGain(); syncDist(); syncComp(); syncMod(); syncDelay();
+    syncEQ(); syncIIR(); syncFIR(); syncReverb(); syncLoopUI();
+  }
+
+  // --- FFT drawing ---
+  let rafFFT=0;
+  function startFFT(){
+    const canvas=$("fft");
+    const g=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const frame=()=>{
+      g.clearRect(0,0,w,h);
+      analyser.getByteFrequencyData(data);
+      const step=Math.max(1, Math.floor(data.length/300));
+      const bars=Math.floor(data.length/step);
+      const bw=w/bars;
+      for(let i=0;i<bars;i++){
+        const v=data[i*step]/255;
+        const bh=v*(h-10);
+        g.fillRect(i*bw, h-bh, bw*0.9, bh);
+      }
+      g.fillText("FFT Spectrum", 10, 18);
+      rafFFT=requestAnimationFrame(frame);
+    };
+    cancelAnimationFrame(rafFFT);
+    rafFFT=requestAnimationFrame(frame);
+  }
+
+  // --- WAV encoding (PCM16) ---
+  function writeString(view, offset, string){ for (let i=0;i<string.length;i++) view.setUint8(offset+i, string.charCodeAt(i)); }
+  function floatTo16BitPCM(view, offset, input){
+    for (let i=0;i<input.length;i++){
+      let s=Math.max(-1, Math.min(1, input[i]));
+      view.setInt16(offset+i*2, s<0 ? s*0x8000 : s*0x7FFF, true);
+    }
+  }
+  function encodeWAVFromAudioBuffer(buffer){
+    const ch=buffer.numberOfChannels, sr=buffer.sampleRate, len=buffer.length;
+    const inter=new Float32Array(len*ch);
+    for (let i=0;i<len;i++) for (let c=0;c<ch;c++) inter[i*ch+c]=buffer.getChannelData(c)[i];
+    const bytesPerSample=2, blockAlign=ch*bytesPerSample;
+    const ab=new ArrayBuffer(44+inter.length*bytesPerSample);
+    const view=new DataView(ab);
+    writeString(view,0,"RIFF");
+    view.setUint32(4,36+inter.length*bytesPerSample,true);
+    writeString(view,8,"WAVE");
+    writeString(view,12,"fmt ");
+    view.setUint32(16,16,true);
+    view.setUint16(20,1,true);
+    view.setUint16(22,ch,true);
+    view.setUint32(24,sr,true);
+    view.setUint32(28,sr*blockAlign,true);
+    view.setUint16(32,blockAlign,true);
+    view.setUint16(34,16,true);
+    writeString(view,36,"data");
+    view.setUint32(40,inter.length*bytesPerSample,true);
+    floatTo16BitPCM(view,44,inter);
+    return new Blob([view], {type:"audio/wav"});
+  }
+  function downloadBlob(blob, filename){
+    const a=document.createElement("a");
+    const url=URL.createObjectURL(blob);
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+
+  async function exportWav(){
+    if(!buffer) return;
+    exportBtn.disabled=true;
+    setStatus("export: offline render…");
+
+    const extraTailSec=4.0;
+    const sr=buffer.sampleRate;
+    const totalLength=Math.ceil((buffer.duration+extraTailSec)*sr);
+    const off=new OfflineAudioContext(2,totalLength,sr);
+
+    // Build offline chain mirroring realtime (same architecture)
+    const pre = off.createGain();
+
+    // Gain bypass
+    const gN=off.createGain(), gB=off.createGain(), gM=off.createGain();
+    pre.connect(gN); pre.connect(gB);
+    gN.connect(gM); gB.connect(gM);
+
+    // Dist
+    const dP=off.createGain(), dS=off.createWaveShaper(), dW=off.createGain(), dD=off.createGain(), dO=off.createGain();
+    gM.connect(dD); gM.connect(dP);
+    dP.connect(dS); dS.connect(dW);
+    dD.connect(dO); dW.connect(dO);
+
+    // Comp bypass
+    const c=off.createDynamicsCompressor(), cB=off.createGain(), cM=off.createGain();
+    dO.connect(c); dO.connect(cB);
+    c.connect(cM); cB.connect(cM);
+
+    // Mod
+    const mI=off.createGain(), mDP=off.createGain(), mDL=off.createDelay(0.05), mFB=off.createGain(), mAP=off.createGain(), mA=off.createGain(), mW=off.createGain(), mD=off.createGain(), mO=off.createGain();
+    cM.connect(mI);
+    mI.connect(mDP); mDP.connect(mDL); mDL.connect(mW); mDL.connect(mFB); mFB.connect(mDL);
+    mI.connect(mAP); mAP.connect(mA); mA.connect(mW);
+    mI.connect(mD); mD.connect(mO); mW.connect(mO);
+
+    const o=off.createOscillator(); o.type="sine";
+    const oG=off.createGain(); o.connect(oG); o.start(0);
+
+    // Delay
+    const dlI=off.createGain(), dl=off.createDelay(2.0), dlFB=off.createGain(), dlW=off.createGain(), dlD=off.createGain(), dlO=off.createGain();
+    mO.connect(dlI);
+    dlI.connect(dlD); dlI.connect(dl);
+    dl.connect(dlW); dl.connect(dlFB); dlFB.connect(dl);
+    dlD.connect(dlO); dlW.connect(dlO);
+
+    // EQ bypass
+    const eI=off.createGain();
+    const eLo=off.createBiquadFilter(); eLo.type="lowshelf"; eLo.frequency.value=200;
+    const eMi=off.createBiquadFilter(); eMi.type="peaking"; eMi.Q.value=1.0;
+    const eHi=off.createBiquadFilter(); eHi.type="highshelf"; eHi.frequency.value=4000;
+    const eB=off.createGain(), eM=off.createGain();
+    dlO.connect(eI);
+    eI.connect(eB);
+    eI.connect(eLo); eLo.connect(eMi); eMi.connect(eHi);
+    eB.connect(eM); eHi.connect(eM);
+
+    // IIR bypass
+    const iiI=off.createGain(), ii=off.createBiquadFilter(), iiB=off.createGain(), iiM=off.createGain();
+    eM.connect(iiI);
+    iiI.connect(iiB); iiI.connect(ii);
+    iiB.connect(iiM); ii.connect(iiM);
+
+    // FIR
+    const fI=off.createGain(), fC=off.createConvolver(), fW=off.createGain(), fD=off.createGain(), fO=off.createGain();
+    iiM.connect(fI);
+    fI.connect(fD); fI.connect(fC);
+    fC.connect(fW);
+    fD.connect(fO); fW.connect(fO);
+
+    // Reverb
+    const rvI=off.createGain(), rvP=off.createDelay(0.3), rvC=off.createConvolver(), rvW=off.createGain(), rvD=off.createGain(), rvO=off.createGain();
+    fO.connect(rvI);
+    rvI.connect(rvD);
+    rvI.connect(rvP); rvP.connect(rvC); rvC.connect(rvW);
+    rvD.connect(rvO); rvW.connect(rvO);
+    rvO.connect(off.destination);
+
+    // Source
+    const s=off.createBufferSource();
+    s.buffer=buffer;
+    s.loop=false;
+    s.connect(pre);
+
+    // Apply params from UI
+    // Gain
+    const gVal=parseFloat(gain.value);
+    gN.gain.value = gainOn.checked ? gVal : 0;
+    gB.gain.value = gainOn.checked ? 0 : 1;
+
+    // Dist
+    const dDrive=parseFloat(distDrive.value);
+    dS.curve = (function(){
+      const n=44100, c0=new Float32Array(n), k=1+dDrive*50;
+      for(let i=0;i<n;i++){ const x=(i*2)/(n-1)-1; c0[i]=Math.atan(k*x)/Math.atan(k); }
+      return c0;
+    })();
+    dS.oversample="4x";
+    dP.gain.value = 1 + dDrive*1.5;
+    const dWetAmt = (parseInt(distMix.value,10)/100) * (distOn.checked?1:0);
+    dW.gain.value = dWetAmt;
+    dD.gain.value = 1 - dWetAmt;
+
+    // Comp
+    c.threshold.value = parseFloat(compTh.value);
+    c.ratio.value = parseFloat(compRatio.value);
+    c.attack.value = parseFloat(compAtk.value);
+    c.release.value = parseFloat(compRel.value);
+    cB.gain.value = compOn.checked ? 0 : 1;
+
+    // Mod
+    const modWetAmt=(parseInt(modMix.value,10)/100) * (modOn.checked?1:0);
+    mW.gain.value = modWetAmt;
+    mD.gain.value = 1 - modWetAmt;
+    o.frequency.value = parseFloat(modRate.value);
+
+    // defaults
+    mDP.gain.value=0; mAP.gain.value=0; mFB.gain.value=0; mA.gain.value=1;
+
+    if(modOn.checked){
+      const type=modType.value;
+      const depth=parseFloat(modDepth.value);
+      const fb=parseFloat(modFb.value);
+
+      if(type==="chorus" || type==="flanger"){
+        mDP.gain.value=1;
+        const base=(type==="flanger")?0.004:0.020;
+        const maxDepth=(type==="flanger")?0.003:0.010;
+        mDL.delayTime.value = base;
+        oG.gain.value = depth * maxDepth;
+        oG.connect(mDL.delayTime);
+        mFB.gain.value = fb;
+      } else if(type==="tremolo"){
+        mAP.gain.value=1;
+        const base=1-depth*0.5;
+        const amp=depth*0.5;
+        mA.gain.value = base;
+        oG.gain.value = amp;
+        oG.connect(mA.gain);
+      } else { // ring
+        mAP.gain.value=1;
+        mA.gain.value = 0;
+        oG.gain.value = depth;
+        oG.connect(mA.gain);
+      }
+    }
+
+    // Delay
+    dl.delayTime.value = parseInt(delayMs.value,10)/1000;
+    const dlWetAmt=(parseInt(delayMix.value,10)/100) * (delayOn.checked?1:0);
+    dlW.gain.value = dlWetAmt;
+    dlD.gain.value = 1 - dlWetAmt;
+    dlFB.gain.value = delayOn.checked ? parseFloat(delayFb.value) : 0;
+
+    // EQ
+    eB.gain.value = eqOn.checked ? 0 : 1;
+    eLo.gain.value = parseFloat(eqLow.value);
+    eMi.gain.value = parseFloat(eqMid.value);
+    eMi.frequency.value = parseInt(eqMidF.value,10);
+    eHi.gain.value = parseFloat(eqHigh.value);
+
+    // IIR
+    iiB.gain.value = iirOn.checked ? 0 : 1;
+    ii.type = iirType.value;
+    ii.frequency.value = parseInt(iirF.value,10);
+    ii.Q.value = parseFloat(iirQ.value);
+
+    // FIR
+    const firWetAmt=(parseInt(firMix.value,10)/100) * (firOn.checked?1:0);
+    fW.gain.value = firWetAmt;
+    fD.gain.value = 1 - firWetAmt;
+
+    // build FIR kernel offline
+    (function(){
+      const cut=parseInt(firF.value,10);
+      const taps=parseInt(firT.value,10);
+      const N=(taps%2===0)?taps+1:taps;
+      const irL=buildWindowedSincLowpass(off.sampleRate, cut, N);
+      const irR=buildWindowedSincLowpass(off.sampleRate, cut, N);
+      const b=off.createBuffer(2,N,off.sampleRate);
+      b.copyToChannel(irL,0); b.copyToChannel(irR,1);
+      fC.buffer=b;
+    })();
+
+    // Reverb
+    rvP.delayTime.value = parseInt(revPre.value,10)/1000;
+    const rvWetAmt=(parseInt(revMix.value,10)/100) * (revOn.checked?1:0);
+    rvW.gain.value = rvWetAmt;
+    rvD.gain.value = 1 - rvWetAmt;
+
+    // build reverb IR offline
+    (function(){
+      const sr2=off.sampleRate;
+      const decaySec=parseFloat(revDecay.value);
+      const preMs=parseInt(revPre.value,10);
+      const damp=parseFloat(revDamp.value);
+      const preS=Math.floor((preMs/1000)*sr2);
+      const irS=Math.max(1, Math.floor(decaySec*sr2));
+      const total=preS+irS;
+      const b=off.createBuffer(2,total,sr2);
+      const a=Math.exp(-damp*6/sr2);
+      function fill(ch){
+        const data=b.getChannelData(ch); let y=0;
+        for(let i=0;i<total;i++){
+          if(i<preS){ data[i]=0; continue; }
+          const n=(Math.random()*2-1);
+          const tt=(i-preS)/irS;
+          const env=Math.pow(1-tt,2.5);
+          y=a*y+(1-a)*n;
+          data[i]=y*env;
+        }
+      }
+      fill(0); fill(1);
+      rvC.buffer=b;
+    })();
+
+    s.start(0);
+
+    const rendered = await off.startRendering();
+    const wav = encodeWAVFromAudioBuffer(rendered);
+    const base = (fileEl.files && fileEl.files[0]) ? fileEl.files[0].name.replace(/\.[^.]+$/, "") : "export";
+    const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+    downloadBlob(wav, `${base}_DSP_MEGA_${stamp}.wav`);
+    setStatus("export klaar");
+    exportBtn.disabled=false;
+  }
+
+  // --- Events ---
+  fileEl.addEventListener("change", async (e)=>{
+    const f = e.target.files?.[0];
+    if(!f) return;
+    ensureCtx();
+    await ctx.resume();
+
+    setStatus("decoderen…");
+    const arr = await f.arrayBuffer();
+    buffer = await ctx.decodeAudioData(arr);
+
+    bufInfoEl.textContent = `${buffer.numberOfChannels}ch, ${buffer.sampleRate} Hz, ${buffer.duration.toFixed(2)}s`;
+
+    loopStart.value = "0";
+    loopEnd.value = buffer.duration.toFixed(2);
+    loopStart.disabled = !loopOn.checked;
+    loopEnd.disabled = !loopOn.checked;
+
+    // rebuild kernels at load
+    rebuildFIR(ctx, fConv);
+    rebuildReverbIR(ctx, rvConv);
+
+    stopBtn.disabled=false;
+    exportBtn.disabled=false;
+    firBuild.disabled=false;
+    revBuild.disabled=false;
+
+    syncAll();
+    play(); // auto-start
+  });
+
+  stopBtn.addEventListener("click", ()=>{ stop(); setStatus("stopped"); });
+
+  exportBtn.addEventListener("click", exportWav);
+
+  // loop changes restart playback
+  loopOn.addEventListener("change", ()=>{ syncLoopUI(); if(buffer) play(); });
+  loopStart.addEventListener("change", ()=>{ if(buffer) play(); });
+  loopEnd.addEventListener("change", ()=>{ if(buffer) play(); });
+
+  // controls
+  gainOn.addEventListener("change", syncGain);
+  gain.addEventListener("input", syncGain);
+
+  distOn.addEventListener("change", syncDist);
+  distDrive.addEventListener("input", syncDist);
+  distMix.addEventListener("input", syncDist);
+
+  compOn.addEventListener("change", syncComp);
+  compTh.addEventListener("input", syncComp);
+  compRatio.addEventListener("input", syncComp);
+  compAtk.addEventListener("input", syncComp);
+  compRel.addEventListener("input", syncComp);
+
+  modOn.addEventListener("change", syncMod);
+  modType.addEventListener("change", syncMod);
+  modRate.addEventListener("input", syncMod);
+  modDepth.addEventListener("input", syncMod);
+  modFb.addEventListener("input", syncMod);
+  modMix.addEventListener("input", syncMod);
+
+  delayOn.addEventListener("change", syncDelay);
+  delayMs.addEventListener("input", syncDelay);
+  delayFb.addEventListener("input", syncDelay);
+  delayMix.addEventListener("input", syncDelay);
+
+  eqOn.addEventListener("change", syncEQ);
+  eqLow.addEventListener("input", syncEQ);
+  eqMid.addEventListener("input", syncEQ);
+  eqMidF.addEventListener("input", syncEQ);
+  eqHigh.addEventListener("input", syncEQ);
+
+  iirOn.addEventListener("change", syncIIR);
+  iirType.addEventListener("change", syncIIR);
+  iirF.addEventListener("input", syncIIR);
+  iirQ.addEventListener("input", syncIIR);
+
+  firOn.addEventListener("change", syncFIR);
+  firF.addEventListener("input", ()=>{ syncFIR(); if(ctx && fConv) rebuildFIR(ctx, fConv); });
+  firT.addEventListener("input", ()=>{ syncFIR(); if(ctx && fConv) rebuildFIR(ctx, fConv); });
+  firMix.addEventListener("input", syncFIR);
+  firBuild.addEventListener("click", ()=>{ if(ctx && fConv){ rebuildFIR(ctx, fConv); setStatus("FIR rebuilt"); } });
+
+  revOn.addEventListener("change", syncReverb);
+  revDecay.addEventListener("input", ()=>{ syncReverb(); if(ctx && rvConv) rebuildReverbIR(ctx, rvConv); });
+  revPre.addEventListener("input", ()=>{ syncReverb(); if(ctx && rvConv) rebuildReverbIR(ctx, rvConv); });
+  revDamp.addEventListener("input", ()=>{ syncReverb(); if(ctx && rvConv) rebuildReverbIR(ctx, rvConv); });
+  revMix.addEventListener("input", syncReverb);
+  revBuild.addEventListener("click", ()=>{ if(ctx && rvConv){ rebuildReverbIR(ctx, rvConv); setStatus("Reverb IR rebuilt"); } });
+
+  // init labels
+  (function initLabels(){
+    gainV.textContent=parseFloat(gain.value).toFixed(2);
+    distDriveV.textContent=parseFloat(distDrive.value).toFixed(3);
+    distMixV.textContent=String(parseInt(distMix.value,10));
+    compThV.textContent=String(parseInt(compTh.value,10));
+    compRatioV.textContent=parseFloat(compRatio.value).toFixed(1);
+    compAtkV.textContent=parseFloat(compAtk.value).toFixed(3);
+    compRelV.textContent=parseFloat(compRel.value).toFixed(2);
+    modRateV.textContent=parseFloat(modRate.value).toFixed(2);
+    modDepthV.textContent=parseFloat(modDepth.value).toFixed(3);
+    modFbV.textContent=parseFloat(modFb.value).toFixed(2);
+    modMixV.textContent=String(parseInt(modMix.value,10));
+    delayMsV.textContent=String(parseInt(delayMs.value,10));
+    delayFbV.textContent=parseFloat(delayFb.value).toFixed(2);
+    delayMixV.textContent=String(parseInt(delayMix.value,10));
+    eqLowV.textContent=parseFloat(eqLow.value).toFixed(1);
+    eqMidV.textContent=parseFloat(eqMid.value).toFixed(1);
+    eqMidFV.textContent=String(parseInt(eqMidF.value,10));
+    eqHighV.textContent=parseFloat(eqHigh.value).toFixed(1);
+    iirFV.textContent=String(parseInt(iirF.value,10));
+    iirQV.textContent=parseFloat(iirQ.value).toFixed(1);
+    firFV.textContent=String(parseInt(firF.value,10));
+    firTV.textContent=String(parseInt(firT.value,10));
+    firMixV.textContent=String(parseInt(firMix.value,10));
+    revDecayV.textContent=parseFloat(revDecay.value).toFixed(1);
+    revPreV.textContent=String(parseInt(revPre.value,10));
+    revDampV.textContent=parseFloat(revDamp.value).toFixed(2);
+    revMixV.textContent=String(parseInt(revMix.value,10));
+    setState("idle");
+  })();
+
+})();
+</script>
+</body>
+</html>

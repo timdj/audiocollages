@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MP4 → WAV (zonder FFmpeg)</title>
+  <style>
+    :root { --bg:#0b0f17; --card:#121a2a; --muted:#9fb0c6; --text:#e8eef7; --line:#26324a; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    h1 { margin:0 0 8px; font-size: 20px; }
+    p { margin: 8px 0; color: var(--muted); line-height: 1.45; }
+    .row { display:flex; gap:12px; flex-wrap: wrap; align-items:center; margin-top: 12px; }
+    input[type="file"] { padding:10px; border:1px solid var(--line); border-radius:12px; background:#0f1626; color:var(--text); }
+    button {
+      padding:10px 14px; border-radius:12px; border:1px solid var(--line);
+      background:#1b2a44; color:var(--text); cursor:pointer;
+    }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .pill { display:inline-block; padding:6px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); background:#0f1626; }
+    .log { margin-top: 12px; padding: 10px; background:#0f1626; border:1px solid var(--line); border-radius:12px; height: 140px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color:#cfe0ff; white-space: pre-wrap; }
+    table { width:100%; border-collapse: collapse; margin-top: 14px; overflow:hidden; border-radius: 12px; }
+    th, td { text-align:left; padding:10px; border-bottom:1px solid var(--line); vertical-align: top; }
+    th { color:#cfe0ff; font-weight: 600; background:#0f1626; }
+    a { color:#9ad0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .status { font-weight: 600; }
+    .ok { color:#7CFFB2; }
+    .err { color:#FF7C7C; }
+    .warn { color:#ffd27c; }
+    .small { font-size: 12px; }
+    code { background:#0f1626; padding:2px 6px; border:1px solid var(--line); border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>MP4 → WAV converter (zonder FFmpeg)</h1>
+      <p>Deze versie gebruikt de <span class="pill">Web Audio API</span> om audio uit MP4 te decoderen en naar <span class="pill">WAV (PCM 16-bit)</span> te exporteren.</p>
+      <p class="small">
+        Werkt alleen als jouw browser de audio in de MP4 kan decoderen (meestal AAC). Als een bestand faalt: gebruik desktop FFmpeg.
+      </p>
+
+      <div class="row">
+        <input id="fileInput" type="file" accept="video/mp4,audio/mp4" multiple />
+        <button id="btnConvert" disabled>Converteer naar WAV</button>
+        <span id="info" class="pill">Kies bestanden</span>
+      </div>
+
+      <div id="log" class="log" aria-live="polite"></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Bestand</th>
+            <th>Status</th>
+            <th>Resultaat</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr>
+            <td colspan="3" class="small" style="color: var(--muted);">Nog geen bestanden gekozen.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="small" style="margin-top:14px;">
+        Desktop alternatief (altijd goed): <code>ffmpeg -i input.mp4 output.wav</code>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      fileInput: document.getElementById("fileInput"),
+      btnConvert: document.getElementById("btnConvert"),
+      info: document.getElementById("info"),
+      log: document.getElementById("log"),
+      tbody: document.getElementById("tbody"),
+    };
+
+    function logLine(s) {
+      const t = new Date().toLocaleTimeString();
+      els.log.textContent += `[${t}] ${s}\n`;
+      els.log.scrollTop = els.log.scrollHeight;
+    }
+
+    function sanitizeBaseName(name) {
+      return name.replace(/\.[^/.]+$/, "").replace(/[^a-z0-9_\-]+/gi, "_").replace(/^_+|_+$/g, "") || "output";
+    }
+
+    function setInfo(text) { els.info.textContent = text; }
+
+    function renderRows(files) {
+      els.tbody.innerHTML = "";
+      for (const file of files) {
+        const tr = document.createElement("tr");
+        tr.dataset.name = file.name;
+
+        const tdName = document.createElement("td");
+        tdName.innerHTML = `<div><strong>${file.name}</strong></div><div class="small" style="color: var(--muted)">${(file.size/1024/1024).toFixed(2)} MB</div>`;
+
+        const tdStatus = document.createElement("td");
+        tdStatus.innerHTML = `<span class="status warn">Wacht</span>`;
+
+        const tdOut = document.createElement("td");
+        tdOut.innerHTML = `<span class="small" style="color: var(--muted)">—</span>`;
+
+        tr.append(tdName, tdStatus, tdOut);
+        els.tbody.appendChild(tr);
+      }
+    }
+
+    function updateRow(name, { statusText, statusClass, linkHtml }) {
+      const tr = [...els.tbody.querySelectorAll("tr")].find(r => r.dataset.name === name);
+      if (!tr) return;
+      tr.children[1].innerHTML = `<span class="status ${statusClass}">${statusText}</span>`;
+      if (linkHtml) tr.children[2].innerHTML = linkHtml;
+    }
+
+    function interleaveToStereo(left, right) {
+      const n = Math.min(left.length, right.length);
+      const out = new Float32Array(n * 2);
+      for (let i = 0; i < n; i++) {
+        out[i*2] = left[i];
+        out[i*2 + 1] = right[i];
+      }
+      return out;
+    }
+
+    function floatTo16BitPCM(view, offset, input) {
+      for (let i = 0; i < input.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+    }
+
+    function writeString(view, offset, str) {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+
+    function encodeWAV({samples, sampleRate, numChannels}) {
+      const bytesPerSample = 2;
+      const blockAlign = numChannels * bytesPerSample;
+      const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+      const view = new DataView(buffer);
+
+      writeString(view, 0, "RIFF");
+      view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+      writeString(view, 8, "WAVE");
+      writeString(view, 12, "fmt ");
+      view.setUint32(16, 16, true);              // PCM
+      view.setUint16(20, 1, true);               // format = 1
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * blockAlign, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);              // bits
+      writeString(view, 36, "data");
+      view.setUint32(40, samples.length * bytesPerSample, true);
+
+      floatTo16BitPCM(view, 44, samples);
+      return buffer;
+    }
+
+    async function decodeMp4ToAudioBuffer(arrayBuffer) {
+      // Sommige browsers vereisen een AudioContext die door user gesture is gestart.
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      try {
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+        return audioBuffer;
+      } finally {
+        // context sluiten om resources te sparen
+        try { await ctx.close(); } catch {}
+      }
+    }
+
+    async function convertFile(file) {
+      updateRow(file.name, { statusText: "Bezig…", statusClass: "warn" });
+      logLine(`Decoderen: ${file.name}`);
+
+      const ab = await file.arrayBuffer();
+      const audioBuffer = await decodeMp4ToAudioBuffer(ab);
+
+      const sampleRate = audioBuffer.sampleRate;
+
+      // Exporteer als stereo als mogelijk, anders mono
+      let numChannels = Math.min(2, audioBuffer.numberOfChannels);
+      let samples;
+
+      if (numChannels === 2) {
+        const left = audioBuffer.getChannelData(0);
+        const right = audioBuffer.getChannelData(1);
+        samples = interleaveToStereo(left, right);
+      } else {
+        samples = audioBuffer.getChannelData(0);
+      }
+
+      logLine(`WAV bouwen (${numChannels}ch, ${sampleRate}Hz): ${file.name}`);
+      const wav = encodeWAV({ samples, sampleRate, numChannels });
+
+      const outName = `${sanitizeBaseName(file.name)}.wav`;
+      const url = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+
+      updateRow(file.name, {
+        statusText: "Klaar ✅",
+        statusClass: "ok",
+        linkHtml: `<a href="${url}" download="${outName}">Download ${outName}</a>`
+      });
+
+      logLine(`Klaar: ${file.name} → ${outName}`);
+    }
+
+    async function convertAll() {
+      const files = [...(els.fileInput.files || [])];
+      if (!files.length) return;
+
+      els.btnConvert.disabled = true;
+      els.fileInput.disabled = true;
+
+      for (const f of files) {
+        try {
+          await convertFile(f);
+        } catch (e) {
+          console.error(e);
+          updateRow(f.name, {
+            statusText: "Fout ❌",
+            statusClass: "err",
+            linkHtml: `<span class="small" style="color: var(--muted)">${String(e?.message || e).slice(0,200)}</span>`
+          });
+          logLine(`FOUT bij ${f.name}: ${e?.message || e}`);
+          logLine(`Tip: als dit bestand niet decodeert in de browser, gebruik desktop FFmpeg.`);
+        }
+      }
+
+      els.fileInput.disabled = false;
+      els.btnConvert.disabled = false;
+      logLine("Alles afgehandeld.");
+    }
+
+    els.fileInput.addEventListener("change", () => {
+      const files = [...(els.fileInput.files || [])];
+      if (!files.length) {
+        els.tbody.innerHTML = `<tr><td colspan="3" class="small" style="color: var(--muted);">Nog geen bestanden gekozen.</td></tr>`;
+        els.btnConvert.disabled = true;
+        setInfo("Kies bestanden");
+        return;
+      }
+      renderRows(files);
+      els.btnConvert.disabled = false;
+      setInfo("Klaar om te converteren");
+    });
+
+    els.btnConvert.addEventListener("click", convertAll);
+
+    logLine("Selecteer MP4-bestanden en klik op ‘Converteer naar WAV’.");
+  </script>
+</body>
+</html>

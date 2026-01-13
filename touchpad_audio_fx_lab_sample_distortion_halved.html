@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Touchpad Audio FX Lab (Upload + XY Filters + Live WAV Export)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#101826; --panel2:#0e1522; --text:#e7eefc; --muted:#9fb2d2;
+      --line:#22314a; --accent:#5ad0ff; --accent2:#b4ff5a; --warn:#ffcf5a; --bad:#ff5a7a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 700px at 20% 0%,#0f1b2a 0%, var(--bg) 60%);color:var(--text);font:14px/1.35 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1200px;margin:0 auto;padding:18px}
+    h1{font-size:18px;margin:0 0 10px 0;color:#f2f6ff}
+    .topbar{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line); border-radius:14px; padding:12px;
+      box-shadow:0 12px 30px rgba(0,0,0,.35);
+    }
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+    .row + .row{margin-top:10px}
+    .group{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.02)}
+    .group .title{font-size:12px;color:var(--muted);margin:0 0 8px 0}
+    label{display:block;font-size:12px;color:var(--muted);margin:0 0 4px 0}
+    input[type="range"]{width:220px}
+    input[type="number"], select, button{
+      background:#0a1019;border:1px solid var(--line);color:var(--text);
+      border-radius:10px;padding:8px 10px;outline:none
+    }
+    input[type="number"]{width:90px}
+    select{min-width:220px}
+    button{cursor:pointer}
+    button.primary{border-color:rgba(90,208,255,.7);box-shadow:0 0 0 2px rgba(90,208,255,.12) inset}
+    button.good{border-color:rgba(180,255,90,.7);box-shadow:0 0 0 2px rgba(180,255,90,.12) inset}
+    button.warn{border-color:rgba(255,207,90,.7);box-shadow:0 0 0 2px rgba(255,207,90,.12) inset}
+    button.bad{border-color:rgba(255,90,122,.7);box-shadow:0 0 0 2px rgba(255,90,122,.12) inset}
+    .hint{color:var(--muted);font-size:12px;margin-top:6px}
+    .status{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:rgba(255,255,255,.02)}
+    .pill b{color:var(--text)}
+    .two{display:grid;grid-template-columns:1fr;gap:12px}
+    @media (min-width: 980px){ .two{grid-template-columns: 1.05fr .95fr;} }
+
+    /* Touchpad area */
+    .padWrap{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line); border-radius:14px; padding:12px;
+      box-shadow:0 12px 30px rgba(0,0,0,.35);
+    }
+    .padMenus{
+      display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:0 0 10px 0
+    }
+    .pad{
+      position:relative;
+      width:100%;
+      height:520px;
+      border-radius:14px;
+      border:1px solid rgba(90,208,255,.45);
+      background:
+        radial-gradient(700px 420px at 30% 20%, rgba(90,208,255,.18), transparent 55%),
+        radial-gradient(700px 420px at 75% 70%, rgba(180,255,90,.14), transparent 55%),
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      overflow:hidden;
+      touch-action:none;
+      user-select:none;
+    }
+    .cross{
+      position:absolute; width:26px; height:26px; transform:translate(-50%,-50%);
+      border-radius:50%;
+      border:2px solid rgba(255,255,255,.9);
+      box-shadow:0 0 0 6px rgba(90,208,255,.15), 0 0 24px rgba(90,208,255,.25);
+      pointer-events:none;
+    }
+    .cross:before,.cross:after{
+      content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:rgba(255,255,255,.9);
+    }
+    .cross:before{width:2px;height:18px}
+    .cross:after{width:18px;height:2px}
+    .readout{
+      position:absolute; left:12px; bottom:12px;
+      padding:8px 10px;border-radius:12px;border:1px solid var(--line);
+      background:rgba(0,0,0,.35); color:var(--text);
+      font-variant-numeric:tabular-nums;
+    }
+    .tiny{font-size:12px;color:var(--muted)}
+    canvas{width:100%;height:140px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.25)}
+    .footerHint{margin-top:10px;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Touchpad Audio FX Lab — upload audio → XY touchpad → live export naar WAV</h1>
+
+  <div class="two">
+    <div class="topbar">
+      <div class="row">
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Audio</div>
+          <div class="row">
+            <div>
+              <label>Upload audio (mp3/wav/ogg)</label>
+              <input id="file" type="file" accept="audio/*" />
+              <div class="hint">Tip: zet <b>Loop</b> aan voor continue controle met het touchpad.</div>
+            </div>
+            <div>
+              <label>Loop</label>
+              <select id="loopSel">
+                <option value="1" selected>Aan</option>
+                <option value="0">Uit</option>
+              </select>
+            </div>
+            <div>
+              <label>Transport</label>
+              <div class="row" style="align-items:center">
+                <button id="btnStart" class="primary">▶ Start</button>
+                <button id="btnStop" class="bad">■ Stop</button>
+                <button id="btnSyncStart" class="good">⏱ Sync start (5s)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Live export (WAV)</div>
+          <div class="row">
+            <div>
+              <label>Export status</label>
+              <div class="status">
+                <span class="pill">Record: <b id="recState">uit</b></span>
+                <span class="pill">Duur: <b id="recDur">0.0s</b></span>
+                <span class="pill">SampleRate: <b id="sr">-</b></span>
+                <span class="pill">Sync: <b id="syncInfo">—</b></span>
+              </div>
+              <div class="hint">WAV export is <b>ongecomprimeerd</b>. Grote bestanden kunnen ontstaan.</div>
+            </div>
+            <div>
+              <label>Controls</label>
+              <div class="row">
+                <button id="btnRec" class="good">⏺ Start live export</button>
+                <button id="btnRecStop" class="warn">⏹ Stop & download WAV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Master / Utility</div>
+          <div class="row">
+            <div>
+              <label>Master volume</label>
+              <input id="master" type="range" min="0" max="1.5" step="0.001" value="1" />
+              <div class="tiny"><span id="masterVal">1.000</span></div>
+            </div>
+            <div>
+              <label>Playback rate</label>
+              <input id="rate" type="range" min="0.25" max="2.5" step="0.001" value="1" />
+              <div class="tiny"><span id="rateVal">1.000</span></div>
+            </div>
+            <div>
+              <label>Stereo pan</label>
+              <input id="pan" type="range" min="-1" max="1" step="0.001" value="0" />
+              <div class="tiny"><span id="panVal">0.000</span></div>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Output limiter (compressor)</label>
+              <select id="compOn">
+                <option value="1" selected>Aan</option>
+                <option value="0">Uit</option>
+              </select>
+            </div>
+            <div>
+              <label>Soft clip (distortion)</label>
+              <select id="distOn">
+                <option value="0" selected>Uit</option>
+                <option value="1">Aan</option>
+              </select>
+            </div>
+            <div>
+              <label>Bitcrusher</label>
+              <select id="crushOn">
+                <option value="0" selected>Uit</option>
+                <option value="1">Aan</option>
+              </select>
+            </div>
+            <div>
+              <label>Tremolo (LFO→volume)</label>
+              <select id="tremOn">
+                <option value="0" selected>Uit</option>
+                <option value="1">Aan</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Filter / EQ (Biquad)</div>
+          <div class="row">
+            <div>
+              <label>Type</label>
+              <select id="fType">
+                <option>lowpass</option><option>highpass</option><option>bandpass</option>
+                <option>lowshelf</option><option>highshelf</option><option>peaking</option>
+                <option>notch</option><option>allpass</option>
+              </select>
+            </div>
+            <div>
+              <label>Freq (Hz)</label>
+              <input id="fFreq" type="range" min="20" max="20000" step="1" value="1200" />
+              <div class="tiny"><span id="fFreqVal">1200</span></div>
+            </div>
+            <div>
+              <label>Q</label>
+              <input id="fQ" type="range" min="0.001" max="30" step="0.001" value="0.707" />
+              <div class="tiny"><span id="fQVal">0.707</span></div>
+            </div>
+            <div>
+              <label>Gain (dB)</label>
+              <input id="fGain" type="range" min="-30" max="30" step="0.01" value="0" />
+              <div class="tiny"><span id="fGainVal">0.00</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Delay / Reverb</div>
+          <div class="row">
+            <div>
+              <label>Delay time (s)</label>
+              <input id="dTime" type="range" min="0" max="1.5" step="0.001" value="0.22" />
+              <div class="tiny"><span id="dTimeVal">0.220</span></div>
+            </div>
+            <div>
+              <label>Feedback</label>
+              <input id="dFb" type="range" min="0" max="0.95" step="0.001" value="0.25" />
+              <div class="tiny"><span id="dFbVal">0.250</span></div>
+            </div>
+            <div>
+              <label>Delay mix</label>
+              <input id="dMix" type="range" min="0" max="1" step="0.001" value="0.15" />
+              <div class="tiny"><span id="dMixVal">0.150</span></div>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Reverb mix</label>
+              <input id="rMix" type="range" min="0" max="1" step="0.001" value="0.12" />
+              <div class="tiny"><span id="rMixVal">0.120</span></div>
+            </div>
+            <div>
+              <label>Reverb decay (s)</label>
+              <input id="rDecay" type="range" min="0.2" max="12" step="0.01" value="2.5" />
+              <div class="tiny"><span id="rDecayVal">2.50</span></div>
+            </div>
+            <div>
+              <label>Pre-delay (ms)</label>
+              <input id="rPre" type="range" min="0" max="200" step="1" value="12" />
+              <div class="tiny"><span id="rPreVal">12</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Distortion / Bitcrusher / Tremolo</div>
+          <div class="row">
+            <div>
+              <label>Distortion amount</label>
+              <input id="distAmt" type="range" min="0" max="150" step="0.1" value="25" />
+              <div class="tiny"><span id="distAmtVal">25.0</span></div>
+            </div>
+            <div>
+              <label>Crush bits</label>
+              <input id="crBits" type="range" min="2" max="16" step="1" value="8" />
+              <div class="tiny"><span id="crBitsVal">8</span></div>
+            </div>
+            <div>
+              <label>Crush rate</label>
+              <input id="crRate" type="range" min="0.01" max="1" step="0.001" value="0.20" />
+              <div class="tiny"><span id="crRateVal">0.200</span></div>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Tremolo rate (Hz)</label>
+              <input id="tRate" type="range" min="0.1" max="30" step="0.01" value="4.0" />
+              <div class="tiny"><span id="tRateVal">4.00</span></div>
+            </div>
+            <div>
+              <label>Tremolo depth</label>
+              <input id="tDepth" type="range" min="0" max="1" step="0.001" value="0.35" />
+              <div class="tiny"><span id="tDepthVal">0.350</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" style="flex:1 1 360px;min-width:320px">
+          <div class="title">Compressor (Limiter)</div>
+          <div class="row">
+            <div>
+              <label>Threshold (dB)</label>
+              <input id="cTh" type="range" min="-60" max="0" step="0.1" value="-12" />
+              <div class="tiny"><span id="cThVal">-12.0</span></div>
+            </div>
+            <div>
+              <label>Ratio</label>
+              <input id="cRa" type="range" min="1" max="20" step="0.1" value="6" />
+              <div class="tiny"><span id="cRaVal">6.0</span></div>
+            </div>
+            <div>
+              <label>Attack (s)</label>
+              <input id="cAt" type="range" min="0.001" max="0.2" step="0.001" value="0.005" />
+              <div class="tiny"><span id="cAtVal">0.005</span></div>
+            </div>
+            <div>
+              <label>Release (s)</label>
+              <input id="cRe" type="range" min="0.02" max="1.0" step="0.001" value="0.15" />
+              <div class="tiny"><span id="cReVal">0.150</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="padWrap">
+      <div class="padMenus">
+        <div class="group" style="flex:1 1 340px;min-width:300px">
+          <div class="title">Touchpad menus (onderaan, boven de touchpad)</div>
+          <div class="row">
+            <div>
+              <label>X → parameter</label>
+              <select id="mapX"></select>
+              <div class="tiny" id="xRange"></div>
+            </div>
+            <div>
+              <label>Y → parameter</label>
+              <select id="mapY"></select>
+              <div class="tiny" id="yRange"></div>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Smoothing</label>
+              <input id="smooth" type="range" min="0" max="0.98" step="0.001" value="0.75" />
+              <div class="tiny"><span id="smoothVal">0.750</span></div>
+            </div>
+            <div>
+              <label>Invert X</label>
+              <select id="invX"><option value="0" selected>Nee</option><option value="1">Ja</option></select>
+            </div>
+            <div>
+              <label>Invert Y</label>
+              <select id="invY"><option value="0" selected>Nee</option><option value="1">Ja</option></select>
+            </div>
+            <div>
+              <label>Quantize</label>
+              <select id="quant">
+                <option value="0" selected>Uit</option>
+                <option value="8">8 stappen</option>
+                <option value="16">16 stappen</option>
+                <option value="32">32 stappen</option>
+                <option value="64">64 stappen</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">Touchpad regelt <b>twee</b> parameters tegelijk. Mapping is via dropdowns.</div>
+        </div>
+
+        <div class="group" style="flex:1 1 340px;min-width:300px">
+          <div class="title">Visual / Monitoring</div>
+          <canvas id="scope" width="900" height="220"></canvas>
+          <div class="hint">Scope toont de <b>output</b> na alle effecten.</div>
+        </div>
+      </div>
+
+      <div id="pad" class="pad" aria-label="Touchpad">
+        <div id="cross" class="cross" style="left:50%;top:50%"></div>
+        <div class="readout">
+          <div><b>XY</b> <span id="xy">0.50, 0.50</span></div>
+          <div class="tiny">X: <span id="xLabel">-</span> → <span id="xOut">-</span></div>
+          <div class="tiny">Y: <span id="yLabel">-</span> → <span id="yOut">-</span></div>
+        </div>
+      </div>
+
+      <div class="footerHint">
+        Gebruik: upload audio → <b>Start</b> → speel met touchpad → (optioneel) live export → download WAV.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  // UI elements
+  const fileEl = $("file");
+  const btnStart = $("btnStart");
+  const btnStop = $("btnStop");
+  const btnSyncStart = $("btnSyncStart");
+  const loopSel = $("loopSel");
+  const btnRec = $("btnRec");
+  const btnRecStop = $("btnRecStop");
+
+  const recState = $("recState");
+  const recDur = $("recDur");
+  const srEl = $("sr");
+  const syncInfo = $("syncInfo");
+
+  const master = $("master"), masterVal = $("masterVal");
+  const rate = $("rate"), rateVal = $("rateVal");
+  const pan = $("pan"), panVal = $("panVal");
+
+  const compOn = $("compOn"), distOn = $("distOn"), crushOn = $("crushOn"), tremOn = $("tremOn");
+
+  const fType = $("fType");
+  const fFreq = $("fFreq"), fFreqVal = $("fFreqVal");
+  const fQ = $("fQ"), fQVal = $("fQVal");
+  const fGain = $("fGain"), fGainVal = $("fGainVal");
+
+  const dTime = $("dTime"), dTimeVal = $("dTimeVal");
+  const dFb = $("dFb"), dFbVal = $("dFbVal");
+  const dMix = $("dMix"), dMixVal = $("dMixVal");
+
+  const rMix = $("rMix"), rMixVal = $("rMixVal");
+  const rDecay = $("rDecay"), rDecayVal = $("rDecayVal");
+  const rPre = $("rPre"), rPreVal = $("rPreVal");
+
+  const distAmt = $("distAmt"), distAmtVal = $("distAmtVal");
+  const crBits = $("crBits"), crBitsVal = $("crBitsVal");
+  const crRate = $("crRate"), crRateVal = $("crRateVal");
+
+  const tRate = $("tRate"), tRateVal = $("tRateVal");
+  const tDepth = $("tDepth"), tDepthVal = $("tDepthVal");
+
+  const cTh = $("cTh"), cThVal = $("cThVal");
+  const cRa = $("cRa"), cRaVal = $("cRaVal");
+  const cAt = $("cAt"), cAtVal = $("cAtVal");
+  const cRe = $("cRe"), cReVal = $("cReVal");
+
+  const pad = $("pad");
+  const cross = $("cross");
+  const xy = $("xy");
+  const xLabel = $("xLabel"), yLabel = $("yLabel");
+  const xOut = $("xOut"), yOut = $("yOut");
+  const mapX = $("mapX"), mapY = $("mapY");
+  const xRange = $("xRange"), yRange = $("yRange");
+  const smooth = $("smooth"), smoothVal = $("smoothVal");
+  const invX = $("invX"), invY = $("invY");
+  const quant = $("quant");
+
+  // Scope
+  const scope = $("scope");
+  const sctx = scope.getContext("2d");
+
+  // Audio graph
+  let ac = null;
+  let buffer = null;
+  let src = null;
+
+  let inGain, panner, biquad, shaper;
+  let delay, delayFb, delayWet, delayDry;
+  let preDelay, convolver, revWet, revDry;
+  let comp, masterGain;
+  let analyser;
+
+  // Crusher
+  let crusherNode = null;
+  let crusherBypassGain = null;
+
+  // Tremolo
+  let tremLFO = null;
+  let tremGain = null;
+  let tremTarget = null;
+
+  // Recording (WAV)
+  let recSP = null;
+  let recDataL = [];
+  let recDataR = [];
+  let recStartTime = 0;
+  let recTimer = null;
+  let isRec = false;
+
+  // Sync start scheduling
+  let syncTimerId = null;
+  let syncTargetMs = null;
+
+  // Touch state
+  let hasPointer = false;
+  let tx = 0.5, ty = 0.5;        // target
+  let sx = 0.5, sy = 0.5;        // smoothed current
+
+  const paramDefs = [
+    { id:"master", name:"Master volume", unit:"", min:0, max:1.5, apply:(v)=> masterGain.gain.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"rate", name:"Playback rate", unit:"x", min:0.25, max:2.5, apply:(v)=> { if (src) src.playbackRate.setTargetAtTime(v, ac.currentTime, 0.01); rate.value = v; rateVal.textContent = v.toFixed(3);} },
+    { id:"pan", name:"Stereo pan", unit:"", min:-1, max:1, apply:(v)=> panner.pan.setTargetAtTime(v, ac.currentTime, 0.01) },
+
+    { id:"fFreq", name:"Filter freq", unit:"Hz", min:20, max:20000, curve:"exp", apply:(v)=> biquad.frequency.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"fQ", name:"Filter Q", unit:"", min:0.001, max:30, apply:(v)=> biquad.Q.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"fGain", name:"Filter gain", unit:"dB", min:-30, max:30, apply:(v)=> biquad.gain.setTargetAtTime(v, ac.currentTime, 0.01) },
+
+    { id:"dTime", name:"Delay time", unit:"s", min:0, max:1.5, apply:(v)=> delay.delayTime.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"dFb", name:"Delay feedback", unit:"", min:0, max:0.95, apply:(v)=> delayFb.gain.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"dMix", name:"Delay mix", unit:"", min:0, max:1, apply:(v)=> { delayWet.gain.setTargetAtTime(v, ac.currentTime, 0.01); delayDry.gain.setTargetAtTime(1-v, ac.currentTime, 0.01);} },
+
+    { id:"rMix", name:"Reverb mix", unit:"", min:0, max:1, apply:(v)=> { revWet.gain.setTargetAtTime(v, ac.currentTime, 0.01); revDry.gain.setTargetAtTime(1-v, ac.currentTime, 0.01);} },
+    { id:"rDecay", name:"Reverb decay", unit:"s", min:0.2, max:12, curve:"exp", apply:(v)=> rebuildImpulse(v, parseFloat(rPre.value)) },
+    { id:"rPre", name:"Reverb pre-delay", unit:"ms", min:0, max:200, apply:(v)=> { preDelay.delayTime.setTargetAtTime(v/1000, ac.currentTime, 0.01);} },
+
+    { id:"distAmt", name:"Distortion amount", unit:"", min:0, max:150, apply:(v)=> updateDistortion(v) },
+    { id:"crBits", name:"Crusher bits", unit:"", min:2, max:16, apply:(v)=> { if (crusherNode) crusherNode._bits = v|0; } },
+    { id:"crRate", name:"Crusher rate", unit:"", min:0.01, max:1, apply:(v)=> { if (crusherNode) crusherNode._normFreq = v; } },
+
+    { id:"tRate", name:"Tremolo rate", unit:"Hz", min:0.1, max:30, curve:"exp", apply:(v)=> { if (tremLFO) tremLFO.frequency.setTargetAtTime(v, ac.currentTime, 0.01); } },
+    { id:"tDepth", name:"Tremolo depth", unit:"", min:0, max:1, apply:(v)=> { if (tremGain) tremGain.gain.setTargetAtTime(v, ac.currentTime, 0.01); } },
+
+    { id:"cTh", name:"Comp threshold", unit:"dB", min:-60, max:0, apply:(v)=> comp.threshold.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"cRa", name:"Comp ratio", unit:"", min:1, max:20, apply:(v)=> comp.ratio.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"cAt", name:"Comp attack", unit:"s", min:0.001, max:0.2, curve:"exp", apply:(v)=> comp.attack.setTargetAtTime(v, ac.currentTime, 0.01) },
+    { id:"cRe", name:"Comp release", unit:"s", min:0.02, max:1.0, curve:"exp", apply:(v)=> comp.release.setTargetAtTime(v, ac.currentTime, 0.01) },
+  ];
+
+  function ensureAC() {
+    if (ac) return;
+    ac = new (window.AudioContext || window.webkitAudioContext)({latencyHint:"interactive"});
+    srEl.textContent = String(ac.sampleRate);
+    buildGraph();
+    startScope();
+  }
+
+  function buildGraph(){
+    inGain = ac.createGain(); inGain.gain.value = 1.0;
+    panner = ac.createStereoPanner(); panner.pan.value = parseFloat(pan.value);
+
+    biquad = ac.createBiquadFilter();
+    biquad.type = fType.value;
+    biquad.frequency.value = parseFloat(fFreq.value);
+    biquad.Q.value = parseFloat(fQ.value);
+    biquad.gain.value = parseFloat(fGain.value);
+
+    shaper = ac.createWaveShaper();
+    shaper.oversample = "4x";
+    updateDistortion(parseFloat(distAmt.value));
+
+    // Delay
+    delay = ac.createDelay(2.0);
+    delay.delayTime.value = parseFloat(dTime.value);
+    delayFb = ac.createGain(); delayFb.gain.value = parseFloat(dFb.value);
+    delayWet = ac.createGain(); delayWet.gain.value = parseFloat(dMix.value);
+    delayDry = ac.createGain(); delayDry.gain.value = 1 - parseFloat(dMix.value);
+
+    // Reverb
+    preDelay = ac.createDelay(0.5);
+    preDelay.delayTime.value = parseFloat(rPre.value) / 1000;
+    convolver = ac.createConvolver();
+    rebuildImpulse(parseFloat(rDecay.value), parseFloat(rPre.value));
+
+    revWet = ac.createGain(); revWet.gain.value = parseFloat(rMix.value);
+    revDry = ac.createGain(); revDry.gain.value = 1 - parseFloat(rMix.value);
+
+    // Compressor
+    comp = ac.createDynamicsCompressor();
+    applyCompressorUI();
+
+    masterGain = ac.createGain(); masterGain.gain.value = parseFloat(master.value);
+
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.85;
+
+    // Crusher
+    crusherBypassGain = ac.createGain();
+    crusherBypassGain.gain.value = (crushOn.value === "1") ? 0 : 1;
+    const crusherFxGain = ac.createGain();
+    crusherFxGain.gain.value = (crushOn.value === "1") ? 1 : 0;
+
+    crusherNode = ac.createScriptProcessor(1024, 2, 2);
+    crusherNode._bits = parseInt(crBits.value, 10);
+    crusherNode._normFreq = parseFloat(crRate.value);
+
+    crusherNode.onaudioprocess = (e) => {
+      const bits = crusherNode._bits|0;
+      const normFreq = Math.max(0.001, Math.min(1, crusherNode._normFreq));
+      const step = Math.pow(0.5, bits);
+
+      const inpL = e.inputBuffer.getChannelData(0);
+      const inpR = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : inpL;
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.getChannelData(1);
+
+      let phaser = 0, last = 0;
+      for (let i = 0; i < inpL.length; i++){
+        phaser += normFreq;
+        if (phaser >= 1.0){
+          phaser -= 1.0;
+          last = step * Math.floor(inpL[i] / step + 0.5);
+        }
+        outL[i] = last;
+      }
+      phaser = 0; last = 0;
+      for (let i = 0; i < inpR.length; i++){
+        phaser += normFreq;
+        if (phaser >= 1.0){
+          phaser -= 1.0;
+          last = step * Math.floor(inpR[i] / step + 0.5);
+        }
+        outR[i] = last;
+      }
+    };
+
+    // Tremolo
+    tremTarget = ac.createGain();
+    tremTarget.gain.value = 1.0;
+
+    tremGain = ac.createGain(); tremGain.gain.value = parseFloat(tDepth.value);
+
+    tremLFO = ac.createOscillator();
+    tremLFO.type = "sine";
+    tremLFO.frequency.value = parseFloat(tRate.value);
+
+    const lfoScale = ac.createGain();
+    lfoScale.gain.value = 0.5; // [-0.5..0.5]
+
+    const lfoOffset = ac.createConstantSource();
+    lfoOffset.offset.value = 1.0;
+
+    tremLFO.connect(lfoScale);
+    lfoScale.connect(tremGain);
+    tremGain.connect(tremTarget.gain);
+    lfoOffset.connect(tremTarget.gain);
+
+    lfoOffset.start();
+    tremLFO.start();
+
+    updateTremOnOff();
+
+    // Wiring:
+    // src -> inGain -> panner -> biquad -> (optional shaper) -> delay+reverb -> (optional comp) -> (optional crusher) -> trem -> master -> analyser -> destination
+    inGain.connect(panner);
+    panner.connect(biquad);
+
+    // distortion on/off
+    const distDry = ac.createGain();
+    const distWet = ac.createGain();
+    distDry.gain.value = (distOn.value === "1") ? 0 : 1;
+    distWet.gain.value = (distOn.value === "1") ? 1 : 0;
+
+    biquad.connect(distDry);
+    biquad.connect(shaper);
+    shaper.connect(distWet);
+
+    const distSum = ac.createGain();
+    distDry.connect(distSum);
+    distWet.connect(distSum);
+
+    // Delay split
+    distSum.connect(delayDry);
+    distSum.connect(delay);
+    delay.connect(delayFb);
+    delayFb.connect(delay);
+    delay.connect(delayWet);
+
+    const delaySum = ac.createGain();
+    delayDry.connect(delaySum);
+    delayWet.connect(delaySum);
+
+    // Reverb split
+    delaySum.connect(revDry);
+    delaySum.connect(preDelay);
+    preDelay.connect(convolver);
+    convolver.connect(revWet);
+
+    const revSum = ac.createGain();
+    revDry.connect(revSum);
+    revWet.connect(revSum);
+
+    // Compressor on/off
+    const postComp = ac.createGain();
+    if (compOn.value === "1") {
+      revSum.connect(comp);
+      comp.connect(postComp);
+    } else {
+      revSum.connect(postComp);
+    }
+
+    // Crusher split
+    const crusherSum = ac.createGain();
+    postComp.connect(crusherBypassGain);
+    crusherBypassGain.connect(crusherSum);
+
+    postComp.connect(crusherFxGain);
+    crusherFxGain.connect(crusherNode);
+    crusherNode.connect(crusherSum);
+
+    crusherSum.connect(tremTarget);
+    tremTarget.connect(masterGain);
+    masterGain.connect(analyser);
+    analyser.connect(ac.destination);
+  }
+
+  function disconnectSource(){
+    if (src){
+      try{ src.stop(); }catch(e){}
+      try{ src.disconnect(); }catch(e){}
+      src = null;
+    }
+  }
+
+
+  function clearSyncTimer(){
+    if (syncTimerId !== null){
+      clearTimeout(syncTimerId);
+      syncTimerId = null;
+    }
+    syncTargetMs = null;
+    if (syncInfo) syncInfo.textContent = "—";
+  }
+
+  function scheduleSyncStart5s(){
+    ensureAC();
+    if (ac.state !== "running") ac.resume();
+    if (!buffer){
+      alert("Upload eerst een audio bestand.");
+      return;
+    }
+
+    // Stop any current playback and pending sync
+    clearSyncTimer();
+    disconnectSource();
+
+    // Wall-clock next boundary (every 5 seconds)
+    const nowMs = Date.now();
+    const period = 5000;
+    const targetMs = Math.ceil(nowMs / period) * period;
+    syncTargetMs = targetMs;
+
+    const msUntil = Math.max(0, targetMs - nowMs);
+    const whenAudio = ac.currentTime + (msUntil / 1000);
+
+    // Update UI
+    const d = new Date(targetMs);
+    if (syncInfo){
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      const ss = String(d.getSeconds()).padStart(2,"0");
+      syncInfo.textContent = `${hh}:${mm}:${ss} (+${msUntil}ms)`;
+    }
+
+    // Create and schedule source
+    src = createSource();
+    if (!src) return;
+
+    // Preferred: schedule via AudioContext timeline
+    try{
+      src.start(whenAudio);
+    }catch(e){
+      console.warn("Scheduled start failed:", e);
+    }
+
+    // Timeout for UI/fallback
+    syncTimerId = setTimeout(() => {
+      syncTimerId = null;
+      if (syncInfo) syncInfo.textContent = "running";
+    }, msUntil + 20);
+  }
+
+  function createSource(){
+    if (!ac || !buffer) return null;
+    const s = ac.createBufferSource();
+    s.buffer = buffer;
+    s.loop = loopSel.value === "1";
+    s.playbackRate.value = parseFloat(rate.value);
+    s.connect(inGain);
+    return s;
+  }
+
+  async function loadFile(file){
+    ensureAC();
+    const ab = await file.arrayBuffer();
+    buffer = await ac.decodeAudioData(ab);
+  }
+
+  function updateDistortion(amount){
+    const k = Math.max(0, amount * 0.5); // distortion halved globally
+    const n = 2048;
+    const curve = new Float32Array(n);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n; i++){
+      const x = (i * 2 / (n - 1)) - 1;
+      curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+    }
+    shaper.curve = curve;
+  }
+
+  function applyCompressorUI(){
+    comp.threshold.value = parseFloat(cTh.value);
+    comp.ratio.value = parseFloat(cRa.value);
+    comp.attack.value = parseFloat(cAt.value);
+    comp.release.value = parseFloat(cRe.value);
+  }
+
+  function updateTremOnOff(){
+    const on = tremOn.value === "1";
+    if (tremGain) tremGain.gain.setTargetAtTime(on ? parseFloat(tDepth.value) : 0, ac.currentTime, 0.02);
+  }
+
+  function rebuildImpulse(decaySeconds, preDelayMs){
+    if (!ac || !convolver) return;
+    const sr = ac.sampleRate;
+    const decay = Math.max(0.15, Math.min(20, decaySeconds));
+    const len = Math.floor(sr * decay);
+    const impulse = ac.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++){
+      const ch = impulse.getChannelData(c);
+      for (let i = 0; i < len; i++){
+        const t = i / len;
+        ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3) * Math.exp(-t * (decay * 2.2));
+      }
+    }
+    convolver.buffer = impulse;
+    if (preDelay) preDelay.delayTime.setTargetAtTime((parseFloat(preDelayMs) || 0)/1000, ac.currentTime, 0.01);
+  }
+
+  function populateMaps(){
+    const makeOpt = (p) => {
+      const o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = p.name;
+      return o;
+    };
+    mapX.innerHTML = "";
+    mapY.innerHTML = "";
+    paramDefs.forEach(p => {
+      mapX.appendChild(makeOpt(p));
+      mapY.appendChild(makeOpt(p));
+    });
+    mapX.value = "fFreq";
+    mapY.value = "dMix";
+    updateMapLabels();
+  }
+
+  function getParam(id){ return paramDefs.find(p => p.id === id); }
+
+  function formatRange(p){
+    const min = p.min, max = p.max;
+    if (p.unit === "Hz") return `${Math.round(min)}–${Math.round(max)} ${p.unit}`;
+    if (p.unit === "ms") return `${Math.round(min)}–${Math.round(max)} ${p.unit}`;
+    if (p.unit) return `${min}–${max} ${p.unit}`;
+    return `${min}–${max}`;
+  }
+
+  function updateMapLabels(){
+    const px = getParam(mapX.value);
+    const py = getParam(mapY.value);
+    xLabel.textContent = px ? px.name : "-";
+    yLabel.textContent = py ? py.name : "-";
+    xRange.textContent = px ? ("Range: " + formatRange(px)) : "";
+    yRange.textContent = py ? ("Range: " + formatRange(py)) : "";
+  }
+
+  function mapNormToParam(n, p){
+    const min = p.min, max = p.max;
+    const nn = Math.max(0, Math.min(1, n));
+    if (p.curve === "exp"){
+      const a = Math.log(Math.max(1e-6, min));
+      const b = Math.log(max);
+      return Math.exp(a + (b - a) * nn);
+    }
+    return min + (max - min) * nn;
+  }
+
+  function fmtVal(v, p){
+    if (p.unit === "Hz") return `${Math.round(v)} Hz`;
+    if (p.unit === "ms") return `${Math.round(v)} ms`;
+    if (p.unit === "dB") return `${v.toFixed(1)} dB`;
+    if (p.unit === "s") return `${v.toFixed(3)} s`;
+    if (p.unit === "x") return `${v.toFixed(3)}x`;
+    if (Math.abs(v) >= 100) return v.toFixed(1);
+    if (Math.abs(v) >= 10) return v.toFixed(2);
+    return v.toFixed(3);
+  }
+
+  function applyMapped(){
+    if (!ac) return;
+    const sm = parseFloat(smooth.value);
+    sx = sx * sm + tx * (1 - sm);
+    sy = sy * sm + ty * (1 - sm);
+
+    let nx = (invX.value === "1") ? (1 - sx) : sx;
+    let ny = (invY.value === "1") ? (1 - sy) : sy;
+
+    const q = parseInt(quant.value, 10);
+    if (q > 0){
+      nx = Math.round(nx * (q - 1)) / (q - 1);
+      ny = Math.round(ny * (q - 1)) / (q - 1);
+    }
+
+    xy.textContent = `${nx.toFixed(2)}, ${ny.toFixed(2)}`;
+
+    const px = getParam(mapX.value);
+    const py = getParam(mapY.value);
+
+    const vx = px ? mapNormToParam(nx, px) : 0;
+    const vy = py ? mapNormToParam(ny, py) : 0;
+
+    if (px) { px.apply(vx); xOut.textContent = fmtVal(vx, px); }
+    if (py) { py.apply(vy); yOut.textContent = fmtVal(vy, py); }
+  }
+
+  function setFromEvent(e){
+    const r = pad.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    tx = Math.max(0, Math.min(1, x));
+    ty = Math.max(0, Math.min(1, y));
+    cross.style.left = (tx * 100).toFixed(2) + "%";
+    cross.style.top  = (ty * 100).toFixed(2) + "%";
+  }
+
+  pad.addEventListener("pointerdown", (e) => {
+    ensureAC();
+    hasPointer = true;
+    pad.setPointerCapture(e.pointerId);
+    setFromEvent(e);
+  });
+  pad.addEventListener("pointermove", (e) => { if (hasPointer) setFromEvent(e); });
+  pad.addEventListener("pointerup", () => { hasPointer = false; });
+  pad.addEventListener("pointercancel", () => { hasPointer = false; });
+
+  function bindRange(el, outEl, fmt=(v)=>v){
+    const update = () => outEl.textContent = fmt(parseFloat(el.value));
+    el.addEventListener("input", update);
+    update();
+  }
+
+  bindRange(master, masterVal, v=>v.toFixed(3));
+  master.addEventListener("input", () => { if (masterGain) masterGain.gain.setTargetAtTime(parseFloat(master.value), ac.currentTime, 0.01); });
+
+  bindRange(rate, rateVal, v=>v.toFixed(3));
+  rate.addEventListener("input", () => { if (src) src.playbackRate.setTargetAtTime(parseFloat(rate.value), ac.currentTime, 0.01); });
+
+  bindRange(pan, panVal, v=>v.toFixed(3));
+  pan.addEventListener("input", () => { if (panner) panner.pan.setTargetAtTime(parseFloat(pan.value), ac.currentTime, 0.01); });
+
+  fType.addEventListener("change", () => { if (biquad) biquad.type = fType.value; });
+  bindRange(fFreq, fFreqVal, v=>String(Math.round(v)));
+  fFreq.addEventListener("input", () => { if (biquad) biquad.frequency.setTargetAtTime(parseFloat(fFreq.value), ac.currentTime, 0.01); });
+
+  bindRange(fQ, fQVal, v=>v.toFixed(3));
+  fQ.addEventListener("input", () => { if (biquad) biquad.Q.setTargetAtTime(parseFloat(fQ.value), ac.currentTime, 0.01); });
+
+  bindRange(fGain, fGainVal, v=>v.toFixed(2));
+  fGain.addEventListener("input", () => { if (biquad) biquad.gain.setTargetAtTime(parseFloat(fGain.value), ac.currentTime, 0.01); });
+
+  bindRange(dTime, dTimeVal, v=>v.toFixed(3));
+  dTime.addEventListener("input", () => { if (delay) delay.delayTime.setTargetAtTime(parseFloat(dTime.value), ac.currentTime, 0.01); });
+
+  bindRange(dFb, dFbVal, v=>v.toFixed(3));
+  dFb.addEventListener("input", () => { if (delayFb) delayFb.gain.setTargetAtTime(parseFloat(dFb.value), ac.currentTime, 0.01); });
+
+  bindRange(dMix, dMixVal, v=>v.toFixed(3));
+  dMix.addEventListener("input", () => {
+    const v = parseFloat(dMix.value);
+    if (delayWet) delayWet.gain.setTargetAtTime(v, ac.currentTime, 0.01);
+    if (delayDry) delayDry.gain.setTargetAtTime(1-v, ac.currentTime, 0.01);
+  });
+
+  bindRange(rMix, rMixVal, v=>v.toFixed(3));
+  rMix.addEventListener("input", () => {
+    const v = parseFloat(rMix.value);
+    if (revWet) revWet.gain.setTargetAtTime(v, ac.currentTime, 0.01);
+    if (revDry) revDry.gain.setTargetAtTime(1-v, ac.currentTime, 0.01);
+  });
+
+  bindRange(rDecay, rDecayVal, v=>v.toFixed(2));
+  rDecay.addEventListener("input", () => { if (convolver) rebuildImpulse(parseFloat(rDecay.value), parseFloat(rPre.value)); });
+
+  bindRange(rPre, rPreVal, v=>String(Math.round(v)));
+  rPre.addEventListener("input", () => { if (preDelay) preDelay.delayTime.setTargetAtTime(parseFloat(rPre.value)/1000, ac.currentTime, 0.01); });
+
+  bindRange(distAmt, distAmtVal, v=>v.toFixed(1));
+  distAmt.addEventListener("input", () => { if (shaper && distOn.value==="1") updateDistortion(parseFloat(distAmt.value)); });
+
+  bindRange(crBits, crBitsVal, v=>String(v|0));
+  crBits.addEventListener("input", () => { if (crusherNode) crusherNode._bits = parseInt(crBits.value,10); });
+
+  bindRange(crRate, crRateVal, v=>v.toFixed(3));
+  crRate.addEventListener("input", () => { if (crusherNode) crusherNode._normFreq = parseFloat(crRate.value); });
+
+  bindRange(tRate, tRateVal, v=>v.toFixed(2));
+  tRate.addEventListener("input", () => { if (tremLFO) tremLFO.frequency.setTargetAtTime(parseFloat(tRate.value), ac.currentTime, 0.01); });
+
+  bindRange(tDepth, tDepthVal, v=>v.toFixed(3));
+  tDepth.addEventListener("input", () => { updateTremOnOff(); });
+
+  bindRange(cTh, cThVal, v=>v.toFixed(1));
+  bindRange(cRa, cRaVal, v=>v.toFixed(1));
+  bindRange(cAt, cAtVal, v=>v.toFixed(3));
+  bindRange(cRe, cReVal, v=>v.toFixed(3));
+  [cTh,cRa,cAt,cRe].forEach(el => el.addEventListener("input", () => { if (comp) applyCompressorUI(); }));
+
+  compOn.addEventListener("change", () => {
+    if (!ac) return;
+    const wasPlaying = !!src;
+    const t = ac.currentTime;
+    disconnectSource();
+    // rebuild graph for correct routing
+    buildGraph();
+    if (wasPlaying && buffer){
+      src = createSource();
+      src.start(t);
+    }
+  });
+
+  distOn.addEventListener("change", () => {
+    if (!ac) return;
+    // easiest: rebuild to switch dry/wet routing
+    const wasPlaying = !!src;
+    const t = ac.currentTime;
+    disconnectSource();
+    buildGraph();
+    if (wasPlaying && buffer){
+      src = createSource();
+      src.start(t);
+    }
+  });
+
+  crushOn.addEventListener("change", () => {
+    if (!ac) return;
+    if (crusherBypassGain) crusherBypassGain.gain.setTargetAtTime((crushOn.value==="1") ? 0 : 1, ac.currentTime, 0.01);
+  });
+
+  tremOn.addEventListener("change", () => { if (ac) updateTremOnOff(); });
+
+  smooth.addEventListener("input", () => { smoothVal.textContent = parseFloat(smooth.value).toFixed(3); });
+  mapX.addEventListener("change", updateMapLabels);
+  mapY.addEventListener("change", updateMapLabels);
+
+  btnStart.addEventListener("click", async () => {
+    ensureAC();
+    if (ac.state !== "running") await ac.resume();
+    if (!buffer){ alert("Upload eerst een audio bestand."); return; }
+    clearSyncTimer();
+    if (src) return;
+    src = createSource();
+    if (!src) return;
+    src.start();
+  });
+
+  btnSyncStart.addEventListener("click", () => scheduleSyncStart5s());
+
+  btnStop.addEventListener("click", () => { if (ac) { clearSyncTimer(); disconnectSource(); } });
+
+  loopSel.addEventListener("change", () => { if (src) src.loop = loopSel.value === "1"; });
+
+  fileEl.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try{
+      await loadFile(f);
+      // Audio loaded (no popup)
+      if (syncInfo) syncInfo.textContent = "—";
+    }catch(err){
+      console.error(err);
+      alert("Kon audio niet laden. Probeer een ander bestand.");
+    }
+  });
+
+  function startRecording(){
+    if (!ac || isRec) return;
+    isRec = true;
+    recDataL = [];
+    recDataR = [];
+    recStartTime = ac.currentTime;
+    recState.textContent = "aan";
+    recDur.textContent = "0.0s";
+
+    recSP = ac.createScriptProcessor(4096, 2, 2);
+    recSP.onaudioprocess = (e) => {
+      if (!isRec) return;
+      const in0 = e.inputBuffer.getChannelData(0);
+      const in1 = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : in0;
+      recDataL.push(new Float32Array(in0));
+      recDataR.push(new Float32Array(in1));
+      // silent output
+      e.outputBuffer.getChannelData(0).fill(0);
+      e.outputBuffer.getChannelData(1).fill(0);
+    };
+
+    masterGain.connect(recSP);
+    recSP.connect(ac.destination);
+
+    recTimer = setInterval(() => {
+      const d = Math.max(0, ac.currentTime - recStartTime);
+      recDur.textContent = d.toFixed(1) + "s";
+    }, 100);
+  }
+
+  function stopRecording(){
+    if (!ac || !isRec) return;
+    isRec = false;
+    recState.textContent = "uit";
+    if (recTimer) clearInterval(recTimer);
+    recTimer = null;
+
+    try{ masterGain.disconnect(recSP); }catch(e){}
+    try{ recSP.disconnect(); }catch(e){}
+    recSP = null;
+
+    const wav = encodeWav(recDataL, recDataR, ac.sampleRate);
+    downloadBlob(wav, `touchpad_export_${new Date().toISOString().replace(/[:.]/g,"-")}.wav`);
+  }
+
+  btnRec.addEventListener("click", () => { ensureAC(); if (ac.state!=="running") ac.resume(); startRecording(); });
+  btnRecStop.addEventListener("click", () => stopRecording());
+
+  function encodeWav(chunksL, chunksR, sampleRate){
+    const length = chunksL.reduce((a,b)=>a + b.length, 0);
+    const interleaved = new Float32Array(length * 2);
+    let offset = 0;
+    for (let i = 0; i < chunksL.length; i++){
+      const L = chunksL[i];
+      const R = chunksR[i] || L;
+      for (let j = 0; j < L.length; j++){
+        interleaved[offset++] = L[j];
+        interleaved[offset++] = R[j];
+      }
+    }
+    const bytesPerSample = 2;
+    const blockAlign = 2 * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = interleaved.length * bytesPerSample;
+
+    const buf = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buf);
+    const writeStr = (off, s) => { for (let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); };
+
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 2, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    let woff = 44;
+    for (let i = 0; i < interleaved.length; i++){
+      let s = Math.max(-1, Math.min(1, interleaved[i]));
+      const v = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      view.setInt16(woff, v, true);
+      woff += 2;
+    }
+    return new Blob([buf], {type:"audio/wav"});
+  }
+
+  function downloadBlob(blob, filename){
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  function startScope(){
+    const buf = new Uint8Array(2048);
+    function draw(){
+      requestAnimationFrame(draw);
+      if (!analyser) return;
+      analyser.getByteTimeDomainData(buf);
+      sctx.clearRect(0,0,scope.width,scope.height);
+
+      const h = scope.height, w = scope.width;
+
+      sctx.globalAlpha = 0.25;
+      sctx.beginPath();
+      for (let i=1;i<10;i++){ const x=(w/10)*i; sctx.moveTo(x,0); sctx.lineTo(x,h); }
+      for (let i=1;i<6;i++){ const y=(h/6)*i; sctx.moveTo(0,y); sctx.lineTo(w,y); }
+      sctx.strokeStyle = "rgba(255,255,255,0.25)";
+      sctx.stroke();
+      sctx.globalAlpha = 1;
+
+      sctx.beginPath();
+      for (let i=0;i<buf.length;i++){
+        const x = (i/(buf.length-1))*w;
+        const v = (buf[i]-128)/128;
+        const y = (0.5 - v*0.42)*h;
+        if (i===0) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+      }
+      sctx.strokeStyle = "rgba(90,208,255,0.95)";
+      sctx.lineWidth = 2;
+      sctx.stroke();
+    }
+    draw();
+
+    function tick(){
+      requestAnimationFrame(tick);
+      if (!ac) return;
+      applyMapped();
+    }
+    tick();
+  }
+
+  // Init
+  populateMaps();
+  smoothVal.textContent = parseFloat(smooth.value).toFixed(3);
+  updateMapLabels();
+})();
+</script>
+</body>
+</html>

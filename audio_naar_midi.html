@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio → MIDI (monofonisch) – offline</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0f14; color:#e6edf3; }
+    header { padding: 16px 18px; border-bottom: 1px solid #1f2a37; position: sticky; top: 0; background: rgba(11,15,20,.92); backdrop-filter: blur(10px); }
+    h1 { font-size: 16px; margin: 0 0 8px; font-weight: 650; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .card { margin: 16px; border: 1px solid #1f2a37; border-radius: 14px; background:#0f1620; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+    .card .content { padding: 14px; }
+    label { font-size: 12px; opacity:.9; display:block; margin-bottom:6px; }
+    input[type="number"], input[type="text"] {
+      background:#0b1220; border:1px solid #233044; color:#e6edf3; border-radius: 10px; padding: 10px 10px; min-width: 110px;
+    }
+    input[type="range"] { width: 220px; }
+    .btn {
+      background:#1d4ed8; border:1px solid #1d4ed8; color:white; padding: 10px 12px; border-radius: 12px;
+      cursor:pointer; font-weight: 650;
+    }
+    .btn.secondary { background:#0b1220; border-color:#233044; color:#e6edf3; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    .muted { opacity:.8; font-size: 12px; line-height: 1.35; }
+    .status { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .field { padding: 10px; border: 1px solid #1f2a37; border-radius: 12px; background:#0b1220; }
+    progress { width: 100%; height: 12px; }
+    footer { padding: 0 16px 18px; opacity: .7; font-size: 12px; }
+    a { color:#7dd3fc; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Audio → MIDI (monofonisch, in-browser, offline)</h1>
+  <div class="muted">
+    Upload een audio-bestand (WAV/MP3/OGG). Deze converter werkt het best met <b>één melodielijn</b> (monofonisch).
+    Polyfone audio (akkoorden) kan rare resultaten geven.
+  </div>
+</header>
+
+<div class="card">
+  <div class="content">
+    <div class="row">
+      <div class="field" style="flex:1; min-width:260px">
+        <label>Audio bestand</label>
+        <input id="audioFile" type="file" accept="audio/*" />
+        <div class="muted" id="fileInfo">Geen bestand gekozen.</div>
+      </div>
+
+      <div class="field">
+        <label>BPM (voor quantize/tempo)</label>
+        <input id="bpm" type="number" min="30" max="300" step="1" value="120" />
+        <div class="muted">Schatting is lastig; kies hier wat past.</div>
+      </div>
+
+      <div class="field">
+        <label>Raster (noten)</label>
+        <input id="grid" type="text" value="1/16" />
+        <div class="muted">Bijv. 1/4, 1/8, 1/16, 1/32</div>
+      </div>
+
+      <div class="field">
+        <label>Min nootduur (ms)</label>
+        <input id="minDurMs" type="number" min="10" max="2000" step="10" value="80" />
+        <div class="muted">Kortere stukjes worden weggefilterd.</div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="field">
+        <label>Pitch gevoeligheid (lager = stabieler)</label>
+        <input id="stability" type="range" min="0" max="100" value="35" />
+        <div class="muted"><span id="stabilityLabel">35</span></div>
+      </div>
+
+      <div class="field">
+        <label>Onset gevoeligheid (energie-drempel)</label>
+        <input id="onset" type="range" min="0" max="100" value="35" />
+        <div class="muted"><span id="onsetLabel">35</span></div>
+      </div>
+
+      <div class="field">
+        <label>Pitch bereik (MIDI)</label>
+        <div class="row">
+          <input id="minMidi" type="number" min="0" max="127" value="36" />
+          <input id="maxMidi" type="number" min="0" max="127" value="96" />
+        </div>
+        <div class="muted">Beperk om ruis te verminderen.</div>
+      </div>
+
+      <div class="field">
+        <label>Velociteit</label>
+        <input id="velocity" type="number" min="1" max="127" value="90" />
+        <div class="muted">Vaste aanslagsterkte.</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="analyzeBtn" class="btn" disabled>Analyseer & maak MIDI</button>
+      <button id="downloadBtn" class="btn secondary" disabled>Download MIDI</button>
+      <div style="flex:1"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <progress id="prog" value="0" max="1" style="display:none"></progress>
+      <div class="status" id="status">Klaar.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Tip: als je audio eerst “droog” maakt (weinig reverb) en de melodie hard/duidelijk, krijg je betere MIDI.
+</footer>
+
+<script>
+/**
+ * DISCLAIMER:
+ * Dit is een eenvoudige, offline, monofonische audio→MIDI benadering (pitch tracking + segmentatie).
+ * Verwacht geen perfecte resultaten zoals Melodyne of BasicPitch—maar vaak bruikbaar voor schetsen.
+ */
+
+// ---------- UI ----------
+const el = (id) => document.getElementById(id);
+const audioFile = el("audioFile");
+const analyzeBtn = el("analyzeBtn");
+const downloadBtn = el("downloadBtn");
+const statusEl = el("status");
+const progEl = el("prog");
+const fileInfo = el("fileInfo");
+
+const stability = el("stability");
+const onset = el("onset");
+const stabilityLabel = el("stabilityLabel");
+const onsetLabel = el("onsetLabel");
+stability.addEventListener("input", () => stabilityLabel.textContent = stability.value);
+onset.addEventListener("input", () => onsetLabel.textContent = onset.value);
+
+let latestMidiBlob = null;
+let latestMidiName = "output.mid";
+
+audioFile.addEventListener("change", () => {
+  if (!audioFile.files?.length) {
+    fileInfo.textContent = "Geen bestand gekozen.";
+    analyzeBtn.disabled = true;
+    return;
+  }
+  fileInfo.textContent = `${audioFile.files[0].name} (${Math.round(audioFile.files[0].size/1024)} KB)`;
+  analyzeBtn.disabled = false;
+  downloadBtn.disabled = true;
+  latestMidiBlob = null;
+});
+
+downloadBtn.addEventListener("click", () => {
+  if (!latestMidiBlob) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(latestMidiBlob);
+  a.download = latestMidiName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ---------- Audio decode ----------
+async function decodeAudioFile(file) {
+  const arrayBuf = await file.arrayBuffer();
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuf = await ac.decodeAudioData(arrayBuf.slice(0));
+  await ac.close?.();
+  return audioBuf;
+}
+
+// ---------- DSP helpers ----------
+function hannWindow(N) {
+  const w = new Float32Array(N);
+  for (let n=0; n<N; n++) w[n] = 0.5 * (1 - Math.cos(2*Math.PI*n/(N-1)));
+  return w;
+}
+
+function rms(frame) {
+  let s=0;
+  for (let i=0;i<frame.length;i++) s += frame[i]*frame[i];
+  return Math.sqrt(s / frame.length);
+}
+
+// Autocorrelation pitch (simple). Returns frequency in Hz or 0 if unvoiced.
+function pitchAutocorr(frame, sampleRate, minHz=55, maxHz=1100) {
+  // Remove DC
+  let mean=0;
+  for (let i=0;i<frame.length;i++) mean += frame[i];
+  mean /= frame.length;
+  const x = new Float32Array(frame.length);
+  for (let i=0;i<frame.length;i++) x[i] = frame[i] - mean;
+
+  const minLag = Math.floor(sampleRate / maxHz);
+  const maxLag = Math.floor(sampleRate / minHz);
+
+  // Energy gate
+  const r = rms(x);
+  if (r < 0.01) return 0;
+
+  let bestLag = -1;
+  let bestVal = 0;
+
+  // Normalized autocorrelation
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let num=0, den1=0, den2=0;
+    for (let i=0; i < x.length - lag; i++) {
+      const a = x[i];
+      const b = x[i+lag];
+      num += a*b;
+      den1 += a*a;
+      den2 += b*b;
+    }
+    const denom = Math.sqrt(den1*den2) + 1e-12;
+    const val = num/denom;
+    if (val > bestVal) {
+      bestVal = val;
+      bestLag = lag;
+    }
+  }
+
+  // Confidence threshold
+  if (bestVal < 0.35) return 0;
+  return sampleRate / bestLag;
+}
+
+function hzToMidi(hz) {
+  return Math.round(69 + 12*Math.log2(hz/440));
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Quantize time (seconds) to a grid step based on BPM and fraction string like "1/16"
+function quantizeTimeSec(t, bpm, fracStr) {
+  const parts = fracStr.trim().split("/");
+  if (parts.length !== 2) return t;
+  const num = parseFloat(parts[0]);
+  const den = parseFloat(parts[1]);
+  if (!isFinite(num) || !isFinite(den) || den<=0 || num<=0) return t;
+
+  const quarter = 60 / bpm;          // seconds per quarter note
+  const whole = quarter * 4;         // seconds per whole note
+  const grid = whole * (num/den);    // seconds per grid step
+  const q = Math.round(t / grid) * grid;
+  return q;
+}
+
+// ---------- MIDI writer (Type 0, single track) ----------
+function writeVarLen(value) {
+  let buffer = value & 0x7F;
+  const bytes = [];
+  while ((value >>= 7)) {
+    buffer <<= 8;
+    buffer |= ((value & 0x7F) | 0x80);
+  }
+  while (true) {
+    bytes.push(buffer & 0xFF);
+    if (buffer & 0x80) buffer >>= 8;
+    else break;
+  }
+  return Uint8Array.from(bytes);
+}
+
+function strBytes(s) {
+  return Uint8Array.from([...s].map(ch => ch.charCodeAt(0)));
+}
+
+function u16be(n) { return Uint8Array.from([(n>>8)&0xFF, n&0xFF]); }
+function u32be(n) { return Uint8Array.from([(n>>24)&0xFF,(n>>16)&0xFF,(n>>8)&0xFF,n&0xFF]); }
+
+function concatBytes(arrays) {
+  const total = arrays.reduce((a,b)=>a+b.length,0);
+  const out = new Uint8Array(total);
+  let o=0;
+  for (const a of arrays) { out.set(a,o); o+=a.length; }
+  return out;
+}
+
+function makeMidi(events, bpm, ppq=480) {
+  events.sort((a,b)=> a.tick - b.tick || (a.type === 'off' ? -1 : 1));
+
+  const trackChunks = [];
+
+  const mpq = Math.round(60000000 / bpm);
+  trackChunks.push(writeVarLen(0));
+  trackChunks.push(Uint8Array.from([0xFF, 0x51, 0x03, (mpq>>16)&0xFF, (mpq>>8)&0xFF, mpq&0xFF]));
+
+  trackChunks.push(writeVarLen(0));
+  trackChunks.push(Uint8Array.from([0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08]));
+
+  let lastTick = 0;
+  const ch = 0;
+  for (const ev of events) {
+    const delta = Math.max(0, ev.tick - lastTick);
+    lastTick = ev.tick;
+    trackChunks.push(writeVarLen(delta));
+    if (ev.type === 'on') {
+      trackChunks.push(Uint8Array.from([0x90 | ch, ev.note & 0x7F, ev.vel & 0x7F]));
+    } else {
+      trackChunks.push(Uint8Array.from([0x80 | ch, ev.note & 0x7F, 0]));
+    }
+  }
+
+  trackChunks.push(writeVarLen(0));
+  trackChunks.push(Uint8Array.from([0xFF, 0x2F, 0x00]));
+
+  const trackData = concatBytes(trackChunks);
+  const header = concatBytes([
+    strBytes("MThd"),
+    u32be(6),
+    u16be(0),
+    u16be(1),
+    u16be(ppq),
+  ]);
+
+  const track = concatBytes([
+    strBytes("MTrk"),
+    u32be(trackData.length),
+    trackData
+  ]);
+
+  return new Blob([header, track], { type: "audio/midi" });
+}
+
+// ---------- Main analysis ----------
+function setStatus(msg) { statusEl.textContent = msg; }
+function setProgress(show, value=0) {
+  progEl.style.display = show ? "block" : "none";
+  progEl.value = value;
+}
+
+analyzeBtn.addEventListener("click", async () => {
+  try {
+    analyzeBtn.disabled = true;
+    downloadBtn.disabled = true;
+    latestMidiBlob = null;
+
+    const file = audioFile.files?.[0];
+    if (!file) throw new Error("Geen bestand gekozen.");
+
+    const bpm = clamp(parseFloat(el("bpm").value) || 120, 30, 300);
+    const gridStr = el("grid").value || "1/16";
+    const minDurMs = clamp(parseFloat(el("minDurMs").value) || 80, 10, 5000);
+    const minMidi = clamp(parseInt(el("minMidi").value || "0", 10), 0, 127);
+    const maxMidi = clamp(parseInt(el("maxMidi").value || "127", 10), 0, 127);
+    const velocity = clamp(parseInt(el("velocity").value || "90", 10), 1, 127);
+
+    const stabilityVal = parseInt(stability.value, 10);
+    const onsetVal = parseInt(onset.value, 10);
+
+    setStatus("Decoderen van audio…");
+    setProgress(true, 0.02);
+    const audioBuf = await decodeAudioFile(file);
+
+    const sr = audioBuf.sampleRate;
+    const data = audioBuf.getChannelData(0);
+
+    const frameSize = 2048;
+    const hopSize = 512;
+    const w = hannWindow(frameSize);
+
+    const pitchJitterTol = 1 + (stabilityVal / 50);
+    const energyGate = 0.005 + (onsetVal/100) * 0.02;
+    const onsetRise = 1.2 + (onsetVal/100) * 1.8;
+
+    const frames = Math.floor((data.length - frameSize) / hopSize);
+    const pitches = new Float32Array(frames);
+    const energies = new Float32Array(frames);
+
+    setStatus(`Analyseren… frames: ${frames}\n(sampleRate=${sr} Hz)`);
+    for (let f=0; f<frames; f++) {
+      const start = f*hopSize;
+      const frame = new Float32Array(frameSize);
+      for (let i=0;i<frameSize;i++) frame[i] = data[start+i] * w[i];
+
+      const e = rms(frame);
+      energies[f] = e;
+
+      if (e < energyGate) {
+        pitches[f] = 0;
+      } else {
+        const hz = pitchAutocorr(frame, sr);
+        pitches[f] = hz;
+      }
+
+      if (f % 200 === 0) setProgress(true, 0.05 + 0.55*(f/frames));
+    }
+
+    setStatus("Segmenteren naar noten…");
+    const notes = [];
+    let current = null;
+
+    const frameTime = hopSize / sr;
+    const minFrames = Math.max(1, Math.round((minDurMs/1000)/frameTime));
+
+    function isOnset(idx) {
+      if (idx <= 0) return false;
+      const prev = energies[idx-1];
+      const now = energies[idx];
+      if (prev < energyGate && now >= energyGate) return true;
+      if (prev > 1e-9 && (now/prev) >= onsetRise && now > energyGate) return true;
+      return false;
+    }
+
+    for (let i=0; i<frames; i++) {
+      const hz = pitches[i];
+      const voiced = hz > 0;
+      const onsetHere = isOnset(i);
+
+      let midi = 0;
+      if (voiced) midi = hzToMidi(hz);
+
+      if (voiced) {
+        if (midi < minMidi || midi > maxMidi) midi = 0;
+      }
+
+      const voicedOk = midi > 0;
+
+      if (!current) {
+        if (voicedOk) current = { startFrame: i, lastMidi: midi, lastVoicedFrame: i };
+        continue;
+      }
+
+      if (!voicedOk || onsetHere) {
+        const endFrame = current.lastVoicedFrame;
+        if ((endFrame - current.startFrame + 1) >= minFrames) {
+          notes.push({ f0: current.startFrame, f1: endFrame, midi: current.lastMidi });
+        }
+        current = null;
+        if (voicedOk) current = { startFrame: i, lastMidi: midi, lastVoicedFrame: i };
+        continue;
+      }
+
+      const diff = Math.abs(midi - current.lastMidi);
+      if (diff <= pitchJitterTol) {
+        current.lastMidi = Math.round((current.lastMidi*3 + midi)/4);
+      } else {
+        const endFrame = current.lastVoicedFrame;
+        if ((endFrame - current.startFrame + 1) >= minFrames) {
+          notes.push({ f0: current.startFrame, f1: endFrame, midi: current.lastMidi });
+        }
+        current = { startFrame: i, lastMidi: midi, lastVoicedFrame: i };
+      }
+      current.lastVoicedFrame = i;
+    }
+
+    if (current) {
+      const endFrame = current.lastVoicedFrame;
+      if ((endFrame - current.startFrame + 1) >= minFrames) {
+        notes.push({ f0: current.startFrame, f1: endFrame, midi: current.lastMidi });
+      }
+    }
+
+    if (notes.length === 0) {
+      throw new Error("Geen noten gevonden. Probeer: onset/energie gevoeligheid lager, of pitch-bereik aanpassen.");
+    }
+
+    setStatus(`Noten gevonden: ${notes.length}\nQuantizen & MIDI schrijven…`);
+    setProgress(true, 0.7);
+
+    const ppq = 480;
+    const secPerQuarter = 60 / bpm;
+    function secToTick(tSec) { return Math.round((tSec / secPerQuarter) * ppq); }
+
+    const events = [];
+    for (const n of notes) {
+      let t0 = n.f0 * frameTime;
+      let t1 = (n.f1 + 1) * frameTime;
+
+      t0 = quantizeTimeSec(t0, bpm, gridStr);
+      t1 = quantizeTimeSec(t1, bpm, gridStr);
+      if (t1 <= t0) t1 = t0 + (minDurMs/1000);
+
+      const tick0 = secToTick(t0);
+      const tick1 = secToTick(t1);
+
+      const note = clamp(n.midi, 0, 127);
+      events.push({ tick: tick0, type: 'on', note, vel: velocity });
+      events.push({ tick: tick1, type: 'off', note, vel: 0 });
+    }
+
+    events.sort((a,b)=>a.tick-b.tick);
+    const minTick = events[0].tick;
+    if (minTick > 0) for (const e of events) e.tick -= minTick;
+
+    latestMidiBlob = makeMidi(events, bpm, ppq);
+    latestMidiName = (file.name.replace(/\.[^/.]+$/, "") || "output") + ".mid";
+
+    setProgress(false);
+    setStatus(`✅ Klaar!\nMIDI: ${latestMidiName}\nNoten: ${notes.length}\nBPM: ${bpm}, grid: ${gridStr}\n\nTip: als het te “stottert”, zet grid grover (bv 1/8) of verhoog Min nootduur.`);
+    downloadBtn.disabled = false;
+  } catch (err) {
+    setProgress(false);
+    setStatus("❌ Fout:\n" + (err?.message || String(err)));
+  } finally {
+    analyzeBtn.disabled = !audioFile.files?.length;
+  }
+});
+</script>
+</body>
+</html>
