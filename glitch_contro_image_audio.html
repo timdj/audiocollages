@@ -1,0 +1,2980 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sonic Pi Slice Player + FFT Video (klikvrij + echte stop)</title>
+  <style>
+    body{font-family:system-ui,sans-serif;margin:16px;background:#0b0b0f;color:#eaeaf2}
+    h1{font-size:18px;margin:0 0 12px}
+    .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+    .card{background:#141420;border:1px solid #24243a;border-radius:12px;padding:12px;flex:1 1 360px}
+    label{display:block;font-size:12px;opacity:.9;margin-top:10px}
+    input,textarea,button,select{width:100%;margin-top:6px;padding:8px;border-radius:10px;border:1px solid #2b2b45;background:#0f0f18;color:#eaeaf2}
+    textarea{min-height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+    button{cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    .small{font-size:12px;opacity:.8;margin-top:8px;line-height:1.35}
+    .vars{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .var{background:#10101a;border:1px solid #24243a;border-radius:10px;padding:10px}
+    code{background:#10101a;padding:2px 6px;border-radius:8px;border:1px solid #24243a}
+    canvas{width:512px;max-width:100%;height:auto;border-radius:12px;border:1px solid #24243a;background:#000;image-rendering:pixelated}
+  </style>
+</head>
+<body>
+  <h1>Sonic Pi-achtig sample slicing — BPM + sleep/wait + FFT video (stopt altijd, geen gekraak)</h1>
+
+  <div class="row">
+    <div class="card">
+      <label>Audio upload</label>
+      <input id="file" type="file" accept="audio/*"/>
+      <div class="small" id="fileInfo">Nog geen bestand.</div>
+
+      <label>Drum sample (2e audio)</label>
+      <input id="drumFile" type="file" accept="audio/*"/>
+      <div class="small" id="drumInfo">Geen drum sample geladen.</div>
+
+      <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        <input id="drumEnable" type="checkbox" style="width:auto;margin:0" checked/> <span>Drum algoritme layer aan</span>
+      </label>
+
+      <div class="vars">
+        <div class="var">
+          <label>Drum BPM (bron)</label>
+          <input id="drumBpm" type="number" min="20" max="300" step="1" value="170"/>
+          <div class="small">Wordt gebruikt voor het drum-grid (16e-noten). Los van je hoofd-BPM.</div>
+        </div>
+        <div class="var">
+          <label>Drum volume</label>
+          <input id="drumGain" type="range" min="0" max="1.5" step="0.01" value="0.7"/>
+          <div class="small" id="drumGainVal">0.70</div>
+        </div>
+        <div class="var" style="grid-column:1 / -1">
+          <label>Drum FX (op sample 2)</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input id="drumFxEnable" type="checkbox" style="width:auto;margin:0" checked/> <span>FX chain aan</span>
+          </label>
+          <div class="small">FX werken op de drum-layer (na drum volume), zowel live als bij export.</div>
+        </div>
+
+        <div class="var">
+          <label>HPF (Hz)</label>
+          <input id="drumHpfSl" type="range" min="0" max="2000" step="1" value="0"/>
+          <input id="drumHpf" type="number" min="0" max="2000" step="1" value="0"/>
+          <div class="small" id="drumHpfVal">0</div>
+        </div>
+
+        <div class="var">
+          <label>LPF (Hz)</label>
+          <input id="drumLpfSl" type="range" min="500" max="20000" step="1" value="20000"/>
+          <input id="drumLpf" type="number" min="500" max="20000" step="1" value="20000"/>
+          <div class="small" id="drumLpfVal">20000</div>
+        </div>
+
+        <div class="var">
+          <label>Drive (distortion)</label>
+          <input id="drumDriveSl" type="range" min="0" max="30" step="0.1" value="0"/>
+          <input id="drumDrive" type="number" min="0" max="30" step="0.1" value="0"/>
+          <div class="small" id="drumDriveVal">0.0</div>
+        </div>
+
+        <div class="var">
+          <label>Bitcrush bits (4..16)</label>
+          <input id="drumCrushBitsSl" type="range" min="4" max="16" step="1" value="16"/>
+          <input id="drumCrushBits" type="number" min="4" max="16" step="1" value="16"/>
+          <div class="small" id="drumCrushBitsVal">16</div>
+        </div>
+
+        <div class="var">
+          <label>Bitcrush downsample (1..32)</label>
+          <input id="drumCrushDownSl" type="range" min="1" max="32" step="1" value="1"/>
+          <input id="drumCrushDown" type="number" min="1" max="32" step="1" value="1"/>
+          <div class="small" id="drumCrushDownVal">1</div>
+        </div>
+
+        <div class="var">
+          <label>Delay time (sec)</label>
+          <input id="drumDelayTimeSl" type="range" min="0" max="1.0" step="0.001" value="0"/>
+          <input id="drumDelayTime" type="number" min="0" max="1.0" step="0.001" value="0"/>
+          <div class="small" id="drumDelayTimeVal">0.000</div>
+        </div>
+
+        <div class="var">
+          <label>Delay feedback</label>
+          <input id="drumDelayFbSl" type="range" min="0" max="0.95" step="0.01" value="0"/>
+          <input id="drumDelayFb" type="number" min="0" max="0.95" step="0.01" value="0"/>
+          <div class="small" id="drumDelayFbVal">0.00</div>
+        </div>
+
+        <div class="var">
+          <label>Delay mix</label>
+          <input id="drumDelayMixSl" type="range" min="0" max="1" step="0.01" value="0"/>
+          <input id="drumDelayMix" type="number" min="0" max="1" step="0.01" value="0"/>
+          <div class="small" id="drumDelayMixVal">0.00</div>
+        </div>
+
+        <div class="var">
+          <label>Reverb mix</label>
+          <input id="drumRevMixSl" type="range" min="0" max="1" step="0.01" value="0"/>
+          <input id="drumRevMix" type="number" min="0" max="1" step="0.01" value="0"/>
+          <div class="small" id="drumRevMixVal">0.00</div>
+        </div>
+
+        <div class="var">
+          <label>Reverb time (sec)</label>
+          <input id="drumRevTimeSl" type="range" min="0.1" max="6" step="0.1" value="2.0"/>
+          <input id="drumRevTime" type="number" min="0.1" max="6" step="0.1" value="2.0"/>
+          <div class="small" id="drumRevTimeVal">2.0</div>
+        </div>
+
+        <div class="var">
+          <label>Stereo pan (-1..1)</label>
+          <input id="drumPanSl" type="range" min="-1" max="1" step="0.01" value="0"/>
+          <input id="drumPan" type="number" min="-1" max="1" step="0.01" value="0"/>
+          <div class="small" id="drumPanVal">0.00</div>
+        </div>
+
+        <div class="var">
+          <label>Tremolo depth</label>
+          <input id="drumTremDepthSl" type="range" min="0" max="1" step="0.01" value="0"/>
+          <input id="drumTremDepth" type="number" min="0" max="1" step="0.01" value="0"/>
+          <div class="small" id="drumTremDepthVal">0.00</div>
+        </div>
+
+        <div class="var">
+          <label>Tremolo rate (Hz)</label>
+          <input id="drumTremRateSl" type="range" min="0.1" max="30" step="0.1" value="6"/>
+          <input id="drumTremRate" type="number" min="0.1" max="30" step="0.1" value="6"/>
+          <div class="small" id="drumTremRateVal">6.0</div>
+        </div>
+
+        <div class="var" style="grid-column:1 / -1">
+          <label>Drum algoritme</label>
+          <select id="drumAlgo">
+            <option value="amen">Amen (jungle)</option>
+            <option value="dnb_twostep">DnB Two-step</option>
+            <option value="breakbeat_classic">Classic Breakbeat</option>
+            <option value="boom_bap">Boom bap</option>
+            <option value="four_on_floor">Four-on-the-floor</option>
+            <option value="trap">Trap (hats/rolls)</option>
+            <option value="shuffle">Shuffle / swing</option>
+            <option value="reggaeton">Reggaeton (dembow)</option>
+            <option value="dubstep_halftime">Dubstep / halftime</option>
+            <option value="house_garage">House / UK garage</option>
+            <option value="anti_groove">Anti-groove (controversieel)</option>
+            <option value="silence_abuse">Silence abuse</option>
+            <option value="jitter_dictator">Jitter dictator</option>
+            <option value="loop_denial">Loop denial</option>
+            <option value="hat_fascism">Hat fascism</option>
+            <option value="bpm_gaslight">BPM gaslight</option>
+            <option value="reverse_trauma">Reverse trauma</option>
+            <option value="broken_amen">Broken amen</option>
+            <option value="machine_panic">Machine panic</option>
+            <option value="clock_drift">Clock drift</option>
+            <option value="stutter_prison">Stutter prison</option>
+            <option value="phase_abuse">Phase abuse</option>
+            <option value="kick_denial">Kick denial</option>
+            <option value="grid_vandal">Grid vandal</option>
+            <option value="psycho_swing">Psycho swing</option>
+            <option value="anti_drop">Anti-drop</option>
+            <option value="random_authority" selected>Random authority</option>
+            <option value="compression_hell">Compression hell</option>
+            <option value="groove_erasure">Groove erasure</option>
+            <option value="final_insult">Final insult</option>
+          </select>
+          <div class="small">Deze patterns slicen je 2e sample (intern 16 slices) en spelen fragmenten op een 16-step grid.</div>
+        </div>
+
+        <div class="var" style="grid-column:1 / -1">
+          <label>Geluid voor drum algoritme</label>
+          <select id="drumSource">
+            <option value="drum" selected>Audio bestand 2 (drum sample)</option>
+            <option value="main">Audio bestand 1 (hoofd sample)</option>
+          </select>
+          <div class="small">Kies welke sample het drum-algoritme aanstuurt.</div>
+        </div>
+
+        <div class="var">
+          <label>drum start line(from)</label>
+          <input id="drumStartFromSl" type="range" min="0" max="1" step="0.001" value="0"/>
+          <input id="drumStartFrom" type="number" min="0" max="1" step="0.001" value="0"/>
+          <div class="small">Window waarbinnen de 16 drum-slices worden gesneden.</div>
+        </div>
+
+        <div class="var">
+          <label>drum start line(to)</label>
+          <input id="drumStartToSl" type="range" min="0" max="1" step="0.001" value="1"/>
+          <input id="drumStartTo" type="number" min="0" max="1" step="0.001" value="1"/>
+          <div class="small">Slider + nummer gesynchroniseerd</div>
+        </div>
+
+        <div class="var">
+          <label>drum start line(steps)</label>
+          <input id="drumStartSteps" type="number" min="2" max="256" step="1" value="16"/>
+        </div>
+
+        <div class="var">
+          <label>Drum start line randomizer</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input id="drumRandStartEnable" type="checkbox" style="width:auto;margin:0" checked/> <span>Activeren</span>
+          </label>
+          <div class="small">Als actief: drum start line(from/to) randomiseert periodiek.</div>
+        </div>
+
+        <div class="var">
+          <label>Drum interval (sec) 0..10</label>
+          <input id="drumRandStartIntSl" type="range" min="0" max="10" step="0.1" value="1"/>
+          <input id="drumRandStartIntNum" type="number" min="0" max="10" step="0.1" value="1"/>
+          <div class="small" id="drumRandStartIntVal">0.0</div>
+        </div>
+
+        <div class="var">
+          <label>Drum reverse toestaan</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input id="drumAllowReverse" type="checkbox" style="width:auto;margin:0"/> <span>Als from &gt; to, speel achterstevoren</span>
+          </label>
+        </div>
+
+      </div>
+
+
+      <label>Crossfade (sec) bij nieuw bestand</label>
+      <input id="xfade" type="range" min="0" max="8" step="0.1" value="1.5"/>
+      <div class="small" id="xfadeVal">1.5</div>
+
+
+      <label>Algoritme (JS) — pas aan en druk op Start</label>
+      <textarea id="algo" spellcheck="false"></textarea>
+      <div class="small">
+        Je schrijft <code>function algo(step, vars, helpers){...}</code> (step = 0,1,2,…) en je returnt:<br/>
+        <code>{ startNorm, finishNorm, amp, sleepBeats, rate? }</code><br/>
+        Sonic Pi mapping: <code>sleepBeats</code> is jouw <code>sleep d</code> (in beats), BPM bepaalt seconden.
+      </div>
+
+      <div class="grid2">
+        <button id="start" disabled>Start</button>
+        <button id="stop" disabled>Stop</button>
+      </div>
+
+      <label>Export lengte (sec)</label>
+      <div class="vars">
+        <div class="var">
+          <label>Lengte (slider)</label>
+          <input id="expLen" type="range" min="1" max="1800" step="1" value="60"/>
+          <div class="small" id="expLenVal">60</div>
+        </div>
+        <div class="var">
+          <label>Lengte (nummer)</label>
+          <input id="expLenNum" type="number" min="1" max="1800" step="1" value="60"/>
+        </div>
+      </div>
+
+
+      <label>Video uitvoer bron</label>
+      <select id="videoMode">
+        <option value="img">Afbeelding slices (random)</option>
+        <option value="fft">FFT canvas (audio)</option>
+        
+      </select>
+
+      <div id="imgModeUI" style="display:none;margin-top:10px">
+        <label>Afbeelding upload (voor slices)</label>
+        <input id="imageUpload" type="file" accept="image/*"/>
+        <div class="small" id="imageInfo">Nog geen afbeelding.</div>
+
+        <label>Verhouding (slice)</label>
+        <select id="sliceRatio">
+          <option value="square">Vierkant</option>
+          <option value="portrait">Portret</option>
+          <option value="landscape">Landschap</option>
+        </select>
+
+        <label>Tijd per frame (sec)</label>
+        <div class="vars">
+          <div class="var">
+            <label>Tijd (slider)</label>
+            <input id="frameTimeSl" type="range" min="0.05" max="5" step="0.05" value="1"/>
+            <div class="small" id="frameTimeVal">1</div>
+          </div>
+          <div class="var">
+            <label>Tijd (nummer)</label>
+            <input id="frameTimeNum" type="number" min="0.05" max="60" step="0.05" value="1"/>
+          </div>
+        </div>
+
+        <label>Aantal slices</label>
+        <div class="vars">
+          <div class="var">
+            <label>Aantal (slider)</label>
+            <input id="sliceCountSl" type="range" min="2" max="1800" step="1" value="60"/>
+            <div class="small" id="sliceCountVal">60</div>
+          </div>
+          <div class="var">
+            <label>Aantal (nummer)</label>
+            <input id="sliceCountNum" type="number" min="2" max="1800" step="1" value="60"/>
+          </div>
+        </div>
+        <div class="small">Aantal wordt standaard berekend als <code>exportLengte / tijd</code>. Bij 60s en 1s is dat 60.</div>
+      </div>
+
+
+      <label>Export</label>
+      <div class="grid2">
+        <button id="exportWav" disabled>Export WAV</button>
+        <button id="exportVid" disabled>Export MP4 (of WebM)</button>
+      </div>
+      <div class="small" id="exportNote">Video export: MP4 (geen WebM fallback).</div>
+
+      <div class="small">
+        Veilig: Stop killt ook alles wat al vooruit gescheduled was.
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Variabelen (zoals in je Sonic Pi snippet)</label>
+      <div class="vars">
+        <div class="var">
+          <label>n</label>
+          <input id="n" type="number" min="2" max="256" step="1" value="8"/>
+          <div class="small">Aantal slices (n)</div>
+        </div>
+
+        <div class="var">
+          <label>d = 1/n (beats)</label>
+          <input id="d" type="text" value="auto" disabled/>
+          <div class="small">Wordt automatisch 1/n</div>
+        </div>
+
+        <div class="var">
+          <label>BPM</label>
+          <input id="bpm" type="range" min="20" max="240" step="1" value="60"/>
+          <div class="small" id="bpmVal">60</div>
+        </div>
+
+        <div class="var">
+          <label>seed</label>
+          <input id="seed" type="number" min="0" max="99999999" step="1" value="12345"/>
+        </div>
+
+<div class="var">
+          <label>Slice keuze</label>
+          <select id="sliceMode">
+            <option value="line_choose" selected>line.choose (zoals Sonic Pi snippet)</option>
+            <option value="shuffle_n">shuffle n (loopt heel bestand langs)</option>
+          </select>
+          <div class="small">shuffle n: elke cyclus een nieuwe willekeurige volgorde van 0..n-1 slices</div>
+        </div>
+
+        <div class="var">
+          <label>start line(from)</label>
+          <input id="startFromSl" type="range" min="0" max="1" step="0.001" value="0"/>
+          <input id="startFrom" type="number" min="0" max="1" step="0.001" value="0"/>
+          <div class="small">Slider + nummer gesynchroniseerd</div>
+        </div>
+        <div class="var">
+          <label>start line(to)</label>
+          <input id="startToSl" type="range" min="0" max="1" step="0.001" value="1"/>
+          <input id="startTo" type="number" min="0" max="1" step="0.001" value="1"/>
+          <div class="small">Slider + nummer gesynchroniseerd</div>
+
+        <div class="var">
+          <label>Start line randomizer</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input id="randStartEnable" type="checkbox" style="width:auto;margin:0" checked/> <span>Activeren</span>
+          </label>
+          <div class="small">Als actief: start line(from/to) krijgen periodiek een willekeurige positie.</div>
+        </div>
+
+        <div class="var">
+          <label>Interval (sec) 0..10</label>
+          <input id="randStartIntSl" type="range" min="0" max="10" step="0.1" value="1"/>
+          <input id="randStartIntNum" type="number" min="0" max="10" step="0.1" value="1"/>
+          <div class="small" id="randStartIntVal">0.0</div>
+        </div>
+
+        <div class="var">
+          <label>Reverse toestaan</label>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input id="allowReverse" type="checkbox" style="width:auto;margin:0"/> <span>Als from &gt; to, speel achterstevoren</span>
+          </label>
+        </div>
+
+        </div>
+        <div class="var">
+          <label>start line(steps)</label>
+          <input id="startSteps" type="number" min="2" max="256" step="1" value="8"/>
+        </div>
+
+        <div class="var">
+          <label>amp line(from)</label>
+          <input id="ampFrom" type="number" min="0" max="20" step="0.01" value="0.15"/>
+        </div>
+        <div class="var">
+          <label>amp line(to)</label>
+          <input id="ampTo" type="number" min="0" max="20" step="0.01" value="0.55"/>
+        </div>
+        <div class="var">
+          <label>amp line(steps)</label>
+          <input id="ampSteps" type="number" min="2" max="256" step="1" value="10"/>
+        </div>
+
+        <div class="var">
+          <label>rate (playback)</label>
+          <input id="rate" type="number" min="0.25" max="4" step="0.01" value="1"/>
+        </div>
+
+        <div class="var">
+          <label>Duratie koppelen aan sleep</label>
+          <select id="durClamp">
+            <option value="none">none (zoals Sonic Pi region)</option>
+            <option value="sleep" selected>sleep (minder overlap / minder clipping)</option>
+          </select>
+          <div class="small">Als je sample lang is, kan region-dur veel overlap geven → sissen/kraak. Deze optie beperkt slice-lengte.</div>
+        </div>
+
+        <div class="var">
+          <label>Dur multiplier (t.o.v. sleep)</label>
+          <input id="durMul" type="range" min="0.1" max="2.0" step="0.01" value="1.0"/>
+          <div class="small" id="durMulVal">1.00</div>
+        </div>
+
+        <div class="var">
+          <label>Limiter/Compressor</label>
+          <select id="limiter">
+            <option value="on" selected>on (aanrader)</option>
+            <option value="off">off</option>
+          </select>
+        </div>
+
+        <div class="var">
+          <label>Fade (sec)</label>
+          <input id="fade" type="number" min="0.001" max="0.05" step="0.001" value="0.005"/>
+          <div class="small">Klikken weg (fade in/out per slice)</div>
+        </div>
+
+        <div class="var">
+          <label>Master gain</label>
+          <input id="master" type="range" min="0" max="1.5" step="0.01" value="0.9"/>
+          <div class="small" id="masterVal">0.90</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>FFT Video Preview (reageert op audio)</label>
+      <canvas id="cv" width="256" height="256"></canvas>
+
+      
+      <label>Pixel presets</label>
+      <div class="grid3">
+        <button id="presetSnappy">Snappy</button>
+        <button id="presetSmooth">Smooth</button>
+        <button id="presetStrobe">Strobe</button>
+      </div>
+      <div class="small">Presets passen attack/release, trail en brightness aan (live).</div>
+
+<label>FFT instellingen</label>
+      <div class="vars">
+        <div class="var">
+          <label>Pixel decay / donkerte</label>
+          <input id="pxDecay" type="range" min="0" max="0.95" step="0.01" value="0.35"/>
+          <div class="small" id="pxDecayVal">0.35</div>
+        </div>
+
+        <div class="var">
+          <label>Pixel grootte</label>
+          <input id="pxSize" type="range" min="1" max="16" step="1" value="4"/>
+          <div class="small" id="pxSizeVal">4</div>
+        </div>
+        <div class="var">
+          <label>Pixel density</label>
+          <input id="pxDen" type="range" min="0" max="1" step="0.01" value="0.35"/>
+          <div class="small" id="pxDenVal">0.35</div>
+        </div>
+
+        <div class="var">
+          <label>Donker worden (trail) — vaker donker</label>
+          <input id="darkRate" type="range" min="0" max="1" step="0.01" value="0.35"/>
+          <div class="small" id="darkRateVal">0.35</div>
+        </div>
+
+        <div class="var">
+          <label>Brightness — felheid</label>
+          <input id="bright" type="range" min="0.2" max="2.0" step="0.01" value="1.0"/>
+          <div class="small" id="brightVal">1.00</div>
+        </div>
+
+        <div class="var">
+          <label>Reactie curve (gamma) — punch</label>
+          <input id="gamma" type="range" min="0.3" max="3.0" step="0.01" value="1.2"/>
+          <div class="small" id="gammaVal">1.20</div>
+        
+        <div class="var">
+          <label>Reactie snelheid: sneller omhoog (attack)</label>
+          <input id="attack" type="range" min="0.01" max="1.0" step="0.01" value="0.65"/>
+          <div class="small" id="attackVal">0.65</div>
+          <div class="small">Hoger = sneller op pieken reageren.</div>
+        </div>
+
+        <div class="var">
+          <label>Reactie snelheid: sneller omlaag (release)</label>
+          <input id="release" type="range" min="0.01" max="1.0" step="0.01" value="0.75"/>
+          <div class="small" id="releaseVal">0.75</div>
+          <div class="small">Hoger = sneller minder pixels als het geluid zakt.</div>
+        </div>
+
+        <div class="var">
+          <label>Pixels reageren op</label>
+          <select id="reactMode">
+            <option value="band" selected>per band (low/mid/high apart)</option>
+            <option value="energy">totale energie (alles samen)</option>
+          </select>
+          <div class="small">‘energy’ maakt dichtheid directer.</div>
+        
+        <div class="var">
+          <label>Gevoeligheid (volume → pixels)</label>
+          <input id="volSens" type="range" min="0.1" max="4.0" step="0.01" value="1.6"/>
+          <div class="small" id="volSensVal">1.60</div>
+          <div class="small">Hoger = meer pixels bij hetzelfde volume, lager = sneller verdwijnen.</div>
+        </div>
+
+        <div class="var">
+          <label>Min pixels (floor)</label>
+          <input id="minFloor" type="range" min="0" max="0.5" step="0.01" value="0.00"/>
+          <div class="small" id="minFloorVal">0.00</div>
+          <div class="small">Zet op 0.00 als je wilt dat het bijna helemaal uit kan gaan.</div>
+        </div>
+</div>
+</div>
+        <div class="var">
+          <label>Band kleuren</label>
+          <div class="small">Laag = rood, Midden = blauw/wit, Hoog = groen/geel</div>
+        </div>
+
+        <div class="var">
+          <label>fftSize</label>
+          <select id="fftSize">
+            <option>256</option>
+            <option>512</option>
+            <option selected>1024</option>
+            <option>2048</option>
+            <option>4096</option>
+            <option>8192</option>
+          </select>
+        </div>
+        <div class="var">
+          <label>Smoothing</label>
+          <input id="smooth" type="range" min="0" max="0.99" step="0.01" value="0.75"/>
+          <div class="small" id="smoothVal">0.75</div>
+        </div>
+        <div class="var">
+          <label>Sensitivity</label>
+          <input id="sens" type="range" min="0.5" max="6" step="0.01" value="2.0"/>
+          <div class="small" id="sensVal">2.00</div>
+        </div>
+        <div class="var">
+          <label>Viz mode</label>
+          <select id="vizMode">
+            <option value="bars">bars</option>
+            <option value="radial">radial</option>
+            <option value="pixels">pixels</option>
+            <option value="scatterRGB" selected>pixels scatter RGB (FFT)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="small">Tip: FFT volgt wat je hoort. Probeer fftSize 2048 of sensitivity lager/hoger.</div>
+    </div>
+  </div>
+
+<script>
+function audioBufferToWavBlob(buffer){
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const length = buffer.length;
+  const bytesPerSample = 2;
+  const blockAlign = numChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = length * blockAlign;
+  const ab = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(ab);
+  function writeString(o, s){ for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); }
+  let o=0;
+  writeString(o,'RIFF'); o+=4;
+  view.setUint32(o, 36 + dataSize, true); o+=4;
+  writeString(o,'WAVE'); o+=4;
+  writeString(o,'fmt '); o+=4;
+  view.setUint32(o, 16, true); o+=4;
+  view.setUint16(o, 1, true); o+=2;
+  view.setUint16(o, numChannels, true); o+=2;
+  view.setUint32(o, sampleRate, true); o+=4;
+  view.setUint32(o, byteRate, true); o+=4;
+  view.setUint16(o, blockAlign, true); o+=2;
+  view.setUint16(o, 16, true); o+=2;
+  writeString(o,'data'); o+=4;
+  view.setUint32(o, dataSize, true); o+=4;
+  const channels = [];
+  for(let c=0;c<numChannels;c++) channels.push(buffer.getChannelData(c));
+  let idx=44;
+  for(let i=0;i<length;i++){
+    for(let c=0;c<numChannels;c++){
+      let s = channels[c][i];
+      s = Math.max(-1, Math.min(1, s));
+      view.setInt16(idx, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      idx += 2;
+    }
+  }
+  return new Blob([ab], {type:'audio/wav'});
+}
+function makeReversedBuffer(ctx, buf){
+  const rb = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+  for(let c=0;c<buf.numberOfChannels;c++){
+    const src = buf.getChannelData(c);
+    const dst = rb.getChannelData(c);
+    for(let i=0, j=src.length-1; i<src.length; i++, j--){ dst[i] = src[j]; }
+  }
+  return rb;
+}
+
+function downloadBlob(blob, filename){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+function makeDistortionCurve(amount){
+  const k = Math.max(0, +amount || 0);
+  const n = 2048;
+  const curve = new Float32Array(n);
+  const deg = Math.PI / 180;
+  // classic arctan style; k=0 => almost linear
+  for(let i=0;i<n;i++){
+    const x = (i * 2 / (n-1)) - 1;
+    curve[i] = (k === 0) ? x : ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+function makeImpulseResponse(ctx, seconds=2.0, decay=2.0){
+  const sr = ctx.sampleRate || 48000;
+  const len = Math.max(1, Math.floor(sr * Math.max(0.1, seconds)));
+  const ir = ctx.createBuffer(2, len, sr);
+  for(let ch=0; ch<2; ch++){
+    const data = ir.getChannelData(ch);
+    for(let i=0;i<len;i++){
+      const t = i / len;
+      // exponential-ish decay noise
+      data[i] = (Math.random()*2-1) * Math.pow(1 - t, Math.max(0.1, decay));
+    }
+  }
+  return ir;
+}
+
+
+// Try to reduce clicks by snapping slice starts to the nearest zero-crossing.
+// (Fade envelopes help too, but starting mid-wave can still "tick" on some material.)
+function snapToZeroCrossing(buf, sec, windowSec=0.006){
+  try{
+    if(!buf) return sec;
+    const ch = buf.getChannelData(0);
+    const sr = buf.sampleRate || 44100;
+    let i0 = Math.floor(sec * sr);
+    i0 = Math.max(0, Math.min(ch.length - 2, i0));
+    const w = Math.max(16, Math.floor(windowSec * sr));
+    const a = Math.max(1, i0 - w);
+    const b = Math.min(ch.length - 2, i0 + w);
+
+    // Find nearest sign change around i0
+    const s0 = (ch[i0] >= 0) ? 1 : -1;
+    let best = i0;
+    let bestDist = 1e9;
+
+    for(let i=a;i<=b;i++){
+      const s1 = (ch[i] >= 0) ? 1 : -1;
+      const s2 = (ch[i+1] >= 0) ? 1 : -1;
+      if(s1 !== s2){ // crosses zero between i and i+1
+        const dist = Math.abs(i - i0);
+        if(dist < bestDist){
+          bestDist = dist;
+          best = i;
+          if(dist === 0) break;
+        }
+      }
+    }
+    return best / sr;
+  }catch(e){
+    return sec;
+  }
+}
+
+function mulberry32(seed){
+  let t = seed >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+
+  // Deterministic start-line randomizer (so exports match what you hear)
+  if(ui.randStartEnable && ui.randStartEnable.checked){
+    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
+    const tRel = (audioCtx && playState) ? (audioCtx.currentTime - playStartTime) : 0;
+    const rs = randStartAtTime(base.seed, tRel, intervalSec, allowRev);
+    if(rs){
+      base.startFrom = +rs.from;
+      base.startTo = +rs.to;
+      // Optional: reflect into UI so you SEE it moving without needing the timer
+      try{ if(typeof syncStartFrom==='function') syncStartFrom(base.startFrom); }catch{}
+      try{ if(typeof syncStartTo==='function') syncStartTo(base.startTo); }catch{}
+    }
+  }
+
+  return base;
+}
+function line(from, to, steps){
+  const arr = [];
+  const n = Math.max(2, steps|0);
+  for(let i=0;i<n;i++) arr.push(from + (to-from)*(i/(n-1)));
+  return arr;
+}
+function choose(arr, rng){ return arr[Math.floor(rng()*arr.length)]; }
+
+
+const DRUM_ALGOS = {
+  // Helper: return single hit
+  _hit(slice, amp=0.9, rate=1.0, durSteps=1){ return [{slice, amp, rate, durSteps}]; },
+
+  // 1) Amen (jungle): 2-bar 16e pattern, slice indices assume 16 slices over the loop
+  amen(step, v){
+    const s = step % 32;
+    // Approx. amen accents (k/s + ghost notes) — rests are null
+    const pat = [
+      0,null, 1,null, 2,null, 3,null,   // bar 1
+      8,null, 9,10, 11,null, 12,null,
+      0,null, 1,null, 2,3, 4,null,      // bar 2
+      8,9, 10,null, 11,12, 13,14
+    ];
+    const slice = pat[s];
+    if(slice==null) return [];
+    // little dynamics: stronger on downbeats / snares
+    const strong = (s===0 || s===8 || s===16 || s===24);
+    const amp = strong ? 1.05 : 0.75;
+    const durSteps = (s===10 || s===25) ? 2 : 1; // occasional longer
+    return [{slice, amp, rate:1.0, durSteps}];
+  },
+
+  // 2) DnB two-step (kick + snare feel, with hats)
+  dnb_twostep(step, v){
+    const s = step % 16;
+    // kick-ish on 0 and 10, snare-ish on 8
+    if(s===0) return [{slice:0, amp:1.0, durSteps:2}];
+    if(s===8) return [{slice:8, amp:1.05, durSteps:2}];
+    if(s===10) return [{slice:2, amp:0.85, durSteps:1}];
+    // hats sprinkled
+    if([2,4,6,12,14].includes(s)) return [{slice:12, amp:0.45, durSteps:1}];
+    return [];
+  },
+
+  // 3) Classic breakbeat (syncopated 1-bar)
+  breakbeat_classic(step, v){
+    const s = step % 16;
+    const hits = [];
+    if([0,7,10].includes(s)) hits.push({slice:0, amp:0.95});
+    if([4,12].includes(s)) hits.push({slice:8, amp:1.0});
+    if([2,6,8,14].includes(s)) hits.push({slice:11, amp:0.5});
+    return hits;
+  },
+
+  // 4) Boom bap (laid back, sparse hats)
+  boom_bap(step, v){
+    const s = step % 16;
+    if(s===0) return [{slice:0, amp:1.0, durSteps:2}];
+    if(s===8) return [{slice:8, amp:1.05, durSteps:2}];
+    if(s===11) return [{slice:2, amp:0.8, durSteps:1}];
+    if([2,6,10,14].includes(s)) return [{slice:12, amp:0.35, durSteps:1}];
+    return [];
+  },
+
+  // 5) Four-on-the-floor (house kick, offbeat hat)
+  four_on_floor(step, v){
+    const s = step % 16;
+    if([0,4,8,12].includes(s)) return [{slice:0, amp:1.0, durSteps:2}];
+    if([2,6,10,14].includes(s)) return [{slice:12, amp:0.5, durSteps:1}];
+    return [];
+  },
+
+  // 6) Trap (hats with occasional rolls)
+  trap(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick/snare
+    if(s===0) hits.push({slice:0, amp:1.0, durSteps:2});
+    if(s===8) hits.push({slice:8, amp:1.05, durSteps:2});
+    if(s===11) hits.push({slice:2, amp:0.8, durSteps:1});
+    // hats every 8th, plus roll before snare
+    if(s%2===0) hits.push({slice:12, amp:0.4, durSteps:1});
+    if(s===7){
+      // 3 quick retriggers: approximate roll by higher rate + short dur
+      hits.push({slice:12, amp:0.35, rate:1.4, durSteps:1});
+      hits.push({slice:12, amp:0.35, rate:1.6, durSteps:1});
+    }
+    return hits;
+  },
+
+  // 7) Shuffle / swing (triplet-ish feel on 16th grid)
+  shuffle(step, v){
+    const s = step % 16;
+    if([0,8].includes(s)) return [{slice:0, amp:0.95, durSteps:2}];
+    if([4,12].includes(s)) return [{slice:8, amp:1.0, durSteps:2}];
+    // swung hats: skip some 16ths
+    if([2,5,10,13].includes(s)) return [{slice:12, amp:0.45, durSteps:1, rate:1.05}];
+    return [];
+  },
+
+  // 8) Reggaeton (dembow)
+  reggaeton(step, v){
+    const s = step % 16;
+    if([0,7,10].includes(s)) return [{slice:0, amp:0.95, durSteps:2}];
+    if([4,12].includes(s)) return [{slice:8, amp:1.0, durSteps:2}];
+    if([2,6,14].includes(s)) return [{slice:12, amp:0.4, durSteps:1}];
+    return [];
+  },
+
+  // 9) Dubstep / halftime
+  dubstep_halftime(step, v){
+    const s = step % 16;
+    if(s===0) return [{slice:0, amp:1.0, durSteps:2}];
+    if(s===8) return [{slice:8, amp:1.1, durSteps:2}];
+    if([3,6,12,15].includes(s)) return [{slice:12, amp:0.45, durSteps:1}];
+    return [];
+  },
+
+  // 10) House / UK garage (skippy)
+  house_garage(step, v){
+    const s = step % 16;
+    const hits = [];
+    if([0,9,12].includes(s)) hits.push({slice:0, amp:0.95, durSteps:2});
+    if([4,8,14].includes(s)) hits.push({slice:8, amp:0.95, durSteps:2});
+    if([2,6,10,15].includes(s)) hits.push({slice:12, amp:0.45, durSteps:1});
+    return hits;
+  }
+};
+
+
+class SliceEngine {
+  constructor(ctx, buffer, revBuffer){
+    this.ctx = ctx;
+    this.buffer = buffer;
+    this.revBuffer = revBuffer || null;
+
+    this.mix = ctx.createGain();
+
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.9;
+
+    // drum layer (2e sample, algoritmisch gesliced)
+    this.drumGain = ctx.createGain();
+    this.drumGain.gain.value = 0.0;
+    this.drumBuffer = null;
+
+    // drum scheduler state
+    this.drumStep = 0;
+    this.nextDrumTime = 0;
+
+    // mix: slices + drums -> master -> (limiter) -> analyser -> destination
+    this.mix.connect(this.master);
+
+    // --- Drum FX chain (applies only to drum layer) ---
+    this.drumFxEnabled = false;
+
+    this.drumFX_in = ctx.createGain();
+
+    this.drumHPF = ctx.createBiquadFilter();
+    this.drumHPF.type = 'highpass';
+    this.drumHPF.frequency.value = 0;
+
+    this.drumLPF = ctx.createBiquadFilter();
+    this.drumLPF.type = 'lowpass';
+    this.drumLPF.frequency.value = 20000;
+
+    // waveshaper distortion
+    this.drumDriveGain = ctx.createGain();
+    this.drumDriveGain.gain.value = 1.0;
+    this.drumShaper = ctx.createWaveShaper();
+    this.drumShaper.oversample = '4x';
+
+    // bitcrusher (ScriptProcessor)
+    this.drumCrush = ctx.createScriptProcessor(1024, 2, 2);
+    this._crushState = { ph: 0, lastL: 0, lastR: 0 };
+    this._crushParams = { bits: 16, down: 1 };
+    this.drumCrush.onaudioprocess = (e)=>{
+      const inpL = e.inputBuffer.getChannelData(0);
+      const inpR = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : inpL;
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.numberOfChannels > 1 ? e.outputBuffer.getChannelData(1) : outL;
+
+      const bits = Math.max(4, Math.min(16, (this._crushParams.bits|0)));
+      const down = Math.max(1, Math.min(64, (this._crushParams.down|0)));
+      const step = Math.pow(0.5, bits);
+      let ph = this._crushState.ph|0;
+      let lastL = this._crushState.lastL;
+      let lastR = this._crushState.lastR;
+
+      for(let i=0;i<inpL.length;i++){
+        if(ph===0){
+          // sample & hold + bit depth quantize
+          lastL = step * Math.floor(inpL[i] / step);
+          lastR = step * Math.floor(inpR[i] / step);
+        }
+        outL[i] = lastL;
+        outR[i] = lastR;
+        ph = (ph + 1) % down;
+      }
+      this._crushState.ph = ph;
+      this._crushState.lastL = lastL;
+      this._crushState.lastR = lastR;
+    };
+
+    // delay (wet/dry)
+    this.drumDelay = ctx.createDelay(1.0);
+    this.drumDelay.delayTime.value = 0.0;
+    this.drumDelayFB = ctx.createGain();
+    this.drumDelayFB.gain.value = 0.0;
+    this.drumDelayMix = ctx.createGain();
+    this.drumDelayMix.gain.value = 0.0;
+    this.drumDry = ctx.createGain();
+    this.drumDry.gain.value = 1.0;
+
+    // reverb (simple generated impulse, wet/dry)
+    this.drumConvolver = ctx.createConvolver();
+    this.drumRevMix = ctx.createGain();
+    this.drumRevMix.gain.value = 0.0;
+
+    // stereo pan
+    this.drumPan = (ctx.createStereoPanner ? ctx.createStereoPanner() : null);
+    if(this.drumPan) this.drumPan.pan.value = 0;
+
+    // tremolo (gain modulation)
+    this.drumTrem = ctx.createGain();
+    this.drumTrem.gain.value = 1.0;
+    this._tremOsc = ctx.createOscillator();
+    this._tremOsc.type = 'sine';
+    this._tremOsc.frequency.value = 6.0;
+    this._tremDepth = ctx.createGain();
+    this._tremDepth.gain.value = 0.0; // depth (0..1), scaled in updateVars
+    // map osc (-1..1) -> gain modulation around 1
+    const tremOff = ctx.createConstantSource();
+    tremOff.offset.value = 1.0;
+    this._tremOsc.connect(this._tremDepth);
+    this._tremDepth.connect(this.drumTrem.gain);
+    tremOff.connect(this.drumTrem.gain);
+    tremOff.start();
+    this._tremOsc.start();
+
+    // wiring: drumGain -> FX_in -> (hpf->lpf->drive->shaper->crush) -> split dry/wet -> mix
+    this.drumGain.connect(this.drumFX_in);
+
+    this.drumFX_in.connect(this.drumHPF);
+    this.drumHPF.connect(this.drumLPF);
+    this.drumLPF.connect(this.drumDriveGain);
+    this.drumDriveGain.connect(this.drumShaper);
+    this.drumShaper.connect(this.drumCrush);
+
+    // delay feedback loop
+    this.drumDelay.connect(this.drumDelayFB);
+    this.drumDelayFB.connect(this.drumDelay);
+
+    // dry path
+    this.drumCrush.connect(this.drumDry);
+
+    // delay wet path
+    this.drumCrush.connect(this.drumDelay);
+    this.drumDelay.connect(this.drumDelayMix);
+
+    // reverb wet path
+    this.drumCrush.connect(this.drumConvolver);
+    this.drumConvolver.connect(this.drumRevMix);
+
+    // sum wet + dry -> trem -> (pan) -> mix
+    const drumSum = ctx.createGain();
+    this._drumSum = drumSum;
+    this.drumDry.connect(drumSum);
+    this.drumDelayMix.connect(drumSum);
+    this.drumRevMix.connect(drumSum);
+
+    drumSum.connect(this.drumTrem);
+    if(this.drumPan){
+      this.drumTrem.connect(this.drumPan);
+      this.drumPan.connect(this.mix);
+    } else {
+      this.drumTrem.connect(this.mix);
+    }
+
+    // default: FX bypassed by setting all params neutral (enable just opens parameters)
+
+
+    this.out = ctx.createGain(); // unified post-limiter output (for speakers + recorder)
+    this.out.gain.value = 1.0;
+
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 1024;
+    this.analyser.smoothingTimeConstant = 0.75;
+
+    // MediaStreamDestination for recording/export (tap is independent of viz/analyser)
+    this.mediaDest = ctx.createMediaStreamDestination();
+
+    this.compressor = ctx.createDynamicsCompressor();
+    // gentle safety limiter
+    this.compressor.threshold.value = -12;
+    this.compressor.knee.value = 12;
+    this.compressor.ratio.value = 8;
+    this.compressor.attack.value = 0.003;
+    this.compressor.release.value = 0.25;
+
+    // Default routing: master -> compressor -> out
+    this.master.connect(this.compressor);
+    this.compressor.connect(this.out);
+
+    // Out feeds everything (so recording never "loses" audio when viz/limiter toggles)
+    this.out.connect(this.analyser);
+    this.out.connect(this.mediaDest);
+    this.out.connect(ctx.destination);
+
+this.active = new Set();
+    this.timer = null;
+    this.running = false;
+
+    this.lookahead = 0.025;
+    this.ahead = 0.12;
+    this.nextTime = 0;
+    this.startTime = 0;
+    this.fade = 0.005;
+    this.step = 0;
+    this.lastStepSec = 0.125;
+  }
+
+  setMaster(v){ this.master.gain.setValueAtTime(v, this.ctx.currentTime); }
+  rampMaster(v, sec){
+    const t = this.ctx.currentTime;
+    try{ this.master.gain.cancelScheduledValues(t); }catch{}
+    this.master.gain.setValueAtTime(this.master.gain.value, t);
+    this.master.gain.linearRampToValueAtTime(v, t + Math.max(0, sec));
+  }
+  setFade(v){ this.fade = v; }
+  setFFT(size, smooth){
+    this.analyser.fftSize = size;
+    this.analyser.smoothingTimeConstant = smooth;
+  }
+
+  setLimiter(on){
+    // rebuild post-master routing safely; keep out->(analyser/mediaDest/destination) intact
+    try{ this.master.disconnect(); }catch{}
+    try{ this.compressor.disconnect(); }catch{}
+    try{ this.out.disconnect(); }catch{} // disconnect out from downstream, then reconnect (safe on some browsers)
+    // Reconnect downstream
+    try{ this.out.connect(this.analyser); }catch{}
+    try{ this.out.connect(this.mediaDest); }catch{}
+    try{ this.out.connect(this.ctx.destination); }catch{}
+
+    if(on){
+      try{ this.master.connect(this.compressor); }catch{}
+      try{ this.compressor.connect(this.out); }catch{}
+    } else {
+      try{ this.master.connect(this.out); }catch{}
+    }
+  }
+
+  getMediaStream(){ return this.mediaDest?.stream; }
+
+  updateVars(vars){
+    this.vars = vars;
+    // live knob updates
+    const v = this.vars || {};
+    const dg = clamp(+v.drumGain || 0, 0, 1.5);
+    try{ this.drumGain.gain.setValueAtTime((v.drumEnable && this.drumBuffer) ? dg : 0, this.ctx.currentTime); }catch{}
+
+    // Drum FX params (neutral when fx disabled)
+    const fxOn = !!v.drumFxEnable;
+    const now = this.ctx.currentTime;
+
+    // filters
+    const hpfHz = clamp(+v.drumHpf || 0, 0, 2000);
+    const lpfHz = clamp(+v.drumLpf || 20000, 500, 20000);
+    try{ this.drumHPF.frequency.setValueAtTime(fxOn ? hpfHz : 0, now); }catch{}
+    try{ this.drumLPF.frequency.setValueAtTime(fxOn ? lpfHz : 20000, now); }catch{}
+
+    // distortion
+    const drive = clamp(+v.drumDrive || 0, 0, 30);
+    try{ this.drumDriveGain.gain.setValueAtTime(fxOn ? (1 + drive*0.08) : 1.0, now); }catch{}
+    try{ this.drumShaper.curve = makeDistortionCurve(fxOn ? drive : 0); }catch{}
+
+    // crusher
+    this._crushParams.bits = fxOn ? clamp(+v.drumCrushBits || 16, 4, 16) : 16;
+    this._crushParams.down = fxOn ? clamp(+v.drumCrushDown || 1, 1, 32) : 1;
+
+    // delay
+    const dT = clamp(+v.drumDelayTime || 0, 0, 1.0);
+    const dFb = clamp(+v.drumDelayFb || 0, 0, 0.95);
+    const dMix = clamp(+v.drumDelayMix || 0, 0, 1);
+    try{ this.drumDelay.delayTime.setValueAtTime(fxOn ? dT : 0, now); }catch{}
+    try{ this.drumDelayFB.gain.setValueAtTime(fxOn ? dFb : 0, now); }catch{}
+    try{ this.drumDelayMix.gain.setValueAtTime(fxOn ? dMix : 0, now); }catch{}
+    try{ this.drumDry.gain.setValueAtTime(1.0, now); }catch{}
+
+    // reverb
+    const rMix = clamp(+v.drumRevMix || 0, 0, 1);
+    const rTime = clamp(+v.drumRevTime || 2.0, 0.1, 6);
+    if(fxOn){
+      // regenerate IR only when time changes significantly to avoid heavy churn
+      if(!this._lastRevTime || Math.abs(this._lastRevTime - rTime) > 0.09){
+        this._lastRevTime = rTime;
+        try{ this.drumConvolver.buffer = makeImpulseResponse(this.ctx, rTime, 2.2); }catch{}
+      }
+    } else {
+      this._lastRevTime = this._lastRevTime || 0;
+    }
+    try{ this.drumRevMix.gain.setValueAtTime(fxOn ? rMix : 0, now); }catch{}
+
+    // pan
+    const pan = clamp(+v.drumPan || 0, -1, 1);
+    if(this.drumPan){
+      try{ this.drumPan.pan.setValueAtTime(fxOn ? pan : 0, now); }catch{}
+    }
+
+    // tremolo
+    const td = clamp(+v.drumTremDepth || 0, 0, 1);
+    const tr = clamp(+v.drumTremRate || 6, 0.1, 30);
+    try{ this._tremOsc.frequency.setValueAtTime(fxOn ? tr : 6, now); }catch{}
+    // depth: map 0..1 to gain modulation (-depth..depth)
+    try{ this._tremDepth.gain.setValueAtTime(fxOn ? td : 0, now); }catch{}
+
+  }
+
+  setDrumBuffer(buf){
+    this.drumBuffer = buf || null;
+    // arm/disarm gain immediately
+    this.updateVars(this.vars || {});
+  }
+
+  setAlgoFn(algoFn){
+    this.algoFn = algoFn;
+  }
+
+  start(algoFn, vars){
+    if(this.running) return;
+    this.running = true;
+    this.algoFn = algoFn;
+    this.vars = vars;
+
+    const now = this.ctx.currentTime;
+    this.startTime = now + 0.05;
+    this.nextTime = this.startTime;
+    this.step = 0;
+
+    // init drum scheduler (if enabled)
+    this.drumStep = 0;
+    this.nextDrumTime = this.startTime;
+    const v = this.vars || {};
+    const dg = clamp(+v.drumGain || 0, 0, 1.5);
+    try{ this.drumGain.gain.setValueAtTime((v.drumEnable && this.drumBuffer) ? dg : 0, this.startTime); }catch{}
+
+    this.timer = setInterval(()=>this._tick(), this.lookahead * 1000);
+  }
+
+  stop(){
+    // instant mute to avoid any tail
+    try{ this.master.gain.cancelScheduledValues(this.ctx.currentTime); }catch{}
+    try{ this.master.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
+    this.running = false;
+    if(this.timer) clearInterval(this.timer);
+    this.timer = null;
+
+    for(const rec of this.active){
+      try { rec.src.onended = null; } catch {}
+      try { rec.src.stop(0); } catch {}
+      try { rec.src.disconnect(); } catch {}
+      try { rec.g.disconnect(); } catch {}
+    }
+    this.active.clear();
+    try{ this.drumGain.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
+  }
+
+  _tick(){
+    if(!this.running) return;
+    if(this.getVarsFn){
+      try{ this.vars = this.getVarsFn(); }catch{}
+    }
+    const now = this.ctx.currentTime;
+
+    while(this.nextTime < now + this.ahead){
+      let ev;
+      try{
+        ev = this.algoFn(this.step, this.vars, {mulberry32, line, choose, clamp});
+      }catch(e){
+        console.error(e);
+        alert("Algoritme error:\n" + e.message);
+        this.stop();
+        return;
+      }
+
+      const sleepBeats = Math.max(0.0001, ev?.sleepBeats ?? this.vars.dBeats);
+      const stepSec = sleepBeats * this.vars.beatSec;
+      this.lastStepSec = stepSec;
+
+      if(ev && ev.amp > 1e-5){
+        this._scheduleSlice(ev, this.nextTime);
+      }
+
+      this.nextTime += stepSec;
+      this.step += 1;
+    }
+    // drum scheduler (2e sample)
+    const v = this.vars || {};
+    const drumOn = !!v.drumEnable && !!this.drumBuffer;
+    const drumBpm = clamp(+v.drumBpm || (+v.bpm || 120), 20, 300);
+    const drumStepSec = (60 / drumBpm) / 4; // 16e-noten
+
+    // keep gain in sync (also during playback)
+    const dg = clamp(+v.drumGain || 0, 0, 1.5);
+    try{ this.drumGain.gain.setValueAtTime(drumOn ? dg : 0, now); }catch{}
+
+    if(drumOn){
+      while(this.nextDrumTime < now + this.ahead){
+        this._scheduleDrumsAtStep(this.drumStep, this.nextDrumTime, v);
+        this.nextDrumTime += drumStepSec;
+        this.drumStep += 1;
+      }
+    } else {
+      // keep time moving to avoid huge catch-up if user enables later
+      this.nextDrumTime = Math.max(this.nextDrumTime, now);
+    }
+
+  }
+
+  _scheduleSlice(ev, when){
+    const buf = (ev && ev.useReversed && this.revBuffer) ? this.revBuffer : this.buffer;
+    const rate = clamp(ev.rate ?? this.vars.rate, 0.25, 4.0);
+
+    const s = clamp(ev.startNorm, 0, 1);
+    const f = clamp(ev.finishNorm, 0, 1);
+    const segNorm = Math.max(0.0001, f - s);
+
+    let outDur = clamp(segNorm * buf.duration / rate, 0.01, Math.max(0.01, buf.duration));
+    // Optional: limit duration to sleep to reduce overlap/clipping
+    if((this.vars.durClamp || 'sleep') === 'sleep'){
+      const target = clamp(this.lastStepSec * (this.vars.durMul ?? 1.0), 0.01, 10.0);
+      outDur = Math.min(outDur, target);
+    }
+    let offset = clamp(s * buf.duration, 0, Math.max(0, buf.duration - 0.01));
+    offset = snapToZeroCrossing(buf, offset, 0.006);
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.setValueAtTime(rate, when);
+
+    const g = this.ctx.createGain();
+    const amp = clamp(ev.amp, 0, 20);
+
+    const fsec = clamp(this.fade, 0.001, Math.min(0.05, outDur * 0.25));
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(amp, when + fsec);
+    g.gain.setValueAtTime(amp, when + outDur - fsec);
+    g.gain.linearRampToValueAtTime(0, when + outDur);
+
+    src.connect(g);
+    g.connect(this.mix);
+
+    const rec = {src, g};
+    this.active.add(rec);
+    src.onended = ()=> this.active.delete(rec);
+
+    const bufferReadDur = outDur * rate;
+    src.start(when, offset, bufferReadDur);
+    src.stop(when + outDur + 0.02);
+  }
+
+  _scheduleDrumsAtStep(step, when, v){
+    // algorithms return a list of hits; each hit: {slice, amp, rate, durSteps}
+    const algoName = (v.drumAlgo || 'amen');
+    const algo = DRUM_ALGOS[algoName] || CONTROVERSIAL_ALGOS[algoName] || DRUM_ALGOS.amen;
+    const hits = algo ? algo(step, v) : [];
+    if(!hits || !hits.length) return;
+    for(const hit of hits){
+      if(!hit) continue;
+      const amp = clamp(hit.amp ?? 0.8, 0, 20);
+      if(amp <= 1e-5) continue;
+      const sliceCount = 16;
+      const slice = ((hit.slice ?? 0) % sliceCount + sliceCount) % sliceCount;
+
+      // Map slice index into drum start-line window
+      let a = clamp((v.drumStartFrom ?? 0), 0, 1);
+      let b = clamp((v.drumStartTo ?? 1), 0, 1);
+      let baseW = Math.min(a,b);
+      let spanW = Math.abs(b-a);
+
+      const s = clamp(baseW + (slice / sliceCount) * spanW, 0, 1);
+      const f = clamp(baseW + ((slice + 1) / sliceCount) * spanW, 0, 1);
+
+      const rate = clamp(hit.rate ?? 1.0, 0.25, 4.0);
+      const durSteps = clamp(hit.durSteps ?? 1, 1, 8);
+
+      this._scheduleDrumSlice({startNorm:s, finishNorm:f, amp, rate, durSteps}, when, v);
+    }
+  }
+
+  _scheduleDrumSlice(ev, when, v){
+    const buf = (v.drumSource === 'main') ? this.buffer : this.drumBuffer;
+    if(!buf) return;
+
+    const rate = clamp(ev.rate ?? 1.0, 0.25, 4.0);
+    const s = clamp(ev.startNorm, 0, 1);
+    const f = clamp(ev.finishNorm, 0, 1);
+    const segNorm = Math.max(0.0001, f - s);
+
+    // 16e-grid duratie
+    const drumBpm = clamp(+v.drumBpm || (+v.bpm || 120), 20, 300);
+    const stepSec = (60 / drumBpm) / 4;
+    const outDur = clamp(ev.durSteps * stepSec, 0.01, 2.0);
+
+    let offset = clamp(s * buf.duration, 0, Math.max(0, buf.duration - 0.01));
+    offset = snapToZeroCrossing(buf, offset, 0.006);
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.setValueAtTime(rate, when);
+
+    const g = this.ctx.createGain();
+    const amp = clamp(ev.amp, 0, 20);
+
+    const fsec = clamp(this.fade, 0.001, Math.min(0.03, outDur * 0.25));
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(amp, when + fsec);
+    g.gain.setValueAtTime(amp, when + outDur - fsec);
+    g.gain.linearRampToValueAtTime(0, when + outDur);
+
+    src.connect(g);
+    g.connect(this.drumGain);
+
+    const rec = {src, g};
+    this.active.add(rec);
+    src.onended = ()=> this.active.delete(rec);
+
+    const bufferReadDur = Math.min(outDur * rate, segNorm * buf.duration);
+    src.start(when, offset, bufferReadDur);
+    src.stop(when + outDur + 0.02);
+  }
+
+}
+
+function makeVisualizer(engine, canvas){
+  const ctx2d = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  const freq = new Uint8Array(engine.analyser.frequencyBinCount);
+  const time = new Uint8Array(engine.analyser.fftSize);
+
+  // envelope followers for snappy up/down response
+  let lowEnv=0, midEnv=0, highEnv=0, volEnv=0;
+
+  let raf = null;
+  function draw(){
+    engine.analyser.getByteFrequencyData(freq);
+    engine.analyser.getByteTimeDomainData(time);
+    const sens = +ui.sens.value;
+
+    ctx2d.fillStyle = '#000';
+    ctx2d.fillRect(0,0,w,h);
+    ctx2d.fillStyle = '#fff';
+    const mode = ui.vizMode.value;
+
+    if(mode === "scatterRGB"){
+      const px = ui.pxSize ? (+ui.pxSize.value|0) : 4;
+      const den = ui.pxDen ? (+ui.pxDen.value) : 0.35;
+      // compute band energies from FFT
+      const sr = engine.ctx.sampleRate || 48000;
+      const ny = sr/2;
+      const binHz = ny / freq.length;
+      const lowCut = 200;
+      const midCut = 2000;
+      let low=0, mid=0, high=0;
+      let lc=0, mc=0, hc=0;
+      for(let i=0;i<freq.length;i++){
+        const hz = i*binHz;
+        const v = freq[i];
+        if(hz < lowCut){ low += v; lc++; }
+        else if(hz < midCut){ mid += v; mc++; }
+        else { high += v; hc++; }
+      }
+            low = lc? (low/lc)/255 : 0;
+      mid = mc? (mid/mc)/255 : 0;
+      high = hc? (high/hc)/255 : 0;
+      // response curve + envelope follower (attack/release)
+      const gam = ui.gamma ? (+ui.gamma.value) : 1.2;
+      const atk = ui.attack ? (+ui.attack.value) : 0.65;
+      const rel = ui.release ? (+ui.release.value) : 0.75;
+      const l0 = Math.pow(Math.pow(low, 1/sens), gam);
+      const m0 = Math.pow(Math.pow(mid, 1/sens), gam);
+      const h0 = Math.pow(Math.pow(high, 1/sens), gam);
+      lowEnv += (l0 - lowEnv) * ((l0 > lowEnv) ? atk : rel);
+      midEnv += (m0 - midEnv) * ((m0 > midEnv) ? atk : rel);
+      highEnv += (h0 - highEnv) * ((h0 > highEnv) ? atk : rel);
+      const lowR = clamp(lowEnv, 0, 1);
+      const midR = clamp(midEnv, 0, 1);
+      const highR = clamp(highEnv, 0, 1);
+      // RMS volume (0..1)
+      let sum=0;
+      for(let i=0;i<time.length;i+=2){
+        const x = (time[i]-128)/128;
+        sum += x*x;
+      }
+      const rms = Math.sqrt(sum / (time.length/2));
+      volEnv += (rms - volEnv) * ((rms > volEnv) ? atk : rel);
+      const vol = clamp(volEnv, 0, 1);
+      const reactMode = ui.reactMode ? ui.reactMode.value : 'band';
+      const energy = (lowR+midR+highR)/3;
+      const drive = (reactMode === 'energy') ? vol : energy;
+      const sensMul = ui.volSens ? (+ui.volSens.value) : 1.6;
+      const floor = ui.minFloor ? (+ui.minFloor.value) : 0.0;
+      const p = clamp(den * clamp(drive * sensMul, 0, 1) + floor, 0, 1);
+
+      const blocksX = Math.max(1, Math.floor(w/px));
+      const blocksY = Math.max(1, Math.floor(h/px));
+      const total = blocksX*blocksY;
+      const draws = Math.floor(total * p);
+      // decay / darkening
+      const decay = ui.pxDecay ? (+ui.pxDecay.value) : 0.35;
+      ctx2d.fillStyle = `rgba(0,0,0,${decay})`;
+      ctx2d.fillRect(0,0,w,h);
+      for(let k=0;k<draws;k++){
+        const bx = (Math.random()*blocksX)|0;
+        const by = (Math.random()*blocksY)|0;
+        const br = ui.bright ? (+ui.bright.value) : 1.0;
+        // Choose a band per pixel, weighted by energy
+        const rsel = Math.random() * (lowR + midR + highR + 1e-6);
+        let rr=0, gg=0, bb=0;
+        if(rsel < lowR){
+          // low -> red
+          rr = Math.min(255, (80 + lowR*220 + Math.random()*40)|0);
+          gg = (Math.random()*20)|0;
+          bb = (Math.random()*20)|0;
+        } else if(rsel < lowR + midR){
+          // mid -> blue/white
+          const wht = Math.min(1, midR*1.3);
+          bb = Math.min(255, (90 + midR*220 + Math.random()*50)|0);
+          rr = Math.min(255, (wht*180 + Math.random()*40)|0);
+          gg = Math.min(255, (wht*180 + Math.random()*40)|0);
+        } else {
+          // high -> green/yellow
+          gg = Math.min(255, (90 + highR*220 + Math.random()*50)|0);
+          rr = Math.min(255, (highR*140 + Math.random()*40)|0);
+          bb = (Math.random()*25)|0;
+        }
+        rr = Math.max(0, Math.min(255, (rr * br)|0));
+        gg = Math.max(0, Math.min(255, (gg * br)|0));
+        bb = Math.max(0, Math.min(255, (bb * br)|0));
+        ctx2d.fillStyle = `rgb(${rr},${gg},${bb})`;
+        ctx2d.fillRect(bx*px, by*px, px, px);
+      }
+    } else if(mode === "bars"){
+      const bins = freq.length;
+      const bars = Math.min(128, bins);
+      const step = Math.floor(bins / bars);
+      const barW = w / bars;
+      for(let bi=0; bi<bars; bi++){
+        const i = bi*step;
+        const v = (freq[i]/255) ** (1/sens);
+        const bh = v * h;
+        ctx2d.fillRect(bi*barW, h-bh, barW*0.9, bh);
+      }
+    } else if(mode === "radial"){
+      const bins = Math.min(freq.length, 256);
+      const cx = w/2, cy = h/2;
+      const base = Math.min(w,h)*0.12;
+      for(let i=0;i<bins;i++){
+        const a = (i/bins) * Math.PI*2;
+        const v = (freq[i]/255) ** (1/sens);
+        const r = base + v * (Math.min(w,h)*0.35);
+        const x = cx + Math.cos(a)*r;
+        const y = cy + Math.sin(a)*r;
+        ctx2d.fillRect(x, y, 2, 2);
+      }
+    } else {
+      const bins = freq.length;
+      for(let y=0;y<h;y++){
+        const i = Math.floor((y/h)*bins);
+        const v = (freq[i]/255) ** (1/sens);
+        const xw = Math.floor(v * w);
+        ctx2d.fillRect(0, y, xw, 1);
+      }
+    }
+
+    raf = requestAnimationFrame(draw);
+  }
+  return { start(){ if(!raf) raf = requestAnimationFrame(draw); }, stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } } };
+}
+
+const ui = {
+  file: document.getElementById('file'),
+  fileInfo: document.getElementById('fileInfo'),
+  drumFile: document.getElementById('drumFile'),
+  drumInfo: document.getElementById('drumInfo'),
+  drumEnable: document.getElementById('drumEnable'),
+  drumBpm: document.getElementById('drumBpm'),
+  drumGain: document.getElementById('drumGain'),
+  drumGainVal: document.getElementById('drumGainVal'),
+  drumAlgo: document.getElementById('drumAlgo'),
+  drumSource: document.getElementById('drumSource'),
+  drumStartFromSl: document.getElementById('drumStartFromSl'),
+  drumStartFrom: document.getElementById('drumStartFrom'),
+  drumStartToSl: document.getElementById('drumStartToSl'),
+  drumStartTo: document.getElementById('drumStartTo'),
+  drumStartSteps: document.getElementById('drumStartSteps'),
+  drumRandStartEnable: document.getElementById('drumRandStartEnable'),
+  drumRandStartIntSl: document.getElementById('drumRandStartIntSl'),
+  drumRandStartIntNum: document.getElementById('drumRandStartIntNum'),
+  drumRandStartIntVal: document.getElementById('drumRandStartIntVal'),
+  drumAllowReverse: document.getElementById('drumAllowReverse'),  // Drum FX UI
+  drumFxEnable: document.getElementById('drumFxEnable'),
+  drumHpfSl: document.getElementById('drumHpfSl'),
+  drumHpf: document.getElementById('drumHpf'),
+  drumHpfVal: document.getElementById('drumHpfVal'),
+  drumLpfSl: document.getElementById('drumLpfSl'),
+  drumLpf: document.getElementById('drumLpf'),
+  drumLpfVal: document.getElementById('drumLpfVal'),
+  drumDriveSl: document.getElementById('drumDriveSl'),
+  drumDrive: document.getElementById('drumDrive'),
+  drumDriveVal: document.getElementById('drumDriveVal'),
+  drumCrushBitsSl: document.getElementById('drumCrushBitsSl'),
+  drumCrushBits: document.getElementById('drumCrushBits'),
+  drumCrushBitsVal: document.getElementById('drumCrushBitsVal'),
+  drumCrushDownSl: document.getElementById('drumCrushDownSl'),
+  drumCrushDown: document.getElementById('drumCrushDown'),
+  drumCrushDownVal: document.getElementById('drumCrushDownVal'),
+  drumDelayTimeSl: document.getElementById('drumDelayTimeSl'),
+  drumDelayTime: document.getElementById('drumDelayTime'),
+  drumDelayTimeVal: document.getElementById('drumDelayTimeVal'),
+  drumDelayFbSl: document.getElementById('drumDelayFbSl'),
+  drumDelayFb: document.getElementById('drumDelayFb'),
+  drumDelayFbVal: document.getElementById('drumDelayFbVal'),
+  drumDelayMixSl: document.getElementById('drumDelayMixSl'),
+  drumDelayMix: document.getElementById('drumDelayMix'),
+  drumDelayMixVal: document.getElementById('drumDelayMixVal'),
+  drumRevMixSl: document.getElementById('drumRevMixSl'),
+  drumRevMix: document.getElementById('drumRevMix'),
+  drumRevMixVal: document.getElementById('drumRevMixVal'),
+  drumRevTimeSl: document.getElementById('drumRevTimeSl'),
+  drumRevTime: document.getElementById('drumRevTime'),
+  drumRevTimeVal: document.getElementById('drumRevTimeVal'),
+  drumPanSl: document.getElementById('drumPanSl'),
+  drumPan: document.getElementById('drumPan'),
+  drumPanVal: document.getElementById('drumPanVal'),
+  drumTremDepthSl: document.getElementById('drumTremDepthSl'),
+  drumTremDepth: document.getElementById('drumTremDepth'),
+  drumTremDepthVal: document.getElementById('drumTremDepthVal'),
+  drumTremRateSl: document.getElementById('drumTremRateSl'),
+  drumTremRate: document.getElementById('drumTremRate'),
+  drumTremRateVal: document.getElementById('drumTremRateVal'),
+  algo: document.getElementById('algo'),
+  start: document.getElementById('start'),
+  stop: document.getElementById('stop'),
+  exportWav: document.getElementById('exportWav'),
+  exportVid: document.getElementById('exportVid'),
+  expLen: document.getElementById('expLen'),
+  expLenNum: document.getElementById('expLenNum'),
+  expLenVal: document.getElementById('expLenVal'),
+  exportNote: document.getElementById('exportNote'),
+
+  n: document.getElementById('n'),
+  d: document.getElementById('d'),
+  bpm: document.getElementById('bpm'),
+  bpmVal: document.getElementById('bpmVal'),
+  seed: document.getElementById('seed'),
+  sliceMode: document.getElementById('sliceMode'),
+
+  startFrom: document.getElementById('startFrom'),
+  startFromSl: document.getElementById('startFromSl'),
+  startTo: document.getElementById('startTo'),
+  startToSl: document.getElementById('startToSl'),
+  randStartEnable: document.getElementById('randStartEnable'),
+  randStartIntSl: document.getElementById('randStartIntSl'),
+  randStartIntNum: document.getElementById('randStartIntNum'),
+  randStartIntVal: document.getElementById('randStartIntVal'),
+  allowReverse: document.getElementById('allowReverse'),
+  startSteps: document.getElementById('startSteps'),
+
+  ampFrom: document.getElementById('ampFrom'),
+  ampTo: document.getElementById('ampTo'),
+  ampSteps: document.getElementById('ampSteps'),
+
+  rate: document.getElementById('rate'),
+  durClamp: document.getElementById('durClamp'),
+  durMul: document.getElementById('durMul'),
+  durMulVal: document.getElementById('durMulVal'),
+  limiter: document.getElementById('limiter'),
+  fade: document.getElementById('fade'),
+  master: document.getElementById('master'),
+  masterVal: document.getElementById('masterVal'),
+
+  cv: document.getElementById('cv'),
+  fftSize: document.getElementById('fftSize'),
+  smooth: document.getElementById('smooth'),
+  smoothVal: document.getElementById('smoothVal'),
+  sens: document.getElementById('sens'),
+  sensVal: document.getElementById('sensVal'),
+  vizMode: document.getElementById('vizMode'),
+  pxSize: document.getElementById('pxSize'),
+  pxSizeVal: document.getElementById('pxSizeVal'),
+  pxDen: document.getElementById('pxDen'),
+  pxDecay: document.getElementById('pxDecay'),
+  pxDecayVal: document.getElementById('pxDecayVal'),
+  pxDenVal: document.getElementById('pxDenVal'),
+  darkRate: document.getElementById('darkRate'),
+  darkRateVal: document.getElementById('darkRateVal'),
+  bright: document.getElementById('bright'),
+  brightVal: document.getElementById('brightVal'),
+  gamma: document.getElementById('gamma'),
+  gammaVal: document.getElementById('gammaVal'),
+  attack: document.getElementById('attack'),
+  attackVal: document.getElementById('attackVal'),
+  release: document.getElementById('release'),
+  releaseVal: document.getElementById('releaseVal'),
+  reactMode: document.getElementById('reactMode'),
+  volSens: document.getElementById('volSens'),
+  volSensVal: document.getElementById('volSensVal'),
+  minFloor: document.getElementById('minFloor'),
+  minFloorVal: document.getElementById('minFloorVal'),
+  presetSnappy: document.getElementById('presetSnappy'),
+  presetSmooth: document.getElementById('presetSmooth'),
+  presetStrobe: document.getElementById('presetStrobe'),
+  videoMode: document.getElementById('videoMode'),
+  imgModeUI: document.getElementById('imgModeUI'),
+  imageUpload: document.getElementById('imageUpload'),
+  imageInfo: document.getElementById('imageInfo'),
+  sliceRatio: document.getElementById('sliceRatio'),
+  frameTimeSl: document.getElementById('frameTimeSl'),
+  frameTimeNum: document.getElementById('frameTimeNum'),
+  frameTimeVal: document.getElementById('frameTimeVal'),
+  sliceCountSl: document.getElementById('sliceCountSl'),
+  sliceCountNum: document.getElementById('sliceCountNum'),
+  sliceCountVal: document.getElementById('sliceCountVal'),
+
+};
+
+let audioCtx = null;
+let exportBusy = false;
+let randStartTimer = null;
+let playState = false; // true after Start until Stop
+let playStartTime = 0;
+
+let buffer = null;
+let drumBuffer = null;
+let engine = null;
+let currentEngine = null;
+let viz = null;
+
+function updateDerived(){
+  const n = Math.max(2, parseInt(ui.n.value,10)||8);
+  ui.d.value = (1/n).toFixed(6);
+}
+updateDerived();
+
+function syncStartFrom(v){
+  const x = clamp(+v, 0, 1);
+  if(ui.startFromSl) ui.startFromSl.value = x;
+  ui.startFrom.value = x.toFixed(3);
+}
+function syncStartTo(v){
+  const x = clamp(+v, 0, 1);
+  if(ui.startToSl) ui.startToSl.value = x;
+  ui.startTo.value = x.toFixed(3);
+}
+if(ui.startFromSl) ui.startFromSl.addEventListener('input', ()=> syncStartFrom(ui.startFromSl.value));
+ui.startFrom.addEventListener('input', ()=> syncStartFrom(ui.startFrom.value));
+if(ui.startToSl) ui.startToSl.addEventListener('input', ()=> syncStartTo(ui.startToSl.value));
+ui.startTo.addEventListener('input', ()=> syncStartTo(ui.startTo.value));
+syncStartFrom(ui.startFrom.value);
+syncStartTo(ui.startTo.value);
+
+function syncDrumStartFrom(v){
+  const x = clamp(+v, 0, 1);
+  if(ui.drumStartFromSl) ui.drumStartFromSl.value = x;
+  if(ui.drumStartFrom) ui.drumStartFrom.value = x.toFixed(3);
+}
+function syncDrumStartTo(v){
+  const x = clamp(+v, 0, 1);
+  if(ui.drumStartToSl) ui.drumStartToSl.value = x;
+  if(ui.drumStartTo) ui.drumStartTo.value = x.toFixed(3);
+}
+if(ui.drumStartFromSl) ui.drumStartFromSl.addEventListener('input', ()=> syncDrumStartFrom(ui.drumStartFromSl.value));
+if(ui.drumStartFrom) ui.drumStartFrom.addEventListener('input', ()=> syncDrumStartFrom(ui.drumStartFrom.value));
+if(ui.drumStartToSl) ui.drumStartToSl.addEventListener('input', ()=> syncDrumStartTo(ui.drumStartToSl.value));
+if(ui.drumStartTo) ui.drumStartTo.addEventListener('input', ()=> syncDrumStartTo(ui.drumStartTo.value));
+try{ if(ui.drumStartFrom) syncDrumStartFrom(ui.drumStartFrom.value); }catch{}
+try{ if(ui.drumStartTo) syncDrumStartTo(ui.drumStartTo.value); }catch{}
+
+function syncRandStartInterval(v){
+  const x = Math.max(0, Math.min(10, +v));
+  if(ui.randStartIntSl) ui.randStartIntSl.value = x;
+  if(ui.randStartIntNum) ui.randStartIntNum.value = x.toFixed(1);
+  if(ui.randStartIntVal) ui.randStartIntVal.textContent = x.toFixed(1);
+}
+if(ui.randStartIntSl) ui.randStartIntSl.addEventListener('input', ()=>{ syncRandStartInterval(ui.randStartIntSl.value); startRandStartTimer(); });
+if(ui.randStartIntNum) ui.randStartIntNum.addEventListener('input', ()=>{ syncRandStartInterval(ui.randStartIntNum.value); startRandStartTimer(); });
+syncRandStartInterval(ui.randStartIntSl ? ui.randStartIntSl.value : 0);
+
+function syncDrumRandStartInterval(v){
+  const x = Math.max(0, Math.min(10, +v));
+  if(ui.drumRandStartIntSl) ui.drumRandStartIntSl.value = x;
+  if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.value = x.toFixed(1);
+  if(ui.drumRandStartIntVal) ui.drumRandStartIntVal.textContent = x.toFixed(1);
+}
+if(ui.drumRandStartIntSl) ui.drumRandStartIntSl.addEventListener('input', ()=>{ syncDrumRandStartInterval(ui.drumRandStartIntSl.value); startRandStartTimer(); });
+if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.addEventListener('input', ()=>{ syncDrumRandStartInterval(ui.drumRandStartIntNum.value); startRandStartTimer(); });
+syncDrumRandStartInterval(ui.drumRandStartIntSl ? ui.drumRandStartIntSl.value : 0);
+
+// --- Drum FX controls (range + number sync) ---
+function bindRangeNumber(sl, num, valEl, min, max, fmt){
+  const clampV = (x)=> Math.max(min, Math.min(max, +x));
+  const set = (x)=>{
+    const v = clampV(x);
+    if(sl) sl.value = v;
+    if(num) num.value = (fmt ? fmt(v) : String(v));
+    if(valEl) valEl.textContent = (fmt ? fmt(v) : String(v));
+  };
+  if(sl) sl.addEventListener('input', ()=> set(sl.value));
+  if(num) num.addEventListener('input', ()=> set(num.value));
+  // init
+  try{ set(sl ? sl.value : (num ? num.value : min)); }catch{}
+  return set;
+}
+
+const setDrumHpf = bindRangeNumber(ui.drumHpfSl, ui.drumHpf, ui.drumHpfVal, 0, 2000, v=>String(v|0));
+const setDrumLpf = bindRangeNumber(ui.drumLpfSl, ui.drumLpf, ui.drumLpfVal, 500, 20000, v=>String(v|0));
+const setDrumDrive = bindRangeNumber(ui.drumDriveSl, ui.drumDrive, ui.drumDriveVal, 0, 30, v=>(+v).toFixed(1));
+const setDrumCrushBits = bindRangeNumber(ui.drumCrushBitsSl, ui.drumCrushBits, ui.drumCrushBitsVal, 4, 16, v=>String(v|0));
+const setDrumCrushDown = bindRangeNumber(ui.drumCrushDownSl, ui.drumCrushDown, ui.drumCrushDownVal, 1, 32, v=>String(v|0));
+const setDrumDelayTime = bindRangeNumber(ui.drumDelayTimeSl, ui.drumDelayTime, ui.drumDelayTimeVal, 0, 1.0, v=>(+v).toFixed(3));
+const setDrumDelayFb = bindRangeNumber(ui.drumDelayFbSl, ui.drumDelayFb, ui.drumDelayFbVal, 0, 0.95, v=>(+v).toFixed(2));
+const setDrumDelayMix = bindRangeNumber(ui.drumDelayMixSl, ui.drumDelayMix, ui.drumDelayMixVal, 0, 1, v=>(+v).toFixed(2));
+const setDrumRevMix = bindRangeNumber(ui.drumRevMixSl, ui.drumRevMix, ui.drumRevMixVal, 0, 1, v=>(+v).toFixed(2));
+const setDrumRevTime = bindRangeNumber(ui.drumRevTimeSl, ui.drumRevTime, ui.drumRevTimeVal, 0.1, 6, v=>(+v).toFixed(1));
+const setDrumPan = bindRangeNumber(ui.drumPanSl, ui.drumPan, ui.drumPanVal, -1, 1, v=>(+v).toFixed(2));
+const setDrumTremDepth = bindRangeNumber(ui.drumTremDepthSl, ui.drumTremDepth, ui.drumTremDepthVal, 0, 1, v=>(+v).toFixed(2));
+const setDrumTremRate = bindRangeNumber(ui.drumTremRateSl, ui.drumTremRate, ui.drumTremRateVal, 0.1, 30, v=>(+v).toFixed(1));
+
+// Ensure Drum FX updates apply immediately (real-time)
+// (WireLiveControls did not include these, so FX only updated when other controls changed.)
+const drumFxControls = [
+  ui.drumFxEnable, ui.drumHpfSl, ui.drumHpf, ui.drumLpfSl, ui.drumLpf, ui.drumDriveSl, ui.drumDrive,
+  ui.drumCrushBitsSl, ui.drumCrushBits, ui.drumCrushDownSl, ui.drumCrushDown,
+  ui.drumDelayTimeSl, ui.drumDelayTime, ui.drumDelayFbSl, ui.drumDelayFb, ui.drumDelayMixSl, ui.drumDelayMix,
+  ui.drumRevMixSl, ui.drumRevMix, ui.drumRevTimeSl, ui.drumRevTime,
+  ui.drumPanSl, ui.drumPan, ui.drumTremDepthSl, ui.drumTremDepth, ui.drumTremRateSl, ui.drumTremRate
+].filter(Boolean);
+
+function pushDrumFxNow(){
+  try{ if(engine) engine.updateVars(getVars()); }catch{}
+}
+
+for(const el of drumFxControls){
+  el.addEventListener('input', pushDrumFxNow);
+  el.addEventListener('change', pushDrumFxNow);
+}
+
+
+
+// Small UX: disable interval inputs when not enabled
+function updateRandStartUI(){
+  const on = ui.randStartEnable && ui.randStartEnable.checked;
+  if(ui.randStartIntSl) ui.randStartIntSl.disabled = !on;
+  if(ui.randStartIntNum) ui.randStartIntNum.disabled = !on;
+  if(ui.allowReverse) ui.allowReverse.disabled = !on;
+  const don = ui.drumRandStartEnable && ui.drumRandStartEnable.checked;
+  if(ui.drumRandStartIntSl) ui.drumRandStartIntSl.disabled = !don;
+  if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.disabled = !don;
+  if(ui.drumAllowReverse) ui.drumAllowReverse.disabled = !don;
+}
+if(ui.randStartEnable) ui.randStartEnable.addEventListener('change', ()=>{ updateRandStartUI();
+if(ui.allowReverse) ui.allowReverse.addEventListener('change', ()=> startRandStartTimer()); startRandStartTimer(); });
+if(ui.drumRandStartEnable) ui.drumRandStartEnable.addEventListener('change', ()=>{ updateRandStartUI(); startRandStartTimer(); });
+if(ui.drumAllowReverse) ui.drumAllowReverse.addEventListener('change', ()=> startRandStartTimer());
+updateRandStartUI();
+if(ui.allowReverse) ui.allowReverse.addEventListener('change', ()=> startRandStartTimer());
+
+
+function syncExportLen(v){
+  const x = Math.max(1, Math.min(1800, (v|0)));
+  if(ui.expLen) ui.expLen.value = x;
+  if(ui.expLenNum) ui.expLenNum.value = x;
+  if(ui.expLenVal) ui.expLenVal.textContent = String(x);
+}
+if(ui.expLen) ui.expLen.addEventListener('input', ()=> syncExportLen(+ui.expLen.value));
+if(ui.expLenNum) ui.expLenNum.addEventListener('input', ()=> syncExportLen(+ui.expLenNum.value));
+syncExportLen(60);
+
+// --- Image slices mode (video export) ---
+let sourceImageBitmap = null;
+let sourceImageW = 0, sourceImageH = 0;
+
+function setImgModeUI(){
+  const isImg = (ui.videoMode?.value === 'img');
+  if(ui.imgModeUI) ui.imgModeUI.style.display = isImg ? 'block' : 'none';
+  updateExportButtons();
+}
+
+async function loadSourceImage(file){
+  sourceImageBitmap = null;
+  sourceImageW = sourceImageH = 0;
+  if(!file){
+    if(ui.imageInfo) ui.imageInfo.textContent = "Nog geen afbeelding.";
+    updateExportButtons();
+    return;
+  }
+  try{
+    const bmp = await createImageBitmap(file);
+    sourceImageBitmap = bmp;
+    sourceImageW = bmp.width;
+    sourceImageH = bmp.height;
+    if(ui.imageInfo) ui.imageInfo.textContent = `Afbeelding: ${file.name} (${sourceImageW}×${sourceImageH})`;
+  }catch(e){
+    console.error(e);
+    alert("Kon afbeelding niet laden.");
+    if(ui.imageInfo) ui.imageInfo.textContent = "Afbeelding laden mislukt.";
+  }
+  updateExportButtons();
+}
+
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function syncFrameTime(v){
+  const x = clamp(+v || 1, 0.05, 60);
+  if(ui.frameTimeSl) ui.frameTimeSl.value = x;
+  if(ui.frameTimeNum) ui.frameTimeNum.value = x;
+  if(ui.frameTimeVal) ui.frameTimeVal.textContent = String(x);
+}
+
+function syncSliceCount(v){
+  const x = clamp((+v||0)|0, 2, 1800);
+  if(ui.sliceCountSl) ui.sliceCountSl.value = x;
+  if(ui.sliceCountNum) ui.sliceCountNum.value = x;
+  if(ui.sliceCountVal) ui.sliceCountVal.textContent = String(x);
+}
+
+function recomputeCountFromTime(){
+  const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
+  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  const n = clamp(Math.round(lenSec / t), 2, 1800);
+  syncSliceCount(n);
+  // keep time as user set
+}
+
+function recomputeTimeFromCount(){
+  const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
+  const n = clamp(+ui.sliceCountNum?.value || 60, 2, 1800);
+  const t = clamp(lenSec / n, 0.05, 60);
+  syncFrameTime(+t.toFixed(2));
+}
+
+function hookImgControls(){
+  ui.videoMode?.addEventListener('change', ()=>{ setImgModeUI(); });
+  ui.imageUpload?.addEventListener('change', (e)=> loadSourceImage(e.target.files?.[0] || null));
+
+  ui.frameTimeSl?.addEventListener('input', ()=>{ syncFrameTime(ui.frameTimeSl.value); recomputeCountFromTime(); });
+  ui.frameTimeNum?.addEventListener('input', ()=>{ syncFrameTime(ui.frameTimeNum.value); recomputeCountFromTime(); });
+
+  ui.sliceCountSl?.addEventListener('input', ()=>{ syncSliceCount(ui.sliceCountSl.value); recomputeTimeFromCount(); });
+  ui.sliceCountNum?.addEventListener('input', ()=>{ syncSliceCount(ui.sliceCountNum.value); recomputeTimeFromCount(); });
+
+  // When export length changes, keep time and recompute count (image mode expectation)
+  const oldSyncExportLen = syncExportLen;
+  syncExportLen = function(v){
+    oldSyncExportLen(v);
+    // only recompute if controls exist
+    if(ui.frameTimeNum && ui.sliceCountNum){
+      recomputeCountFromTime();
+    }
+  };
+
+  // initial
+  syncFrameTime(1);
+  recomputeCountFromTime();
+  setImgModeUI();
+}
+hookImgControls();
+
+function updateExportButtons(){
+  const hasAudio = !!buffer;
+  const isImg = (ui.videoMode?.value === 'img');
+  const hasImg = !!sourceImageBitmap;
+  try{
+    if(ui.exportWav) ui.exportWav.disabled = !hasAudio || exportBusy;
+    if(ui.exportVid) ui.exportVid.disabled = (!hasAudio || exportBusy || (isImg && !hasImg));
+  }catch{}
+}
+
+function sliceAspectFromUI(){
+  const v = ui.sliceRatio?.value || "square";
+  if(v === "portrait") return 3/4;
+  if(v === "landscape") return 16/9;
+  return 1;
+}
+
+function computeSliceRects(N){
+  const bmp = sourceImageBitmap;
+  if(!bmp) return [];
+  const target = sliceAspectFromUI();
+  // cols/rows approx target
+  let cols = Math.ceil(Math.sqrt(N * target));
+  cols = clamp(cols, 1, 2000);
+  let rows = Math.ceil(N / cols);
+  rows = clamp(rows, 1, 2000);
+
+  const rects = [];
+  for(let i=0;i<N;i++){
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    const x0 = Math.round((c * bmp.width) / cols);
+    const x1 = Math.round(((c+1) * bmp.width) / cols);
+    const y0 = Math.round((r * bmp.height) / rows);
+    const y1 = Math.round(((r+1) * bmp.height) / rows);
+    rects.push({x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)});
+  }
+  return rects;
+}
+
+function drawRandomSliceToCanvas(){
+  const cv = ui.cv;
+  if(!cv || !sourceImageBitmap) return;
+  const ctx = cv.getContext('2d');
+  if(!ctx) return;
+
+  const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
+  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  const N = clamp(Math.round(lenSec / t), 2, 1800);
+  // Keep UI consistent
+  syncSliceCount(N);
+
+  const rects = computeSliceRects(N);
+  if(!rects.length) return;
+  const rect = rects[(Math.random() * rects.length)|0];
+
+  // Clear and draw scaled
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // cover canvas
+  ctx.drawImage(sourceImageBitmap, rect.x, rect.y, rect.w, rect.h, 0, 0, cv.width, cv.height);
+}
+
+function startImageSliceLoop(){
+  // draw immediately
+  drawRandomSliceToCanvas();
+  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  const ms = Math.max(50, t*1000);
+  const id = setInterval(drawRandomSliceToCanvas, ms);
+  return ()=> clearInterval(id);
+}
+
+
+
+if(ui.pxSize){
+  ui.pxSize.addEventListener('input', ()=> ui.pxSizeVal.textContent = ui.pxSize.value);
+  ui.pxSizeVal.textContent = ui.pxSize.value;
+}
+function syncPxDecay(v){
+  const x = Math.max(0, Math.min(0.95, +v));
+  if(ui.pxDecay) ui.pxDecay.value = x;
+  if(ui.pxDecayVal) ui.pxDecayVal.textContent = x.toFixed(2);
+}
+if(ui.pxDecay){
+  ui.pxDecay.addEventListener('input', ()=> syncPxDecay(ui.pxDecay.value));
+  syncPxDecay(ui.pxDecay.value);
+}
+
+if(ui.pxDen){
+  ui.pxDen.addEventListener('input', ()=> ui.pxDenVal.textContent = (+ui.pxDen.value).toFixed(2));
+  ui.pxDenVal.textContent = (+ui.pxDen.value).toFixed(2);
+}
+if(ui.darkRate){
+  ui.darkRate.addEventListener('input', ()=> ui.darkRateVal.textContent = (+ui.darkRate.value).toFixed(2));
+  ui.darkRateVal.textContent = (+ui.darkRate.value).toFixed(2);
+}
+if(ui.bright){
+  ui.bright.addEventListener('input', ()=> ui.brightVal.textContent = (+ui.bright.value).toFixed(2));
+  ui.brightVal.textContent = (+ui.bright.value).toFixed(2);
+}
+if(ui.gamma){
+  ui.gamma.addEventListener('input', ()=> ui.gammaVal.textContent = (+ui.gamma.value).toFixed(2));
+  ui.gammaVal.textContent = (+ui.gamma.value).toFixed(2);
+}
+if(ui.attack){
+  ui.attack.addEventListener('input', ()=> ui.attackVal.textContent = (+ui.attack.value).toFixed(2));
+  ui.attackVal.textContent = (+ui.attack.value).toFixed(2);
+}
+if(ui.release){
+  ui.release.addEventListener('input', ()=> ui.releaseVal.textContent = (+ui.release.value).toFixed(2));
+  ui.releaseVal.textContent = (+ui.release.value).toFixed(2);
+}
+if(ui.volSens){
+  ui.volSens.addEventListener('input', ()=> ui.volSensVal.textContent = (+ui.volSens.value).toFixed(2));
+  ui.volSensVal.textContent = (+ui.volSens.value).toFixed(2);
+}
+if(ui.minFloor){
+  ui.minFloor.addEventListener('input', ()=> ui.minFloorVal.textContent = (+ui.minFloor.value).toFixed(2));
+  ui.minFloorVal.textContent = (+ui.minFloor.value).toFixed(2);
+}
+
+ui.n.addEventListener('input', updateDerived);
+
+if(ui.presetSnappy) ui.presetSnappy.addEventListener('click', ()=> applyPreset('snappy'));
+if(ui.presetSmooth) ui.presetSmooth.addEventListener('click', ()=> applyPreset('smooth'));
+if(ui.presetStrobe) ui.presetStrobe.addEventListener('click', ()=> applyPreset('strobe'));
+
+ui.bpm.addEventListener('input', ()=> ui.bpmVal.textContent = String(ui.bpm.value|0));
+ui.master.addEventListener('input', ()=>{
+  ui.masterVal.textContent = (+ui.master.value).toFixed(2);
+  engine?.setMaster(+ui.master.value);
+});
+
+if(ui.drumGain){
+  const syncDrumGain = ()=>{
+    if(ui.drumGainVal) ui.drumGainVal.textContent = (+ui.drumGain.value).toFixed(2);
+    engine?.updateVars(getVars());
+  };
+  ui.drumGain.addEventListener('input', syncDrumGain);
+  syncDrumGain();
+}
+if(ui.drumEnable){
+  ui.drumEnable.addEventListener('change', ()=> engine?.updateVars(getVars()));
+}
+if(ui.drumBpm){
+  ui.drumBpm.addEventListener('input', ()=> engine?.updateVars(getVars()));
+}
+if(ui.drumAlgo){
+  ui.drumAlgo.addEventListener('change', ()=> engine?.updateVars(getVars()));
+}
+if(ui.drumSource){
+  ui.drumSource.addEventListener('change', ()=> engine?.updateVars(getVars()));
+}
+ui.smooth.addEventListener('input', ()=>{
+  ui.smoothVal.textContent = (+ui.smooth.value).toFixed(2);
+  engine?.setFFT(+ui.fftSize.value, +ui.smooth.value);
+});
+ui.sens.addEventListener('input', ()=> ui.sensVal.textContent = (+ui.sens.value).toFixed(2));
+ui.fftSize.addEventListener('change', ()=> engine?.setFFT(+ui.fftSize.value, +ui.smooth.value));
+ui.fade.addEventListener('input', ()=> engine?.setFade(+ui.fade.value));
+ui.durMul.addEventListener('input', ()=> ui.durMulVal.textContent = (+ui.durMul.value).toFixed(2));
+ui.durMulVal.textContent = (+ui.durMul.value).toFixed(2);
+ui.limiter.addEventListener('change', ()=> engine?.setLimiter(ui.limiter.value === 'on'));
+
+function getVars(){
+  const n = Math.max(2, parseInt(ui.n.value,10)||8);
+  const dBeats = 1 / n;
+  const bpm = +ui.bpm.value;
+  const beatSec = 60 / bpm;
+
+  const base = {
+    n, dBeats, bpm, beatSec,
+    seed: (parseInt(ui.seed.value,10)||0) >>> 0,
+
+    drumEnable: !!(ui.drumEnable && ui.drumEnable.checked),
+    drumBpm: +(ui.drumBpm ? ui.drumBpm.value : bpm),
+    drumGain: +(ui.drumGain ? ui.drumGain.value : 0),
+    drumAlgo: (ui.drumAlgo ? ui.drumAlgo.value : 'amen'),
+    drumSource: (ui.drumSource ? ui.drumSource.value : 'drum'),
+
+    startFrom: +(ui.startFrom ? ui.startFrom.value : 0),
+    startTo: +(ui.startTo ? ui.startTo.value : 1),
+    startSteps: Math.max(2, parseInt(ui.startSteps ? ui.startSteps.value : n,10)||n),
+
+    drumStartFrom: +(ui.drumStartFrom ? ui.drumStartFrom.value : 0),
+    drumStartTo: +(ui.drumStartTo ? ui.drumStartTo.value : 1),
+    drumStartSteps: Math.max(2, parseInt(ui.drumStartSteps ? ui.drumStartSteps.value : 16,10)||16),
+    drumRandStartEnable: !!(ui.drumRandStartEnable && ui.drumRandStartEnable.checked),
+    drumRandStartInterval: +(ui.drumRandStartIntSl ? ui.drumRandStartIntSl.value : 0),
+    drumAllowReverse: !!(ui.drumAllowReverse && ui.drumAllowReverse.checked),
+    // Drum FX
+    drumFxEnable: !!(ui.drumFxEnable && ui.drumFxEnable.checked),
+    drumHpf: +(ui.drumHpf ? ui.drumHpf.value : 0),
+    drumLpf: +(ui.drumLpf ? ui.drumLpf.value : 20000),
+    drumDrive: +(ui.drumDrive ? ui.drumDrive.value : 0),
+    drumCrushBits: +(ui.drumCrushBits ? ui.drumCrushBits.value : 16),
+    drumCrushDown: +(ui.drumCrushDown ? ui.drumCrushDown.value : 1),
+    drumDelayTime: +(ui.drumDelayTime ? ui.drumDelayTime.value : 0),
+    drumDelayFb: +(ui.drumDelayFb ? ui.drumDelayFb.value : 0),
+    drumDelayMix: +(ui.drumDelayMix ? ui.drumDelayMix.value : 0),
+    drumRevMix: +(ui.drumRevMix ? ui.drumRevMix.value : 0),
+    drumRevTime: +(ui.drumRevTime ? ui.drumRevTime.value : 2.0),
+    drumPan: +(ui.drumPan ? ui.drumPan.value : 0),
+    drumTremDepth: +(ui.drumTremDepth ? ui.drumTremDepth.value : 0),
+    drumTremRate: +(ui.drumTremRate ? ui.drumTremRate.value : 6),
+
+
+    ampFrom: +ui.ampFrom.value,
+    ampTo: +ui.ampTo.value,
+    ampSteps: Math.max(2, parseInt(ui.ampSteps.value,10)||10),
+
+    rate: clamp(+ui.rate.value, 0.25, 4.0),
+    durClamp: ui.durClamp.value,
+    durMul: +ui.durMul.value,
+  };
+
+  // main randomizer (deterministisch)
+  if(ui.randStartEnable && ui.randStartEnable.checked){
+    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
+    const tRel = (audioCtx && playState) ? (audioCtx.currentTime - playStartTime) : 0;
+    const w = Math.abs(base.startTo - base.startFrom);
+    const rs = randStartAtTime(base.seed ^ 0xA3C59AC3, tRel, intervalSec, w, allowRev);
+    if(rs){
+      base.startFrom = +rs.from;
+      base.startTo = +rs.to;
+      try{ syncStartFrom(base.startFrom); }catch{}
+      try{ syncStartTo(base.startTo); }catch{}
+    }
+  }
+
+  // drum randomizer (deterministisch)
+  if(base.drumRandStartEnable){
+    const intervalSec = base.drumRandStartInterval || 0;
+    const tRel = (audioCtx && playState) ? (audioCtx.currentTime - playStartTime) : 0;
+    const w = Math.abs(base.drumStartTo - base.drumStartFrom);
+    const rs = randStartAtTime((base.seed ^ 0x5B8D2A4F) >>> 0, tRel, intervalSec, w, base.drumAllowReverse);
+    if(rs){
+      base.drumStartFrom = +rs.from;
+      base.drumStartTo = +rs.to;
+      try{ syncDrumStartFrom(base.drumStartFrom); }catch{}
+      try{ syncDrumStartTo(base.drumStartTo); }catch{}
+    }
+  }
+
+  return base;
+}
+
+
+function wireLiveControls(){
+  const refresh = ()=>{
+    if(!engine) return;
+    engine.updateVars(getVars());
+          };
+  const elems = [ui.n, ui.bpm, ui.seed, ui.sliceMode,
+    ui.startFrom, ui.startFromSl, ui.startTo, ui.startToSl, ui.startSteps,
+    ui.randStartEnable, ui.randStartIntSl, ui.randStartIntNum, ui.allowReverse,
+    ui.drumEnable, ui.drumBpm, ui.drumGain, ui.drumAlgo, ui.drumSource,
+    ui.drumStartFrom, ui.drumStartFromSl, ui.drumStartTo, ui.drumStartToSl, ui.drumStartSteps,
+    ui.drumRandStartEnable, ui.drumRandStartIntSl, ui.drumRandStartIntNum, ui.drumAllowReverse,
+    ui.pxSize, ui.pxDen, ui.darkRate, ui.bright, ui.gamma, ui.attack, ui.release, ui.reactMode, ui.volSens, ui.minFloor,
+    ui.ampFrom, ui.ampTo, ui.ampSteps, ui.rate, ui.fade, ui.master, ui.fftSize, ui.smooth, ui.limiter, ui.durClamp, ui.durMul,
+    ui.drumFxEnable, ui.drumHpfSl, ui.drumHpf, ui.drumLpfSl, ui.drumLpf, ui.drumDriveSl, ui.drumDrive,
+    ui.drumCrushBitsSl, ui.drumCrushBits, ui.drumCrushDownSl, ui.drumCrushDown,
+    ui.drumDelayTimeSl, ui.drumDelayTime, ui.drumDelayFbSl, ui.drumDelayFb, ui.drumDelayMixSl, ui.drumDelayMix,
+    ui.drumRevMixSl, ui.drumRevMix, ui.drumRevTimeSl, ui.drumRevTime,
+    ui.drumPanSl, ui.drumPan, ui.drumTremDepthSl, ui.drumTremDepth, ui.drumTremRateSl, ui.drumTremRate];
+  elems.forEach(el=>{
+    if(!el) return;
+    el.addEventListener('input', refresh);
+    el.addEventListener('change', refresh);
+  });
+  // live recompile algorithm (debounced)
+  let t=null;
+  ui.algo.addEventListener('input', ()=>{
+    if(!engine || !engine.running) return;
+    if(t) clearTimeout(t);
+    t=setTimeout(()=>{
+      try{ engine.setAlgoFn(compileAlgo()); }catch(e){ /* keep last good */ }
+    }, 300);
+  });
+}
+
+function compileAlgo(){
+  const code = ui.algo.value;
+  const fn = new Function(code + "\nreturn algo;");
+  const algoFn = fn();
+  if(typeof algoFn !== "function") throw new Error("Geen function algo(step, vars, helpers) gevonden.");
+  return algoFn;
+}
+
+ui.algo.value = `// Directe vertaling van jouw Sonic Pi snippet (start/finish + amp + sleep d)
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+
+  const starts = h.line(vars.startFrom, vars.startTo, vars.startSteps);
+  const rng = h.mulberry32(vars.seed + step * 1013);
+  const s = h.choose(starts, rng);
+  const f = s + d;
+
+  const amps = h.line(vars.ampFrom, vars.ampTo, vars.ampSteps);
+  const amp = h.choose(amps, rng);
+
+  // Tip: durClamp='sleep' beperkt slice-lengte tot sleep → minder overlap/kraak
+  return { startNorm: s, finishNorm: f, amp, sleepBeats: d, rate: vars.rate };
+}`;
+
+
+function setExportBusy(b){
+  exportBusy = !!b;
+  updateExportButtons();
+}
+
+async function renderOfflineAudio(lenSec){
+  const vars = getVars();
+  const algoFn = compileAlgo();
+
+  // Match the *behavioral* randomness of live mode:
+  // during playback the randomizer produces fresh randomness each interval.
+  // For offline/export we generate a per-export nonce so each render can vary,
+  // while still being deterministic *within* that render.
+  let exportNonce = 0;
+  try{
+    const u = new Uint32Array(1);
+    (crypto || window.crypto).getRandomValues(u);
+    exportNonce = u[0] >>> 0;
+  }catch(e){
+    exportNonce = ((Date.now()|0) ^ (Math.random()*0xFFFFFFFF)) >>> 0;
+  }
+
+  // snapshot UI-dependent values so export is deterministic and doesn't rely on globals
+  const durClamp = vars.durClamp || "sleep";
+  const durMul = +vars.durMul || 1.0;
+  const fade = +vars.fade || 0.01;
+  // NOTE: during offline rendering there is no realtime timer updating UI values.
+  // We therefore reproduce the live randomizers deterministically as a function of time.
+  const randEnabled = ui.randStartEnable && ui.randStartEnable.checked;
+  const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+  const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
+  const mainRandSeed = (((vars.seed>>>0) ^ 0xA3C59AC3 ^ exportNonce)>>>0);
+  const mainWindow0 = Math.abs((vars.startTo ?? 1) - (vars.startFrom ?? 0));
+
+  const drumRandEnabled = !!(ui.drumRandStartEnable && ui.drumRandStartEnable.checked);
+  const drumIntervalSec = ui.drumRandStartIntSl ? (+ui.drumRandStartIntSl.value) : 0;
+  const drumAllowRev = !!(ui.drumAllowReverse && ui.drumAllowReverse.checked);
+  const drumRandSeed = (((vars.seed>>>0) ^ 0x5B8D2A4F ^ exportNonce)>>>0);
+  const drumWindow0 = Math.abs((+((ui.drumStartTo && ui.drumStartTo.value) || 1)) - (+((ui.drumStartFrom && ui.drumStartFrom.value) || 0)));
+
+  const sampleRate = 48000;
+  const totalFrames = Math.floor(lenSec * sampleRate);
+  const offline = new OfflineAudioContext(2, totalFrames, sampleRate);
+
+  // reversed buffer for 'reverse' playback support during export
+  const rev = offline.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const srcCh = buffer.getChannelData(c);
+    const dstCh = rev.getChannelData(c);
+    for(let i=0, j=srcCh.length-1; i<srcCh.length; i++, j--) dstCh[i] = srcCh[j];
+  }
+
+  const master = offline.createGain();
+  master.gain.value = +ui.master.value;
+
+  // optional limiter
+  if(ui.limiter && ui.limiter.value === "on"){
+    const comp = offline.createDynamicsCompressor();
+    comp.threshold.value = -12;
+    comp.knee.value = 12;
+    comp.ratio.value = 8;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+    master.connect(comp);
+    comp.connect(offline.destination);
+  } else {
+    master.connect(offline.destination);
+  }
+  // drum layer is rendered by the same scheduler below (if enabled + drum sample loaded)
+
+  // --- Drum FX (offline) ---
+  const drumFxOn = !!(ui.drumFxEnable && ui.drumFxEnable.checked);
+
+  // drum bus -> master
+  const drumBus = offline.createGain();
+  drumBus.gain.value = drumFxOn ? 1.0 : 1.0;
+
+  const drumHPF = offline.createBiquadFilter();
+  drumHPF.type = 'highpass';
+  drumHPF.frequency.value = drumFxOn ? clamp(+((ui.drumHpf && ui.drumHpf.value) || 0), 0, 2000) : 0;
+
+  const drumLPF = offline.createBiquadFilter();
+  drumLPF.type = 'lowpass';
+  drumLPF.frequency.value = drumFxOn ? clamp(+((ui.drumLpf && ui.drumLpf.value) || 20000), 500, 20000) : 20000;
+
+  const drumDriveGain = offline.createGain();
+  const drive = drumFxOn ? clamp(+((ui.drumDrive && ui.drumDrive.value) || 0), 0, 30) : 0;
+  drumDriveGain.gain.value = 1 + drive*0.08;
+
+  const drumShaper = offline.createWaveShaper();
+  drumShaper.oversample = '4x';
+  drumShaper.curve = makeDistortionCurve(drive);
+
+  const drumCrush = offline.createScriptProcessor(1024, 2, 2);
+  const crushBits = drumFxOn ? clamp(+((ui.drumCrushBits && ui.drumCrushBits.value) || 16), 4, 16) : 16;
+  const crushDown = drumFxOn ? clamp(+((ui.drumCrushDown && ui.drumCrushDown.value) || 1), 1, 32) : 1;
+  let crushPh=0, crushLastL=0, crushLastR=0;
+  drumCrush.onaudioprocess = (e)=>{
+    const inpL = e.inputBuffer.getChannelData(0);
+    const inpR = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : inpL;
+    const outL = e.outputBuffer.getChannelData(0);
+    const outR = e.outputBuffer.numberOfChannels > 1 ? e.outputBuffer.getChannelData(1) : outL;
+    const step = Math.pow(0.5, crushBits|0);
+    for(let i=0;i<inpL.length;i++){
+      if(crushPh===0){
+        crushLastL = step * Math.floor(inpL[i] / step);
+        crushLastR = step * Math.floor(inpR[i] / step);
+      }
+      outL[i] = crushLastL;
+      outR[i] = crushLastR;
+      crushPh = (crushPh + 1) % (crushDown|0);
+    }
+  };
+
+  const drumDelay = offline.createDelay(1.0);
+  drumDelay.delayTime.value = drumFxOn ? clamp(+((ui.drumDelayTime && ui.drumDelayTime.value) || 0), 0, 1.0) : 0;
+  const drumDelayFB = offline.createGain();
+  drumDelayFB.gain.value = drumFxOn ? clamp(+((ui.drumDelayFb && ui.drumDelayFb.value) || 0), 0, 0.95) : 0;
+  const drumDelayMix = offline.createGain();
+  drumDelayMix.gain.value = drumFxOn ? clamp(+((ui.drumDelayMix && ui.drumDelayMix.value) || 0), 0, 1) : 0;
+  const drumDry = offline.createGain();
+  drumDry.gain.value = 1.0;
+
+  const drumConv = offline.createConvolver();
+  const drumRevMix = offline.createGain();
+  const rMix = drumFxOn ? clamp(+((ui.drumRevMix && ui.drumRevMix.value) || 0), 0, 1) : 0;
+  const rTime = drumFxOn ? clamp(+((ui.drumRevTime && ui.drumRevTime.value) || 2.0), 0.1, 6) : 2.0;
+  drumConv.buffer = drumFxOn ? makeImpulseResponse(offline, rTime, 2.2) : makeImpulseResponse(offline, 0.2, 2.2);
+  drumRevMix.gain.value = rMix;
+
+  const drumSum = offline.createGain();
+  const drumTrem = offline.createGain();
+  drumTrem.gain.value = 1.0;
+
+  // tremolo: osc -> depth -> trem.gain + 1
+  const tremOsc = offline.createOscillator();
+  tremOsc.type = 'sine';
+  tremOsc.frequency.value = drumFxOn ? clamp(+((ui.drumTremRate && ui.drumTremRate.value) || 6), 0.1, 30) : 6;
+  const tremDepth = offline.createGain();
+  tremDepth.gain.value = drumFxOn ? clamp(+((ui.drumTremDepth && ui.drumTremDepth.value) || 0), 0, 1) : 0;
+  const tremOff = offline.createConstantSource();
+  tremOff.offset.value = 1.0;
+  tremOsc.connect(tremDepth);
+  tremDepth.connect(drumTrem.gain);
+  tremOff.connect(drumTrem.gain);
+  tremOff.start(0);
+  tremOsc.start(0);
+
+  const drumPan = (offline.createStereoPanner ? offline.createStereoPanner() : null);
+  if(drumPan) drumPan.pan.value = drumFxOn ? clamp(+((ui.drumPan && ui.drumPan.value) || 0), -1, 1) : 0;
+
+  // feedback loop
+  drumDelay.connect(drumDelayFB);
+  drumDelayFB.connect(drumDelay);
+
+  // wiring
+  drumBus.connect(drumHPF);
+  drumHPF.connect(drumLPF);
+  drumLPF.connect(drumDriveGain);
+  drumDriveGain.connect(drumShaper);
+  drumShaper.connect(drumCrush);
+
+  drumCrush.connect(drumDry);
+  drumCrush.connect(drumDelay);
+  drumDelay.connect(drumDelayMix);
+  drumCrush.connect(drumConv);
+  drumConv.connect(drumRevMix);
+
+  drumDry.connect(drumSum);
+  drumDelayMix.connect(drumSum);
+  drumRevMix.connect(drumSum);
+
+  drumSum.connect(drumTrem);
+  if(drumPan){
+    drumTrem.connect(drumPan);
+    drumPan.connect(master);
+  } else {
+    drumTrem.connect(master);
+  }
+
+  let t = 0;
+  let step = 0;
+
+  // drum scheduler (offline): 16e-grid
+  const drumBufSel = ((ui.drumSource && ui.drumSource.value === 'main') ? buffer : drumBuffer);
+  const drumOn = !!(ui.drumEnable && ui.drumEnable.checked) && !!drumBufSel;
+  const drumAlgo = (ui.drumAlgo ? ui.drumAlgo.value : 'amen');
+  const drumBpm = clamp(+((ui.drumBpm && ui.drumBpm.value) || (+ui.bpm.value || 120)), 20, 300);
+  const drumStepSec = (60 / drumBpm) / 4;
+  const drumGainVal = clamp(+((ui.drumGain && ui.drumGain.value) || 0), 0, 1.5);
+  let drumT = 0;
+  let drumStep = 0;
+
+  while(t < lenSec){
+    let varsStep = vars;
+    if(randEnabled){
+      const rs = randStartAtTime(mainRandSeed, t, intervalSec, mainWindow0, allowRev);
+      if(rs){ varsStep = {...vars, startFrom: rs.from, startTo: rs.to}; }
+    }
+    const ev = algoFn(step, varsStep, {mulberry32, line, choose, clamp});
+    const sleepBeats = Math.max(0.0001, ev?.sleepBeats ?? vars.dBeats);
+    const stepSec = sleepBeats * vars.beatSec;
+
+    if(ev && ev.amp > 1e-5){
+      const rate = clamp(ev.rate ?? vars.rate, 0.25, 4.0);
+      const s = clamp(ev.startNorm, 0, 1);
+      const f = clamp(ev.finishNorm, 0, 1);
+      const segNorm = Math.max(0.0001, f - s);
+
+      let outDur = clamp(segNorm * buffer.duration / rate, 0.01, buffer.duration);
+      if((durClamp) === "sleep"){
+        const target = clamp(stepSec * (durMul ?? 1.0), 0.01, 10.0);
+        outDur = Math.min(outDur, target);
+      }
+
+      const offset = clamp(s * buffer.duration, 0, Math.max(0, buffer.duration - 0.01));
+
+      const src = offline.createBufferSource();
+      src.buffer = (ev && ev.useReversed) ? rev : buffer;
+      src.playbackRate.setValueAtTime(rate, t);
+
+      const g = offline.createGain();
+      const amp = clamp(ev.amp, 0, 20);
+
+      const fsec = clamp(fade, 0.001, Math.min(0.05, outDur * 0.25));
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(amp, t + fsec);
+      g.gain.setValueAtTime(amp, t + outDur - fsec);
+      g.gain.linearRampToValueAtTime(0, t + outDur);
+
+      src.connect(g);
+      g.connect(master);
+
+      const bufferReadDur = outDur * rate;
+      try{
+        src.start(t, offset, bufferReadDur);
+        src.stop(t + outDur + 0.02);
+      }catch(e){}
+    }
+
+    // schedule drums up to the next algorithm step
+    if(drumOn && drumGainVal > 1e-5){
+      while(drumT < t + stepSec && drumT < lenSec){
+        const algoD = DRUM_ALGOS[drumAlgo] || CONTROVERSIAL_ALGOS[drumAlgo] || DRUM_ALGOS.amen;
+        const hits = (algoD ? algoD(drumStep, vars) : []) || [];
+        for(const hit of hits){
+          if(!hit) continue;
+          const amp = clamp((hit.amp ?? 0.8) * drumGainVal, 0, 20);
+          if(amp <= 1e-5) continue;
+          const sliceCount = 16;
+          const slice = ((hit.slice ?? 0) % sliceCount + sliceCount) % sliceCount;
+          let aW = clamp(+((ui.drumStartFrom && ui.drumStartFrom.value) || 0), 0, 1);
+          let bW = clamp(+((ui.drumStartTo && ui.drumStartTo.value) || 1), 0, 1);
+          if(drumRandEnabled && drumIntervalSec > 0){
+            const rsD = randStartAtTime(drumRandSeed, drumT, drumIntervalSec, drumWindow0, drumAllowRev);
+            if(rsD){ aW = +rsD.from; bW = +rsD.to; }
+          }
+          const baseW = Math.min(aW,bW);
+          const spanW = Math.abs(bW-aW);
+          const sN = clamp(baseW + (slice / sliceCount) * spanW, 0, 0.9999);
+          const fN = clamp(baseW + ((slice + 1) / sliceCount) * spanW, 0, 1);
+          const rate = clamp(hit.rate ?? 1.0, 0.25, 4.0);
+          const durSteps = clamp(hit.durSteps ?? 1, 1, 8);
+
+          const outDur = clamp(durSteps * drumStepSec, 0.01, 2.0);
+          const offset = clamp(sN * drumBufSel.duration, 0, Math.max(0, drumBufSel.duration - 0.01));
+          const src = offline.createBufferSource();
+          src.buffer = drumBufSel;
+          src.playbackRate.setValueAtTime(rate, drumT);
+
+          const g = offline.createGain();
+          const fsec = clamp(fade, 0.001, Math.min(0.03, outDur * 0.25));
+          g.gain.setValueAtTime(0, drumT);
+          g.gain.linearRampToValueAtTime(amp, drumT + fsec);
+          g.gain.setValueAtTime(amp, drumT + outDur - fsec);
+          g.gain.linearRampToValueAtTime(0, drumT + outDur);
+
+          src.connect(g);
+          g.connect(drumBus);
+
+          const segNorm = Math.max(0.0001, fN - sN);
+          const bufferReadDur = Math.min(outDur * rate, segNorm * drumBufSel.duration);
+          try{
+            src.start(drumT, offset, bufferReadDur);
+            src.stop(drumT + outDur + 0.02);
+          }catch(e){}
+        }
+        drumT += drumStepSec;
+        drumStep += 1;
+      }
+    }
+
+
+    t += stepSec;
+    step += 1;
+  }
+
+  const rendered = await offline.startRendering();
+  return rendered;
+}
+
+async function exportWav(){
+  if(!buffer) return;
+  setExportBusy(true);
+  // Prevent double-audio: if live engine is running, stop it during export
+  const wasPlaying = !!playState;
+  if(wasPlaying){
+    try{ stopRandStartTimer(); }catch{}
+    playState = false;
+    try{ engine?.stop(); }catch{}
+    try{ currentEngine?.stop(); }catch{}
+    try{ ui.start.disabled = !buffer; ui.stop.disabled = true; }catch{}
+  }
+  const lenSec = Math.max(1, Math.min(1800, +(ui.expLen?.value||60)));
+  if(ui.exportNote) ui.exportNote.textContent = "Render WAV…";
+  const rendered = await renderOfflineAudio(lenSec);
+  const wav = audioBufferToWavBlob(rendered);
+  const ts = new Date().toISOString().replace('T','_').replace(/:/g,'-').split('.')[0];
+  downloadBlob(wav, `GK_${ts}.wav`);
+  if(ui.exportNote) ui.exportNote.textContent = "WAV klaar.";
+  setExportBusy(false);
+}
+
+async function exportVideo(){
+  if(!buffer) return;
+  setExportBusy(true);
+
+  const lenSec = Math.max(1, Math.min(1800, +(ui.expLen?.value||60)));
+  const fps = 30;
+
+  const isImgMode = (ui.videoMode?.value === 'img');
+  if(isImgMode && !sourceImageBitmap){
+    setExportBusy(false);
+    alert("Upload eerst een afbeelding (voor slices).");
+    return;
+  }
+  // When exporting in image-slices mode, we temporarily drive the canvas ourselves.
+  let stopImgLoop = null;
+  const restoreVizAfter = !!(viz);
+  if(isImgMode){
+    try{ viz?.stop(); }catch{}
+    try{ stopImgLoop = startImageSliceLoop(); }catch(e){ console.error(e); }
+  }
+
+  // We record the LIVE engine graph (no offline render) so what you hear is what gets captured.
+  // This also avoids the classic "double audio" problem.
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try{ await audioCtx.resume(); }catch{}
+
+  // Ensure engine exists
+  if(!engine && buffer){
+    const revBuffer = makeReversedBuffer(audioCtx, buffer);
+    engine = new SliceEngine(audioCtx, buffer, revBuffer);
+    if(drumBuffer) try{ engine.setDrumBuffer(drumBuffer); }catch{}
+    engine.getVarsFn = getVars;
+    engine.setFade(+ui.fade.value);
+    engine.setFFT(+ui.fftSize.value, +ui.smooth.value);
+    engine.setLimiter(ui.limiter.value === 'on');
+  }
+
+  // If not already playing, start playback for the duration of the recording
+  const wasPlaying = !!playState;
+  if(!wasPlaying){
+    try{
+      try{ engine?.setMaster(+ui.master.value); }catch{}
+
+      const algoFn = compileAlgo();
+      engine.setAlgoFn(algoFn);
+      engine.updateVars(getVars());
+      engine.start(algoFn, getVars());
+      playState = true;
+      playStartTime = audioCtx.currentTime;
+      if(ui.start) ui.start.disabled = true;
+      if(ui.stop) ui.stop.disabled = false;
+      // Start visualizer if present
+      try{ viz?.start(); }catch{}
+      startRandStartTimer();
+    }catch(e){
+      try{ stopImgLoop && stopImgLoop(); }catch{}
+      if(isImgMode){ try{ viz?.start(); }catch{} }
+      setExportBusy(false);
+      alert('Kan niet starten voor export:\n' + e.message);
+      return;
+    }
+  }
+
+  // Capture canvas + audio from the engine's MediaStreamDestination
+  // NOTE: using a NEW MediaStream([...tracks]) is more reliable than addTrack() in some browsers.
+  const vstream = ui.cv.captureStream(fps);
+  const astream = engine?.getMediaStream ? engine.getMediaStream() : null;
+  const vtracks = vstream.getVideoTracks();
+  const atracks = astream ? astream.getAudioTracks() : [];
+
+  // IMPORTANT: clone audio tracks for recording, so we never stop the engine's original MediaStream track.
+  // Stopping the original track can make audio "disappear" on subsequent exports in some browsers.
+  const atracksRec = atracks.map(t => (t && typeof t.clone === 'function') ? t.clone() : t).filter(Boolean);
+
+  if(!atracksRec.length){
+    console.warn('Geen audio MediaStream beschikbaar; video wordt zonder audio opgenomen.');
+  }
+
+  const stream = new MediaStream([ ...vtracks, ...atracksRec ]);
+
+  // Prefer WebM/Opus first (usually most reliable for audio). MP4 may be supported but can drop audio depending on browser.
+  const mp4Candidates = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4"
+  ];
+  const mimeType = mp4Candidates.find(m => MediaRecorder.isTypeSupported(m)) || "";
+  if(!mimeType){
+    alert("MP4 opnemen wordt door deze browser niet ondersteund via MediaRecorder. Probeer Chrome/Edge (desktop) of exporteer WAV + combineer extern.");
+    if(ui.exportNote) ui.exportNote.textContent = "MP4 export niet ondersteund in deze browser.";
+    try{ stopImgLoop && stopImgLoop(); }catch{}
+    if(isImgMode){ try{ viz?.start(); }catch{} }
+    setExportBusy(false);
+    return;
+  }
+  const rec = new MediaRecorder(stream, { mimeType });
+  // ensure audio context is running
+  try{ if(audioCtx && audioCtx.state !== "running") await audioCtx.resume(); }catch{}
+// Give the audio track a moment to become 'live' in some browsers
+  await new Promise(r => setTimeout(r, 50));
+
+  const chunks = [];
+  rec.ondataavailable = (e)=>{ if(e.data && e.data.size) chunks.push(e.data); };
+
+  if(ui.exportNote) ui.exportNote.textContent = "Opnemen video (live)…";
+  rec.start();
+
+  // Record for lenSec
+  await new Promise(resolve => setTimeout(resolve, lenSec*1000));
+
+  rec.stop();
+  await new Promise(r => rec.onstop = r);
+  try{ vtracks.forEach(t=>t.stop()); }catch{}
+  try{ atracksRec.forEach(t=>t.stop()); }catch{}
+  try{ vstream.getTracks().forEach(t=>t.stop()); }catch{}
+  try{ stopImgLoop && stopImgLoop(); }catch{}
+  if(isImgMode){ try{ viz?.start(); }catch{} }
+
+  const blob = new Blob(chunks, {type: "video/mp4"});
+  const ext = "mp4";
+  const ts = new Date().toISOString().replace('T','_').replace(/:/g,'-').split('.')[0];
+  downloadBlob(blob, `GK_${ts}.${ext}`);
+
+  // If we started playback only for export, stop it gently afterwards
+  if(!wasPlaying){
+    try{
+      try{ engine?.setMaster(+ui.master.value); }catch{}
+
+      // small fade-out to avoid clicks
+      try{ engine?.rampMaster(0, 0.08); }catch{}
+      setTimeout(()=>{ try{ engine?.stop(); }catch{} }, 120);
+      playState = false;
+      stopRandStartTimer();
+      try{ ui.start.disabled = !buffer; ui.stop.disabled = true; }catch{}
+    }catch{}
+  }
+
+  if(ui.exportNote) ui.exportNote.textContent = `Video klaar (${ext}).`;
+  setExportBusy(false);
+}
+
+
+
+ui.drumFile?.addEventListener('change', async ()=>{
+  const f = ui.drumFile.files?.[0];
+  if(!f) return;
+  try{
+    if(ui.drumInfo) ui.drumInfo.textContent = `Laden: ${f.name} ...`;
+    const arr = await f.arrayBuffer();
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    drumBuffer = await audioCtx.decodeAudioData(arr.slice(0));
+    if(ui.drumInfo) ui.drumInfo.textContent = `Drum sample: ${f.name} (${drumBuffer.duration.toFixed(2)}s)`;
+    engine?.setDrumBuffer(drumBuffer);
+    engine?.updateVars(getVars());
+  }catch(e){
+    console.error(e);
+    if(ui.drumInfo) ui.drumInfo.textContent = `Fout bij laden: ${e.message}`;
+  }
+});
+
+ui.file.addEventListener('change', async ()=>{
+  const f = ui.file.files?.[0];
+  if(!f) return;
+
+  ui.fileInfo.textContent = `Laden: ${f.name} ...`;
+  const arr = await f.arrayBuffer();
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  buffer = await audioCtx.decodeAudioData(arr.slice(0));
+
+  const oldEngineForFade = currentEngine;
+  // CROSSFADE_START
+  const wasPlaying = !!playState;
+
+  // Build reversed buffer for reverse playback support
+  const revBuffer = makeReversedBuffer(audioCtx, buffer);
+
+  const newEngine = new SliceEngine(audioCtx, buffer, revBuffer);
+  // attach amen buffer if loaded
+  if(drumBuffer) try{ newEngine.setDrumBuffer(drumBuffer); }catch{}
+
+  // Apply current settings
+  newEngine.setMaster(0); // fade in if autoplay
+  newEngine.setFade(+ui.fade.value);
+  newEngine.setFFT(+ui.fftSize.value, +ui.smooth.value);
+  newEngine.setLimiter(ui.limiter.value === 'on');
+  newEngine.getVarsFn = getVars; // live vars
+
+  const xfadeSec = ui.xfade ? (+ui.xfade.value) : 1.5;
+  const targetMaster = +ui.master.value;
+
+  // Swap engines
+  engine = newEngine;
+  currentEngine = newEngine;
+
+  // If we were playing: autoplay continues by starting the new engine immediately and crossfading
+  if(wasPlaying){
+    try{
+      try{ await audioCtx.resume(); }catch{}
+
+      const algoFn = compileAlgo();
+      const vars = getVars();
+      newEngine.setAlgoFn(algoFn);
+      // Start new engine NOW
+      newEngine.start(algoFn, vars);
+
+      // Fade out old engine, fade in new engine
+      try{ oldEngineForFade.rampMaster(0, xfadeSec); }catch{}
+      newEngine.rampMaster(targetMaster, xfadeSec);
+
+      // Stop old engine after fade completes
+      setTimeout(()=>{ try{ oldEngineForFade.stop(); }catch{} }, Math.max(0, xfadeSec*1000) + 80);
+    }catch(e){
+      console.error(e);
+      // Fallback: just bring master up so user hears something if they hit Start
+      newEngine.setMaster(targetMaster);
+    }
+  } else {
+    // Not playing yet: keep silent until user presses Start
+    newEngine.setMaster(targetMaster);
+  }
+  ui.durMulVal.textContent = (+ui.durMul.value).toFixed(2);
+
+  try{ viz?.stop(); }catch{}
+  viz = makeVisualizer(engine, ui.cv);
+  viz.start();
+  wireLiveControls();
+
+  ui.fileInfo.textContent = `Geladen: ${f.name} — ${buffer.duration.toFixed(2)}s, ${buffer.numberOfChannels}ch @ ${buffer.sampleRate}Hz`;
+  setExportBusy(false);
+  if((typeof wasPlaying !== 'undefined' && wasPlaying) || playState){
+    ui.start.disabled = true;
+    ui.stop.disabled = false;
+  } else {
+    ui.start.disabled = false;
+    ui.stop.disabled = true;
+  }
+});
+
+
+
+
+// Deterministische start-line randomizer
+// Elke interval krijgen start line(from) en start line(to) *elk* een nieuwe willekeurige positie.
+// - allowReverse UIT: we sorteren zodat from <= to (altijd vooruit).
+// - allowReverse AAN: from en to mogen onafhankelijk zijn (dus ook from > to = achteruit).
+// Kleine minimum-breedte voorkomt een (bijna) lege slice-range.
+function randStartAtTime(seed, tSec, intervalSec, _ignoredWindowSize, allowReverse){
+  if(!intervalSec || intervalSec <= 0) return null;
+  const cycle = Math.floor(Math.max(0, tSec) / intervalSec);
+  const r = mulberry32(((seed>>>0) + 99991*cycle)>>>0);
+
+  const minW = 0.002; // 0.2% van de sample-duur
+  let a = clamp(r(), 0, 1);
+  let b = clamp(r(), 0, 1);
+
+  if(!allowReverse){
+    let frm = Math.min(a,b);
+    let to  = Math.max(a,b);
+    if((to - frm) < minW){
+      to = clamp(frm + minW, 0, 1);
+      if((to - frm) < minW){
+        frm = clamp(to - minW, 0, 1);
+      }
+    }
+    return { from: frm, to: to, cycle };
+  }
+
+  // allowReverse: laat richting vrij (from kan > to)
+  if(Math.abs(b - a) < minW){
+    // duw b een tikje weg van a
+    const dir = (r() < 0.5) ? -1 : 1;
+    b = clamp(a + dir*minW, 0, 1);
+  }
+  return { from: a, to: b, cycle };
+}
+
+function applyPreset(name){
+  const set = (el, v, txtEl, fmt=2)=>{
+    if(!el) return;
+    el.value = v;
+    if(txtEl) txtEl.textContent = (+v).toFixed(fmt);
+    el.dispatchEvent(new Event('input'));
+  };
+
+  if(name === 'snappy'){
+    set(ui.attack, 0.9, ui.attackVal);
+    set(ui.release, 0.9, ui.releaseVal);
+    set(ui.darkRate, 0.55, ui.darkRateVal);
+    set(ui.bright, 1.2, ui.brightVal);
+    set(ui.gamma, 1.1, ui.gammaVal);
+    if(ui.reactMode) ui.reactMode.value = 'energy';
+  }
+  if(name === 'smooth'){
+    set(ui.attack, 0.35, ui.attackVal);
+    set(ui.release, 0.25, ui.releaseVal);
+    set(ui.darkRate, 0.25, ui.darkRateVal);
+    set(ui.bright, 1.0, ui.brightVal);
+    set(ui.gamma, 1.4, ui.gammaVal);
+    if(ui.reactMode) ui.reactMode.value = 'band';
+  }
+  if(name === 'strobe'){
+    set(ui.attack, 1.0, ui.attackVal);
+    set(ui.release, 1.0, ui.releaseVal);
+    set(ui.darkRate, 0.9, ui.darkRateVal);
+    set(ui.bright, 1.6, ui.brightVal);
+    set(ui.gamma, 0.8, ui.gammaVal);
+    if(ui.reactMode) ui.reactMode.value = 'energy';
+  }
+}
+
+function stopRandStartTimer(){
+  if(randStartTimer){ clearInterval(randStartTimer); randStartTimer = null; }
+  lastRandCycles.main = -1;
+  lastRandCycles.drum = -1;
+}
+
+// Houdt cycles bij zodat we alleen updaten wanneer een nieuwe selectie plaatsvindt
+const lastRandCycles = { main: -1, drum: -1 };
+
+function startRandStartTimer(){
+  stopRandStartTimer();
+
+  // Start een lichte "poll" die beide randomizers kan bedienen.
+  // We updaten alleen wanneer de cycle verandert.
+  randStartTimer = setInterval(()=>{
+    if(!audioCtx || !playState) return;
+    const tRel = Math.max(0, audioCtx.currentTime - playStartTime);
+
+    // --- MAIN ---
+    const mainOn = !!(ui.randStartEnable && ui.randStartEnable.checked);
+    const mainSec = mainOn && ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    if(mainOn && mainSec > 0){
+      const wMain = (+(ui.startTo?.value || 1)) - (+(ui.startFrom?.value || 0));
+      const rs = randStartAtTime(((parseInt(ui.seed.value,10)||0)>>>0) ^ 0xA3C59AC3, tRel, mainSec, wMain, !!(ui.allowReverse && ui.allowReverse.checked));
+      if(rs && rs.cycle !== lastRandCycles.main){
+        lastRandCycles.main = rs.cycle;
+        try{ syncStartFrom(rs.from); }catch{ try{ ui.startFrom.value = (+rs.from).toFixed(3); }catch{} }
+        try{ syncStartTo(rs.to); }catch{ try{ ui.startTo.value = (+rs.to).toFixed(3); }catch{} }
+      }
+    }
+
+    // --- DRUM ---
+    const drumOn = !!(ui.drumRandStartEnable && ui.drumRandStartEnable.checked);
+    const drumSec = drumOn && ui.drumRandStartIntSl ? (+ui.drumRandStartIntSl.value) : 0;
+    if(drumOn && drumSec > 0){
+      const wDrum = (+(ui.drumStartTo?.value || 1)) - (+(ui.drumStartFrom?.value || 0));
+      const rs = randStartAtTime(((parseInt(ui.seed.value,10)||0)>>>0) ^ 0x5B8D2A4F, tRel, drumSec, wDrum, !!(ui.drumAllowReverse && ui.drumAllowReverse.checked));
+      if(rs && rs.cycle !== lastRandCycles.drum){
+        lastRandCycles.drum = rs.cycle;
+        try{ syncDrumStartFrom(rs.from); }catch{ try{ ui.drumStartFrom.value = (+rs.from).toFixed(3); }catch{} }
+        try{ syncDrumStartTo(rs.to); }catch{ try{ ui.drumStartTo.value = (+rs.to).toFixed(3); }catch{} }
+      }
+    }
+  }, 60);
+}
+
+ui.start.addEventListener('click', async ()=>{
+  if(!buffer || !engine) return;
+  try{
+    await audioCtx.resume();
+    engine.stop();
+
+    const algoFn = compileAlgo();
+    const vars = getVars();
+    engine.setAlgoFn(algoFn);
+    engine.vars = vars; // live reference
+
+        
+    currentEngine = engine;
+    // ensure master is at desired level
+    engine.setMaster(+ui.master.value);
+    try{ if(drumBuffer) engine.setDrumBuffer(drumBuffer); }catch{}
+    engine.start(algoFn, vars);
+    if(!playState) playStartTime = (audioCtx ? audioCtx.currentTime : 0);
+    playState = true;
+    startRandStartTimer();
+    // ensure analyser runs
+    audioCtx.resume();
+
+    ui.start.disabled = true;
+    ui.stop.disabled = false;
+  }catch(e){
+    alert("Start error:\n" + e.message);
+  }
+});
+
+if(ui.exportWav) ui.exportWav.addEventListener('click', ()=> exportWav().catch(e=>{ setExportBusy(false); alert('WAV export error:\n'+e.message);}));
+if(ui.exportVid) ui.exportVid.addEventListener('click', ()=> exportVideo().catch(e=>{ setExportBusy(false); alert('Video export error:\n'+e.message);}));
+
+ui.stop.addEventListener('click', ()=>{
+  stopRandStartTimer();
+  playState = false;
+  try{ engine?.stop(); }catch{}
+  try{ currentEngine?.stop(); }catch{}
+  ui.start.disabled = !buffer;
+  ui.stop.disabled = true;
+});
+
+
+// --- Live parameter update (no restart needed) ---
+setInterval(()=>{
+  if(engine && engine.running){
+    engine.vars = getVars();
+  }
+}, 50);
+window.addEventListener('beforeunload', ()=>{
+  try{ stopRandStartTimer(); }catch{}
+  try{ engine?.stop(); }catch{}
+  try{ audioCtx?.close(); }catch{}
+});
+
+// ===== CONTROVERSIAL ALGORITHMS (added, nothing removed) =====
+const CONTROVERSIAL_ALGOS = {
+  anti_groove(step){ if(step % 4 === 0) return []; return [{slice:(step*3)%16, amp:0.8}]; },
+  silence_abuse(step){ if(step % 16 !== 7) return []; return [{slice:7, amp:1.2, durSteps:4}]; },
+  jitter_dictator(step){ return [{slice:(step+Math.floor(Math.random()*5))%16, amp:0.4+Math.random(), rate:0.7+Math.random()*1.5}]; },
+  loop_denial(step){ return [{slice:(15-step)%16, amp:0.9, rate:0.95}]; },
+  hat_fascism(step){ return [{slice:12, amp:0.25, rate:2.0, durSteps:1}]; },
+  bpm_gaslight(step){ return [{slice:step%16, amp:0.6, rate:step%2?0.5:1.75}]; },
+  reverse_trauma(step){ return [{slice:step%16, amp:0.8, rate:-1}]; },
+  broken_amen(step){ if(step%3===0) return []; return [{slice:[0,3,8,11][step%4], amp:1.0}]; },
+  machine_panic(step){ return Array.from({length:2},()=>({slice:Math.floor(Math.random()*16), amp:0.4, durSteps:1})); },
+  clock_drift(step){ return [{slice:step%16, amp:0.7, rate:1+Math.sin(step/7)*0.4}]; },
+  stutter_prison(step){ if(step%2) return []; return [{slice:step%8, amp:0.9, durSteps:1}]; },
+  phase_abuse(step){ return [{slice:(step*step)%16, amp:0.6, rate:1.25}]; },
+  kick_denial(step){ if(step%4===0) return []; return [{slice:8, amp:1.1}]; },
+  grid_vandal(step){ return [{slice:Math.floor(Math.random()*16), amp:0.3+Math.random()*0.7}]; },
+  psycho_swing(step){ return [{slice:step%16, amp:0.8, rate:step%2?1.3:0.7}]; },
+  anti_drop(step){ if(step<32) return []; return [{slice:0, amp:1.5, durSteps:8}]; },
+  random_authority(step){ if(Math.random()<0.7) return []; return [{slice:Math.floor(Math.random()*16), amp:1.3}]; },
+  compression_hell(step){ return [{slice:step%16, amp:2.0}]; },
+  groove_erasure(step){ return [{slice:0, amp:0.2, rate:0.5}]; },
+  final_insult(step){ return [{slice:15, amp:step%32===0?2.0:0.1, durSteps:step%32===0?8:1}]; }
+};
+
+</script>
+</body>
+</html>
