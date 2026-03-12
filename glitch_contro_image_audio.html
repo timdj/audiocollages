@@ -455,8 +455,8 @@
 
         <div class="var">
           <label>Master gain</label>
-          <input id="master" type="range" min="0" max="1.5" step="0.01" value="0.9"/>
-          <div class="small" id="masterVal">0.90</div>
+          <input id="master" type="range" min="0" max="1.5" step="0.01" value="1"/>
+          <div class="small" id="masterVal">1.00</div>
         </div>
       </div>
     </div>
@@ -587,6 +587,114 @@
       <div class="small">Tip: FFT volgt wat je hoort. Probeer fftSize 2048 of sensitivity lager/hoger.</div>
     </div>
   </div>
+
+  <div class="card" id="dspRackCard" style="margin-top:16px">
+    <label>DSP effecten uit de rack — onderaan toegevoegd aan Glitch</label>
+    <div class="small">Alle nieuwe effect-instellingen starten op <b>0</b>. Ook master gain start op <b>0</b>.</div>
+    <div class="grid3" style="margin-top:12px">
+      <button id="dspZeroAll" type="button">Zet DSP op nul</button>
+      <div class="small" style="padding:10px 0">De chain werkt op de totale output van de Glitch-player.</div>
+      <div></div>
+    </div>
+    <div class="vars">
+      <div class="var">
+        <label>Extra gain</label>
+        <input id="dspGain" type="range" min="0" max="2" step="0.01" value="0"/>
+        <div class="small" id="dspGainVal">0.00</div>
+      </div>
+
+      <div class="var">
+        <label>Distortion drive</label>
+        <input id="dspDistDrive" type="range" min="0" max="1" step="0.001" value="0"/>
+        <div class="small" id="dspDistDriveVal">0.000</div>
+        <label>Distortion mix (%)</label>
+        <input id="dspDistMix" type="range" min="0" max="100" step="1" value="0"/>
+        <div class="small" id="dspDistMixVal">0%</div>
+      </div>
+
+      <div class="var">
+        <label>Modulatie mode</label>
+        <select id="dspModMode">
+          <option value="off" selected>off</option>
+          <option value="chorus">chorus</option>
+          <option value="flanger">flanger</option>
+          <option value="tremolo">tremolo</option>
+          <option value="ringmod">ringmod</option>
+          <option value="phaser">phaser</option>
+        </select>
+        <label>Mod rate</label>
+        <input id="dspModRate" type="range" min="0" max="12" step="0.01" value="0"/>
+        <div class="small" id="dspModRateVal">0.00 Hz</div>
+        <label>Mod depth</label>
+        <input id="dspModDepth" type="range" min="0" max="1" step="0.001" value="0"/>
+        <div class="small" id="dspModDepthVal">0.000</div>
+        <label>Mod feedback</label>
+        <input id="dspModFb" type="range" min="0" max="0.95" step="0.01" value="0"/>
+        <div class="small" id="dspModFbVal">0.00</div>
+        <label>Mod mix (%)</label>
+        <input id="dspModMix" type="range" min="0" max="100" step="1" value="0"/>
+        <div class="small" id="dspModMixVal">0%</div>
+      </div>
+
+      <div class="var">
+        <label>Delay (ms)</label>
+        <input id="dspDelayMs" type="range" min="0" max="1200" step="1" value="0"/>
+        <div class="small" id="dspDelayMsVal">0 ms</div>
+        <label>Delay feedback</label>
+        <input id="dspDelayFb" type="range" min="0" max="0.95" step="0.01" value="0"/>
+        <div class="small" id="dspDelayFbVal">0.00</div>
+        <label>Delay mix (%)</label>
+        <input id="dspDelayMix" type="range" min="0" max="100" step="1" value="0"/>
+        <div class="small" id="dspDelayMixVal">0%</div>
+      </div>
+
+      <div class="var">
+        <label>EQ low (dB)</label>
+        <input id="dspEqLow" type="range" min="-18" max="18" step="0.5" value="0"/>
+        <div class="small" id="dspEqLowVal">0.0 dB</div>
+        <label>EQ mid (dB)</label>
+        <input id="dspEqMid" type="range" min="-18" max="18" step="0.5" value="0"/>
+        <div class="small" id="dspEqMidVal">0.0 dB</div>
+        <label>EQ high (dB)</label>
+        <input id="dspEqHigh" type="range" min="-18" max="18" step="0.5" value="0"/>
+        <div class="small" id="dspEqHighVal">0.0 dB</div>
+      </div>
+
+      <div class="var">
+        <label>Filter type</label>
+        <select id="dspFilterType">
+          <option value="off" selected>off</option>
+          <option value="lowpass">lowpass</option>
+          <option value="highpass">highpass</option>
+          <option value="bandpass">bandpass</option>
+          <option value="notch">notch</option>
+          <option value="peaking">peaking</option>
+        </select>
+        <label>Filter amount</label>
+        <input id="dspFilterFreq" type="range" min="0" max="1" step="0.001" value="0"/>
+        <div class="small" id="dspFilterFreqVal">0.000</div>
+        <label>Filter Q</label>
+        <input id="dspFilterQ" type="range" min="0" max="18" step="0.1" value="0"/>
+        <div class="small" id="dspFilterQVal">0.0</div>
+      </div>
+
+      <div class="var">
+        <label>Reverb decay</label>
+        <input id="dspRevDecay" type="range" min="0" max="8" step="0.1" value="0"/>
+        <div class="small" id="dspRevDecayVal">0.0 s</div>
+        <label>Reverb pre-delay (ms)</label>
+        <input id="dspRevPre" type="range" min="0" max="200" step="1" value="0"/>
+        <div class="small" id="dspRevPreVal">0 ms</div>
+        <label>Reverb damp</label>
+        <input id="dspRevDamp" type="range" min="0" max="1" step="0.01" value="0"/>
+        <div class="small" id="dspRevDampVal">0.00</div>
+        <label>Reverb mix (%)</label>
+        <input id="dspRevMix" type="range" min="0" max="100" step="1" value="0"/>
+        <div class="small" id="dspRevMixVal">0%</div>
+      </div>
+    </div>
+  </div>
+
 
 <script>
 function audioBufferToWavBlob(buffer){
@@ -869,6 +977,274 @@ const DRUM_ALGOS = {
 };
 
 
+
+
+function makeDriveCurve(amount=0.5){
+  const n = 2048;
+  const curve = new Float32Array(n);
+  const k = Math.max(0, amount) * 400;
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1))*2 - 1;
+    curve[i] = ((3 + k) * x * 20 * Math.PI/180) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+function makeImpulse(ctx, seconds, damp){
+  const sr = ctx.sampleRate || 48000;
+  const len = Math.max(1, Math.floor(sr * Math.max(0.03, seconds)));
+  const ir = ctx.createBuffer(2, len, sr);
+  const decay = Math.max(0.03, seconds);
+  for(let c=0;c<2;c++){
+    const ch = ir.getChannelData(c);
+    for(let i=0;i<len;i++){
+      const t = i / sr;
+      const env = Math.pow(1 - i/len, 1 + damp * 5);
+      ch[i] = (Math.random()*2 - 1) * env * Math.exp(-3 * t / decay);
+    }
+  }
+  return ir;
+}
+
+class PostFXRack {
+  constructor(ctx){
+    this.ctx = ctx;
+    this.input = ctx.createGain();
+    this.output = ctx.createGain();
+    this._reverbKey = '';
+
+    // Gain
+    this.gNode = ctx.createGain();
+
+    // Distortion
+    this.dIn = ctx.createGain();
+    this.dPre = ctx.createGain();
+    this.dShaper = ctx.createWaveShaper();
+    this.dDry = ctx.createGain();
+    this.dWet = ctx.createGain();
+    this.dOut = ctx.createGain();
+
+    // Modulation
+    this.mDry = ctx.createGain();
+    this.mWet = ctx.createGain();
+    this.mOut = ctx.createGain();
+    this.mDelayIn = ctx.createGain();
+    this.mDelay = ctx.createDelay(0.05);
+    this.mFb = ctx.createGain();
+    this.mAmp = ctx.createGain();
+    this.mPh1 = ctx.createBiquadFilter(); this.mPh1.type = 'allpass';
+    this.mPh2 = ctx.createBiquadFilter(); this.mPh2.type = 'allpass';
+    this.mPh3 = ctx.createBiquadFilter(); this.mPh3.type = 'allpass';
+    this.mPh4 = ctx.createBiquadFilter(); this.mPh4.type = 'allpass';
+    this.mPhWet = ctx.createGain();
+    this.mLfo = ctx.createOscillator();
+    this.mLfo.type = 'sine';
+    this.mLfoGain = ctx.createGain();
+    this.mLfo.connect(this.mLfoGain);
+    this._mOffset = ctx.createConstantSource();
+    this._mOffset.offset.value = 1;
+
+    // Delay
+    this.dyIn = ctx.createGain();
+    this.dyDelay = ctx.createDelay(1.2);
+    this.dyFb = ctx.createGain();
+    this.dyDry = ctx.createGain();
+    this.dyWet = ctx.createGain();
+    this.dyOut = ctx.createGain();
+
+    // EQ
+    this.eqLow = ctx.createBiquadFilter(); this.eqLow.type = 'lowshelf'; this.eqLow.frequency.value = 140;
+    this.eqMid = ctx.createBiquadFilter(); this.eqMid.type = 'peaking'; this.eqMid.frequency.value = 1200; this.eqMid.Q.value = 0.9;
+    this.eqHigh = ctx.createBiquadFilter(); this.eqHigh.type = 'highshelf'; this.eqHigh.frequency.value = 4200;
+
+    // Filter
+    this.fDry = ctx.createGain();
+    this.fWet = ctx.createGain();
+    this.fNode = ctx.createBiquadFilter();
+    this.fOut = ctx.createGain();
+
+    // Reverb
+    this.rDry = ctx.createGain();
+    this.rWet = ctx.createGain();
+    this.rOut = ctx.createGain();
+    this.rPre = ctx.createDelay(0.2);
+    this.rTone = ctx.createBiquadFilter(); this.rTone.type = 'lowpass'; this.rTone.frequency.value = 18000;
+    this.rConv = ctx.createConvolver();
+
+    // Wiring
+    this.input.connect(this.gNode);
+
+    this.gNode.connect(this.dDry);
+    this.gNode.connect(this.dIn);
+    this.dIn.connect(this.dPre);
+    this.dPre.connect(this.dShaper);
+    this.dShaper.connect(this.dWet);
+    this.dDry.connect(this.dOut);
+    this.dWet.connect(this.dOut);
+
+    this.dOut.connect(this.mDry);
+    this.dOut.connect(this.mDelayIn);
+    this.dOut.connect(this.mAmp);
+    this.dOut.connect(this.mPh1);
+    this.mDelayIn.connect(this.mDelay);
+    this.mDelay.connect(this.mWet);
+    this.mDelay.connect(this.mFb);
+    this.mFb.connect(this.mDelayIn);
+    this.mAmp.connect(this.mWet);
+    this.mPh1.connect(this.mPh2); this.mPh2.connect(this.mPh3); this.mPh3.connect(this.mPh4); this.mPh4.connect(this.mPhWet);
+    this.mPhWet.connect(this.mWet);
+    this.mDry.connect(this.mOut);
+    this.mWet.connect(this.mOut);
+
+    this._mOffset.connect(this.mAmp.gain);
+    this._mOffset.start();
+    this.mLfo.start();
+
+    this.mOut.connect(this.dyDry);
+    this.mOut.connect(this.dyIn);
+    this.dyIn.connect(this.dyDelay);
+    this.dyDelay.connect(this.dyWet);
+    this.dyDelay.connect(this.dyFb);
+    this.dyFb.connect(this.dyIn);
+    this.dyDry.connect(this.dyOut);
+    this.dyWet.connect(this.dyOut);
+
+    this.dyOut.connect(this.eqLow);
+    this.eqLow.connect(this.eqMid);
+    this.eqMid.connect(this.eqHigh);
+
+    this.eqHigh.connect(this.fDry);
+    this.eqHigh.connect(this.fNode);
+    this.fNode.connect(this.fWet);
+    this.fDry.connect(this.fOut);
+    this.fWet.connect(this.fOut);
+
+    this.fOut.connect(this.rDry);
+    this.fOut.connect(this.rPre);
+    this.rPre.connect(this.rTone);
+    this.rTone.connect(this.rConv);
+    this.rConv.connect(this.rWet);
+    this.rDry.connect(this.rOut);
+    this.rWet.connect(this.rOut);
+    this.rOut.connect(this.output);
+
+    this.update({});
+  }
+
+  _setReverb(decay, damp){
+    const key = `${decay.toFixed(2)}|${damp.toFixed(2)}`;
+    if(key === this._reverbKey) return;
+    this._reverbKey = key;
+    this.rConv.buffer = makeImpulse(this.ctx, Math.max(0.03, decay), damp);
+  }
+
+  update(v={}){
+    const now = this.ctx.currentTime;
+    const gainAmt = Math.max(0, +(v.dspGain ?? 0));
+    this.gNode.gain.setValueAtTime(1 + gainAmt, now);
+
+    const dDrive = Math.max(0, +(v.dspDistDrive ?? 0));
+    const dMix = clamp((+(v.dspDistMix ?? 0))/100, 0, 1);
+    this.dPre.gain.setValueAtTime(1 + dDrive * 24, now);
+    this.dShaper.curve = makeDriveCurve(dDrive);
+    this.dShaper.oversample = '4x';
+    this.dDry.gain.setValueAtTime(1 - dMix, now);
+    this.dWet.gain.setValueAtTime(dMix, now);
+
+    const modMode = (v.dspModMode || 'off');
+    const modRate = Math.max(0, +(v.dspModRate ?? 0));
+    const modDepth = clamp(+(v.dspModDepth ?? 0), 0, 1);
+    const modFb = clamp(+(v.dspModFb ?? 0), 0, 0.95);
+    const modMix = clamp((+(v.dspModMix ?? 0))/100, 0, 1);
+    this.mDry.gain.setValueAtTime(1 - modMix, now);
+    this.mWet.gain.setValueAtTime(modMix, now);
+    this.mFb.gain.setValueAtTime(0, now);
+    this.mDelay.delayTime.setValueAtTime(0.015, now);
+    this.mAmp.gain.cancelScheduledValues(now);
+    this.mAmp.gain.setValueAtTime(1, now);
+    this.mLfo.frequency.setValueAtTime(Math.max(0.01, modRate || 0.01), now);
+    this.mLfoGain.disconnect();
+    try{ this._mOffset.disconnect(); }catch{}
+    this._mOffset.connect(this.mAmp.gain);
+    [this.mPh1,this.mPh2,this.mPh3,this.mPh4].forEach((f,idx)=>{
+      f.frequency.setValueAtTime(400 + idx*350, now);
+      f.Q.setValueAtTime(0.7 + modDepth * 4, now);
+    });
+
+    if(modMode === 'chorus' && modMix > 0 && modDepth > 0){
+      this.mDelay.delayTime.setValueAtTime(0.015, now);
+      this.mFb.gain.setValueAtTime(modFb * 0.4, now);
+      this.mLfoGain.gain.setValueAtTime(modDepth * 0.012, now);
+      this.mLfoGain.connect(this.mDelay.delayTime);
+    } else if(modMode === 'flanger' && modMix > 0 && modDepth > 0){
+      this.mDelay.delayTime.setValueAtTime(0.003, now);
+      this.mFb.gain.setValueAtTime(modFb, now);
+      this.mLfoGain.gain.setValueAtTime(modDepth * 0.004, now);
+      this.mLfoGain.connect(this.mDelay.delayTime);
+    } else if(modMode === 'tremolo' && modMix > 0 && modDepth > 0){
+      this.mAmp.gain.setValueAtTime(1 - modDepth * 0.5, now);
+      this.mLfoGain.gain.setValueAtTime(modDepth * 0.5, now);
+      this.mLfoGain.connect(this.mAmp.gain);
+    } else if(modMode === 'ringmod' && modMix > 0 && modDepth > 0){
+      try{ this._mOffset.disconnect(); }catch{}
+      this.mAmp.gain.setValueAtTime(0, now);
+      this.mLfoGain.gain.setValueAtTime(modDepth, now);
+      this.mLfoGain.connect(this.mAmp.gain);
+    } else if(modMode === 'phaser' && modMix > 0 && modDepth > 0){
+      const arr = [this.mPh1,this.mPh2,this.mPh3,this.mPh4];
+      arr.forEach((f, idx)=>{
+        const base = 300 + idx*300;
+        f.frequency.setValueAtTime(base + modDepth*500, now);
+        f.Q.setValueAtTime(0.7 + modFb*8, now);
+      });
+      this.mLfoGain.gain.setValueAtTime(modDepth * 700, now);
+      this.mLfoGain.connect(this.mPh1.frequency);
+      this.mLfoGain.connect(this.mPh2.frequency);
+      this.mLfoGain.connect(this.mPh3.frequency);
+      this.mLfoGain.connect(this.mPh4.frequency);
+    }
+
+    const delayMs = Math.max(0, +(v.dspDelayMs ?? 0));
+    const delayFb = clamp(+(v.dspDelayFb ?? 0), 0, 0.95);
+    const delayMix = clamp((+(v.dspDelayMix ?? 0))/100, 0, 1);
+    this.dyDelay.delayTime.setValueAtTime(delayMs / 1000, now);
+    this.dyFb.gain.setValueAtTime(delayFb, now);
+    this.dyDry.gain.setValueAtTime(1 - delayMix, now);
+    this.dyWet.gain.setValueAtTime(delayMix, now);
+
+    this.eqLow.gain.setValueAtTime(+(v.dspEqLow ?? 0), now);
+    this.eqMid.gain.setValueAtTime(+(v.dspEqMid ?? 0), now);
+    this.eqHigh.gain.setValueAtTime(+(v.dspEqHigh ?? 0), now);
+
+    const fType = v.dspFilterType || 'off';
+    const fAmt = clamp(+(v.dspFilterFreq ?? 0), 0, 1);
+    const fQ = Math.max(0.0001, +(v.dspFilterQ ?? 0));
+    if(fType === 'off' || fAmt <= 0){
+      this.fDry.gain.setValueAtTime(1, now);
+      this.fWet.gain.setValueAtTime(0, now);
+    } else {
+      this.fNode.type = fType;
+      const minHz = 40, maxHz = 12000;
+      const hz = minHz * Math.pow(maxHz/minHz, fAmt);
+      this.fNode.frequency.setValueAtTime(hz, now);
+      this.fNode.Q.setValueAtTime(Math.max(0.7, fQ), now);
+      if(fType === 'peaking') this.fNode.gain.setValueAtTime(6, now);
+      this.fDry.gain.setValueAtTime(0, now);
+      this.fWet.gain.setValueAtTime(1, now);
+    }
+
+    const revDecay = Math.max(0, +(v.dspRevDecay ?? 0));
+    const revPre = Math.max(0, +(v.dspRevPre ?? 0));
+    const revDamp = clamp(+(v.dspRevDamp ?? 0), 0, 1);
+    const revMix = clamp((+(v.dspRevMix ?? 0))/100, 0, 1);
+    this.rPre.delayTime.setValueAtTime(revPre / 1000, now);
+    this.rTone.frequency.setValueAtTime(18000 - revDamp * 16000, now);
+    this.rDry.gain.setValueAtTime(1 - revMix, now);
+    this.rWet.gain.setValueAtTime(revMix * (revDecay > 0 ? 1 : 0), now);
+    if(revDecay > 0 && revMix > 0) this._setReverb(revDecay, revDamp);
+  }
+}
+
 class SliceEngine {
   constructor(ctx, buffer, revBuffer){
     this.ctx = ctx;
@@ -878,7 +1254,7 @@ class SliceEngine {
     this.mix = ctx.createGain();
 
     this.master = ctx.createGain();
-    this.master.gain.value = 0.9;
+    this.master.gain.value = 1.0;
 
     // drum layer (2e sample, algoritmisch gesliced)
     this.drumGain = ctx.createGain();
@@ -1039,8 +1415,10 @@ class SliceEngine {
     this.compressor.attack.value = 0.003;
     this.compressor.release.value = 0.25;
 
-    // Default routing: master -> compressor -> out
-    this.master.connect(this.compressor);
+    // Default routing: master -> DSP rack -> compressor -> out
+    this.postFx = new PostFXRack(ctx);
+    this.master.connect(this.postFx.input);
+    this.postFx.output.connect(this.compressor);
     this.compressor.connect(this.out);
 
     // Out feeds everything (so recording never "loses" audio when viz/limiter toggles)
@@ -1078,6 +1456,7 @@ this.active = new Set();
     // rebuild post-master routing safely; keep out->(analyser/mediaDest/destination) intact
     try{ this.master.disconnect(); }catch{}
     try{ this.compressor.disconnect(); }catch{}
+    try{ this.postFx.output.disconnect(); }catch{}
     try{ this.out.disconnect(); }catch{} // disconnect out from downstream, then reconnect (safe on some browsers)
     // Reconnect downstream
     try{ this.out.connect(this.analyser); }catch{}
@@ -1085,10 +1464,12 @@ this.active = new Set();
     try{ this.out.connect(this.ctx.destination); }catch{}
 
     if(on){
-      try{ this.master.connect(this.compressor); }catch{}
+      try{ this.master.connect(this.postFx.input); }catch{}
+      try{ this.postFx.output.connect(this.compressor); }catch{}
       try{ this.compressor.connect(this.out); }catch{}
     } else {
-      try{ this.master.connect(this.out); }catch{}
+      try{ this.master.connect(this.postFx.input); }catch{}
+      try{ this.postFx.output.connect(this.out); }catch{}
     }
   }
 
@@ -1098,6 +1479,7 @@ this.active = new Set();
     this.vars = vars;
     // live knob updates
     const v = this.vars || {};
+    try{ this.postFx?.update(v); }catch{}
     const dg = clamp(+v.drumGain || 0, 0, 1.5);
     try{ this.drumGain.gain.setValueAtTime((v.drumEnable && this.drumBuffer) ? dg : 0, this.ctx.currentTime); }catch{}
 
@@ -1654,6 +2036,49 @@ const ui = {
   presetSmooth: document.getElementById('presetSmooth'),
   presetStrobe: document.getElementById('presetStrobe'),
   videoMode: document.getElementById('videoMode'),
+
+  dspZeroAll: document.getElementById('dspZeroAll'),
+  dspGain: document.getElementById('dspGain'),
+  dspGainVal: document.getElementById('dspGainVal'),
+  dspDistDrive: document.getElementById('dspDistDrive'),
+  dspDistDriveVal: document.getElementById('dspDistDriveVal'),
+  dspDistMix: document.getElementById('dspDistMix'),
+  dspDistMixVal: document.getElementById('dspDistMixVal'),
+  dspModMode: document.getElementById('dspModMode'),
+  dspModRate: document.getElementById('dspModRate'),
+  dspModRateVal: document.getElementById('dspModRateVal'),
+  dspModDepth: document.getElementById('dspModDepth'),
+  dspModDepthVal: document.getElementById('dspModDepthVal'),
+  dspModFb: document.getElementById('dspModFb'),
+  dspModFbVal: document.getElementById('dspModFbVal'),
+  dspModMix: document.getElementById('dspModMix'),
+  dspModMixVal: document.getElementById('dspModMixVal'),
+  dspDelayMs: document.getElementById('dspDelayMs'),
+  dspDelayMsVal: document.getElementById('dspDelayMsVal'),
+  dspDelayFb: document.getElementById('dspDelayFb'),
+  dspDelayFbVal: document.getElementById('dspDelayFbVal'),
+  dspDelayMix: document.getElementById('dspDelayMix'),
+  dspDelayMixVal: document.getElementById('dspDelayMixVal'),
+  dspEqLow: document.getElementById('dspEqLow'),
+  dspEqLowVal: document.getElementById('dspEqLowVal'),
+  dspEqMid: document.getElementById('dspEqMid'),
+  dspEqMidVal: document.getElementById('dspEqMidVal'),
+  dspEqHigh: document.getElementById('dspEqHigh'),
+  dspEqHighVal: document.getElementById('dspEqHighVal'),
+  dspFilterType: document.getElementById('dspFilterType'),
+  dspFilterFreq: document.getElementById('dspFilterFreq'),
+  dspFilterFreqVal: document.getElementById('dspFilterFreqVal'),
+  dspFilterQ: document.getElementById('dspFilterQ'),
+  dspFilterQVal: document.getElementById('dspFilterQVal'),
+  dspRevDecay: document.getElementById('dspRevDecay'),
+  dspRevDecayVal: document.getElementById('dspRevDecayVal'),
+  dspRevPre: document.getElementById('dspRevPre'),
+  dspRevPreVal: document.getElementById('dspRevPreVal'),
+  dspRevDamp: document.getElementById('dspRevDamp'),
+  dspRevDampVal: document.getElementById('dspRevDampVal'),
+  dspRevMix: document.getElementById('dspRevMix'),
+  dspRevMixVal: document.getElementById('dspRevMixVal'),
+
   imgModeUI: document.getElementById('imgModeUI'),
   imageUpload: document.getElementById('imageUpload'),
   imageInfo: document.getElementById('imageInfo'),
@@ -2029,6 +2454,51 @@ if(ui.minFloor){
   ui.minFloorVal.textContent = (+ui.minFloor.value).toFixed(2);
 }
 
+
+function bindDspUi(){
+  const pairs = [
+    [ui.dspGain, ui.dspGainVal, v=>(+v).toFixed(2)],
+    [ui.dspDistDrive, ui.dspDistDriveVal, v=>(+v).toFixed(3)],
+    [ui.dspDistMix, ui.dspDistMixVal, v=>`${v|0}%`],
+    [ui.dspModRate, ui.dspModRateVal, v=>`${(+v).toFixed(2)} Hz`],
+    [ui.dspModDepth, ui.dspModDepthVal, v=>(+v).toFixed(3)],
+    [ui.dspModFb, ui.dspModFbVal, v=>(+v).toFixed(2)],
+    [ui.dspModMix, ui.dspModMixVal, v=>`${v|0}%`],
+    [ui.dspDelayMs, ui.dspDelayMsVal, v=>`${v|0} ms`],
+    [ui.dspDelayFb, ui.dspDelayFbVal, v=>(+v).toFixed(2)],
+    [ui.dspDelayMix, ui.dspDelayMixVal, v=>`${v|0}%`],
+    [ui.dspEqLow, ui.dspEqLowVal, v=>`${(+v).toFixed(1)} dB`],
+    [ui.dspEqMid, ui.dspEqMidVal, v=>`${(+v).toFixed(1)} dB`],
+    [ui.dspEqHigh, ui.dspEqHighVal, v=>`${(+v).toFixed(1)} dB`],
+    [ui.dspFilterFreq, ui.dspFilterFreqVal, v=>(+v).toFixed(3)],
+    [ui.dspFilterQ, ui.dspFilterQVal, v=>(+v).toFixed(1)],
+    [ui.dspRevDecay, ui.dspRevDecayVal, v=>`${(+v).toFixed(1)} s`],
+    [ui.dspRevPre, ui.dspRevPreVal, v=>`${v|0} ms`],
+    [ui.dspRevDamp, ui.dspRevDampVal, v=>(+v).toFixed(2)],
+    [ui.dspRevMix, ui.dspRevMixVal, v=>`${v|0}%`],
+  ];
+  const push = ()=>{ try{ engine?.updateVars(getVars()); }catch{} };
+  for(const [el, valEl, fmt] of pairs){
+    if(!el) continue;
+    const refresh = ()=>{ if(valEl) valEl.textContent = fmt(el.value); push(); };
+    el.addEventListener('input', refresh);
+    refresh();
+  }
+  if(ui.dspModMode) ui.dspModMode.addEventListener('change', push);
+  if(ui.dspFilterType) ui.dspFilterType.addEventListener('change', push);
+  if(ui.dspZeroAll){
+    ui.dspZeroAll.addEventListener('click', ()=>{
+      const zeroIds = ['dspGain','dspDistDrive','dspDistMix','dspModRate','dspModDepth','dspModFb','dspModMix','dspDelayMs','dspDelayFb','dspDelayMix','dspEqLow','dspEqMid','dspEqHigh','dspFilterFreq','dspFilterQ','dspRevDecay','dspRevPre','dspRevDamp','dspRevMix'];
+      for(const id of zeroIds){ if(ui[id]) ui[id].value = 0; }
+      if(ui.dspModMode) ui.dspModMode.value = 'off';
+      if(ui.dspFilterType) ui.dspFilterType.value = 'off';
+      for(const [el, valEl, fmt] of pairs){ if(el && valEl) valEl.textContent = fmt(el.value); }
+      push();
+    });
+  }
+}
+bindDspUi();
+
 ui.n.addEventListener('input', updateDerived);
 
 if(ui.presetSnappy) ui.presetSnappy.addEventListener('click', ()=> applyPreset('snappy'));
@@ -2122,6 +2592,29 @@ function getVars(){
     rate: clamp(+ui.rate.value, 0.25, 4.0),
     durClamp: ui.durClamp.value,
     durMul: +ui.durMul.value,
+
+    dspGain: +(ui.dspGain ? ui.dspGain.value : 0),
+    dspDistDrive: +(ui.dspDistDrive ? ui.dspDistDrive.value : 0),
+    dspDistMix: +(ui.dspDistMix ? ui.dspDistMix.value : 0),
+    dspModMode: (ui.dspModMode ? ui.dspModMode.value : 'off'),
+    dspModRate: +(ui.dspModRate ? ui.dspModRate.value : 0),
+    dspModDepth: +(ui.dspModDepth ? ui.dspModDepth.value : 0),
+    dspModFb: +(ui.dspModFb ? ui.dspModFb.value : 0),
+    dspModMix: +(ui.dspModMix ? ui.dspModMix.value : 0),
+    dspDelayMs: +(ui.dspDelayMs ? ui.dspDelayMs.value : 0),
+    dspDelayFb: +(ui.dspDelayFb ? ui.dspDelayFb.value : 0),
+    dspDelayMix: +(ui.dspDelayMix ? ui.dspDelayMix.value : 0),
+    dspEqLow: +(ui.dspEqLow ? ui.dspEqLow.value : 0),
+    dspEqMid: +(ui.dspEqMid ? ui.dspEqMid.value : 0),
+    dspEqHigh: +(ui.dspEqHigh ? ui.dspEqHigh.value : 0),
+    dspFilterType: (ui.dspFilterType ? ui.dspFilterType.value : 'off'),
+    dspFilterFreq: +(ui.dspFilterFreq ? ui.dspFilterFreq.value : 0),
+    dspFilterQ: +(ui.dspFilterQ ? ui.dspFilterQ.value : 0),
+    dspRevDecay: +(ui.dspRevDecay ? ui.dspRevDecay.value : 0),
+    dspRevPre: +(ui.dspRevPre ? ui.dspRevPre.value : 0),
+    dspRevDamp: +(ui.dspRevDamp ? ui.dspRevDamp.value : 0),
+    dspRevMix: +(ui.dspRevMix ? ui.dspRevMix.value : 0),
+
   };
 
   // main randomizer (deterministisch)
