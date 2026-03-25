@@ -42,7 +42,7 @@
       <div class="vars">
         <div class="var">
           <label>Drum BPM (bron)</label>
-          <input id="drumBpm" type="number" min="20" max="300" step="1" value="170"/>
+          <input id="drumBpm" type="number" min="20" max="300" step="1" value="1"/>
           <div class="small">Wordt gebruikt voor het drum-grid (16e-noten). Los van je hoofd-BPM.</div>
         </div>
         <div class="var">
@@ -74,7 +74,7 @@
 
         <div class="var">
           <label>Drive (distortion)</label>
-          <input id="drumDriveSl" type="range" min="0" max="30" step="0.1" value="0"/>
+          <input id="drumDriveSl" type="range" min="0" max="30" step="0.1" value="15"/>
           <input id="drumDrive" type="number" min="0" max="30" step="0.1" value="0"/>
           <div class="small" id="drumDriveVal">0.0</div>
         </div>
@@ -116,15 +116,15 @@
 
         <div class="var">
           <label>Reverb mix</label>
-          <input id="drumRevMixSl" type="range" min="0" max="1" step="0.01" value="0"/>
+          <input id="drumRevMixSl" type="range" min="0" max="1" step="0.01" value="0.5"/>
           <input id="drumRevMix" type="number" min="0" max="1" step="0.01" value="0"/>
           <div class="small" id="drumRevMixVal">0.00</div>
         </div>
 
         <div class="var">
           <label>Reverb time (sec)</label>
-          <input id="drumRevTimeSl" type="range" min="0.1" max="6" step="0.1" value="2.0"/>
-          <input id="drumRevTime" type="number" min="0.1" max="6" step="0.1" value="2.0"/>
+          <input id="drumRevTimeSl" type="range" min="0.1" max="6" step="0.1" value="3.0"/>
+          <input id="drumRevTime" type="number" min="0.1" max="6" step="0.1" value="3.0"/>
           <div class="small" id="drumRevTimeVal">2.0</div>
         </div>
 
@@ -273,6 +273,7 @@
 
       <label>Video uitvoer bron</label>
       <select id="videoMode">
+        <option value="stereo_img">Stereoscopisch: 2 vierkanten naast elkaar</option>
         <option value="img">Afbeelding slices (random)</option>
         <option value="fft">FFT canvas (audio)</option>
         
@@ -294,12 +295,12 @@
         <div class="vars">
           <div class="var">
             <label>Tijd (slider)</label>
-            <input id="frameTimeSl" type="range" min="0.05" max="5" step="0.05" value="1"/>
-            <div class="small" id="frameTimeVal">1</div>
+            <input id="frameTimeSl" type="range" min="0.05" max="5" step="0.01" value="0.07"/>
+            <div class="small" id="frameTimeVal">0.07</div>
           </div>
           <div class="var">
             <label>Tijd (nummer)</label>
-            <input id="frameTimeNum" type="number" min="0.05" max="60" step="0.05" value="1"/>
+            <input id="frameTimeNum" type="number" min="0.05" max="60" step="0.01" value="0.07"/>
           </div>
         </div>
 
@@ -307,15 +308,15 @@
         <div class="vars">
           <div class="var">
             <label>Aantal (slider)</label>
-            <input id="sliceCountSl" type="range" min="2" max="1800" step="1" value="60"/>
-            <div class="small" id="sliceCountVal">60</div>
+            <input id="sliceCountSl" type="range" min="2" max="1800" step="1" value="857"/>
+            <div class="small" id="sliceCountVal">857</div>
           </div>
           <div class="var">
             <label>Aantal (nummer)</label>
-            <input id="sliceCountNum" type="number" min="2" max="1800" step="1" value="60"/>
+            <input id="sliceCountNum" type="number" min="2" max="1800" step="1" value="857"/>
           </div>
         </div>
-        <div class="small">Aantal wordt standaard berekend als <code>exportLengte / tijd</code>. Bij 60s en 1s is dat 60.</div>
+        <div class="small">Aantal wordt standaard berekend als <code>exportLengte / tijd</code>. Bij 60s en 0.07s is dat 857.</div>
       </div>
 
 
@@ -348,7 +349,7 @@
 
         <div class="var">
           <label>BPM</label>
-          <input id="bpm" type="range" min="20" max="240" step="1" value="60"/>
+          <input id="bpm" type="range" min="20" max="240" step="1" value="20"/>
           <div class="small" id="bpmVal">60</div>
         </div>
 
@@ -2248,9 +2249,27 @@ syncExportLen(60);
 let sourceImageBitmap = null;
 let sourceImageW = 0, sourceImageH = 0;
 
+function isImageVideoMode(){
+  const mode = ui.videoMode?.value || "fft";
+  return mode === 'img' || mode === 'stereo_img';
+}
+
+function updatePreviewCanvasForVideoMode(){
+  const cv = ui.cv;
+  if(!cv) return;
+  const mode = ui.videoMode?.value || "fft";
+  const wantW = (mode === 'stereo_img') ? 512 : 256;
+  const wantH = 256;
+  if(cv.width !== wantW || cv.height !== wantH){
+    cv.width = wantW;
+    cv.height = wantH;
+  }
+}
+
 function setImgModeUI(){
-  const isImg = (ui.videoMode?.value === 'img');
+  const isImg = isImageVideoMode();
   if(ui.imgModeUI) ui.imgModeUI.style.display = isImg ? 'block' : 'none';
+  updatePreviewCanvasForVideoMode();
   updateExportButtons();
 }
 
@@ -2279,7 +2298,7 @@ async function loadSourceImage(file){
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
 function syncFrameTime(v){
-  const x = clamp(+v || 1, 0.05, 60);
+  const x = clamp(+v || 0.07, 0.05, 60);
   if(ui.frameTimeSl) ui.frameTimeSl.value = x;
   if(ui.frameTimeNum) ui.frameTimeNum.value = x;
   if(ui.frameTimeVal) ui.frameTimeVal.textContent = String(x);
@@ -2294,7 +2313,7 @@ function syncSliceCount(v){
 
 function recomputeCountFromTime(){
   const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
-  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
   const n = clamp(Math.round(lenSec / t), 2, 1800);
   syncSliceCount(n);
   // keep time as user set
@@ -2302,13 +2321,17 @@ function recomputeCountFromTime(){
 
 function recomputeTimeFromCount(){
   const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
-  const n = clamp(+ui.sliceCountNum?.value || 60, 2, 1800);
+  const n = clamp(+ui.sliceCountNum?.value || 857, 2, 1800);
   const t = clamp(lenSec / n, 0.05, 60);
   syncFrameTime(+t.toFixed(2));
 }
 
 function hookImgControls(){
-  ui.videoMode?.addEventListener('change', ()=>{ setImgModeUI(); });
+  ui.videoMode?.addEventListener('change', ()=>{
+    resetImageSequenceState();
+    setImgModeUI();
+    if(isImageVideoMode()) drawCurrentImageModeToCanvas();
+  });
   ui.imageUpload?.addEventListener('change', (e)=> loadSourceImage(e.target.files?.[0] || null));
 
   ui.frameTimeSl?.addEventListener('input', ()=>{ syncFrameTime(ui.frameTimeSl.value); recomputeCountFromTime(); });
@@ -2328,7 +2351,7 @@ function hookImgControls(){
   };
 
   // initial
-  syncFrameTime(1);
+  syncFrameTime(0.07);
   recomputeCountFromTime();
   setImgModeUI();
 }
@@ -2336,7 +2359,7 @@ hookImgControls();
 
 function updateExportButtons(){
   const hasAudio = !!buffer;
-  const isImg = (ui.videoMode?.value === 'img');
+  const isImg = isImageVideoMode();
   const hasImg = !!sourceImageBitmap;
   try{
     if(ui.exportWav) ui.exportWav.disabled = !hasAudio || exportBusy;
@@ -2374,6 +2397,43 @@ function computeSliceRects(N){
   return rects;
 }
 
+const imageSequenceState = {
+  left: { order: [], pos: 0, lastN: 0 },
+  right: { order: [], pos: 0, lastN: 0 }
+};
+
+function shuffleIndices(N){
+  const arr = Array.from({length:N}, (_,i)=>i);
+  for(let i=arr.length-1;i>0;i--){
+    const j = (Math.random() * (i+1)) | 0;
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+function resetImageSequenceState(){
+  imageSequenceState.left = { order: [], pos: 0, lastN: 0 };
+  imageSequenceState.right = { order: [], pos: 0, lastN: 0 };
+}
+
+function nextSequenceIndex(side, N){
+  const st = imageSequenceState[side];
+  if(!st || N <= 0) return 0;
+  if(st.lastN !== N || st.pos >= st.order.length || !st.order.length){
+    st.order = shuffleIndices(N);
+    st.pos = 0;
+    st.lastN = N;
+  }
+  return st.order[st.pos++];
+}
+
+function drawRectCover(ctx, rect, dx, dy, dw, dh){
+  if(!sourceImageBitmap || !ctx || !rect) return;
+  ctx.drawImage(sourceImageBitmap, rect.x, rect.y, rect.w, rect.h, dx, dy, dw, dh);
+}
+
 function drawRandomSliceToCanvas(){
   const cv = ui.cv;
   if(!cv || !sourceImageBitmap) return;
@@ -2381,27 +2441,58 @@ function drawRandomSliceToCanvas(){
   if(!ctx) return;
 
   const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
-  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
   const N = clamp(Math.round(lenSec / t), 2, 1800);
-  // Keep UI consistent
   syncSliceCount(N);
 
   const rects = computeSliceRects(N);
   if(!rects.length) return;
   const rect = rects[(Math.random() * rects.length)|0];
 
-  // Clear and draw scaled
   ctx.clearRect(0,0,cv.width,cv.height);
-  // cover canvas
-  ctx.drawImage(sourceImageBitmap, rect.x, rect.y, rect.w, rect.h, 0, 0, cv.width, cv.height);
+  drawRectCover(ctx, rect, 0, 0, cv.width, cv.height);
+}
+
+function drawStereoRandomSlicesToCanvas(){
+  const cv = ui.cv;
+  if(!cv || !sourceImageBitmap) return;
+  const ctx = cv.getContext('2d');
+  if(!ctx) return;
+
+  const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
+  const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
+  const N = clamp(Math.round(lenSec / t), 2, 1800);
+  syncSliceCount(N);
+
+  const rects = computeSliceRects(N);
+  if(!rects.length) return;
+
+  const leftRect = rects[nextSequenceIndex('left', rects.length)];
+  const rightRect = rects[nextSequenceIndex('right', rects.length)];
+
+  const halfW = Math.floor(cv.width / 2);
+  const square = Math.min(halfW, cv.height);
+  const leftX = Math.floor((halfW - square) / 2);
+  const rightX = halfW + Math.floor((halfW - square) / 2);
+  const y = Math.floor((cv.height - square) / 2);
+
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawRectCover(ctx, leftRect, leftX, y, square, square);
+  drawRectCover(ctx, rightRect, rightX, y, square, square);
+}
+
+function drawCurrentImageModeToCanvas(){
+  updatePreviewCanvasForVideoMode();
+  if((ui.videoMode?.value || 'fft') === 'stereo_img') return drawStereoRandomSlicesToCanvas();
+  return drawRandomSliceToCanvas();
 }
 
 function startImageSliceLoop(){
-  // draw immediately
-  drawRandomSliceToCanvas();
-  const t = clamp(+ui.frameTimeNum?.value || 1, 0.05, 60);
+  resetImageSequenceState();
+  drawCurrentImageModeToCanvas();
+  const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
   const ms = Math.max(50, t*1000);
-  const id = setInterval(drawRandomSliceToCanvas, ms);
+  const id = setInterval(drawCurrentImageModeToCanvas, ms);
   return ()=> clearInterval(id);
 }
 
@@ -3040,7 +3131,7 @@ async function exportVideo(){
   const lenSec = Math.max(1, Math.min(1800, +(ui.expLen?.value||60)));
   const fps = 30;
 
-  const isImgMode = (ui.videoMode?.value === 'img');
+  const isImgMode = isImageVideoMode();
   if(isImgMode && !sourceImageBitmap){
     setExportBusy(false);
     alert("Upload eerst een afbeelding (voor slices).");
@@ -3051,7 +3142,7 @@ async function exportVideo(){
   const restoreVizAfter = !!(viz);
   if(isImgMode){
     try{ viz?.stop(); }catch{}
-    try{ stopImgLoop = startImageSliceLoop(); }catch(e){ console.error(e); }
+    try{ resetImageSequenceState(); stopImgLoop = startImageSliceLoop(); }catch(e){ console.error(e); }
   }
 
   // We record the LIVE engine graph (no offline render) so what you hear is what gets captured.
