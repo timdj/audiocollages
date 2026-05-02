@@ -633,15 +633,16 @@
 
     <!-- TIMELINE -->
     <div class="timeline-section" id="timelineSection">
-      <div class="timeline-header">
+      <div class="timeline-header" style="grid-template-columns: 44px 52px 90px 1fr 60px 80px 70px 52px 100px">
         <span>#</span>
         <span>TIJD</span>
         <span>ENERGIE</span>
         <span>PATROON</span>
-        <span>FREQUENTIE</span>
-        <span>FLITS/SEC</span>
+        <span>BAND</span>
+        <span>ZONE</span>
+        <span>FLITS Hz</span>
         <span>LICHT</span>
-        <span>INTERVAL</span>
+        <span>OVERRIDE</span>
       </div>
       <div id="timelineRows">
         <div class="empty-timeline">— LAAD EEN AUDIOBESTAND —</div>
@@ -951,118 +952,150 @@ function drawWaveform() {
   }
 }
 
+// === FFT BAND ENERGY via OfflineAudioContext ===
+// Analyseert één seconde audio en geeft bandenergiëen terug via echte FFT
+async function fftAnalyseSec(chunk, sampleRate) {
+  const fftSize = 4096; // hogere resolutie = nauwkeuriger lage freq
+  const offline = new OfflineAudioContext(1, chunk.length, sampleRate);
+
+  // Zet chunk in een buffer
+  const buf = offline.createBuffer(1, chunk.length, sampleRate);
+  buf.copyToChannel(chunk, 0);
+
+  const src = offline.createBufferSource();
+  src.buffer = buf;
+
+  const analyser = offline.createAnalyser();
+  analyser.fftSize = fftSize;
+  analyser.smoothingTimeConstant = 0; // geen smoothing, we willen ruwe data
+
+  src.connect(analyser);
+  analyser.connect(offline.destination);
+  src.start(0);
+
+  await offline.startRendering();
+
+  // Haal frequentiedata op (dB schaal, -Infinity tot 0)
+  const freqData = new Float32Array(analyser.frequencyBinCount);
+  analyser.getFloatFrequencyData(freqData);
+
+  // Binbreedte in Hz per bin
+  const binHz = sampleRate / fftSize;
+
+  // Bereken gemiddeld vermogen per band (lineair, niet dB)
+  function bandEnergy(loHz, hiHz) {
+    const lo = Math.max(0, Math.floor(loHz / binHz));
+    const hi = Math.min(freqData.length - 1, Math.ceil(hiHz / binHz));
+    let sum = 0, count = 0;
+    for (let i = lo; i <= hi; i++) {
+      // Van dB naar lineair vermogen: 10^(dB/10)
+      const db = freqData[i];
+      if (db > -Infinity) sum += Math.pow(10, db / 10);
+      count++;
+    }
+    return count > 0 ? sum / count : 0;
+  }
+
+  return {
+    sub:  bandEnergy(20, 250),      // bas, kick
+    mid:  bandEnergy(250, 4000),    // stem, melodie
+    high: bandEnergy(4000, 20000),  // hi-hat, lucht
+  };
+}
+
+// Hersengolf zones → flits Hz
+// Delta  1–4 Hz   diepe rust
+// Theta  4–8 Hz   dromerig, hypnagogisch
+// Alpha  8–12 Hz  ontspannen, visuele patronen (Lumenate sweet spot)
+// Beta  12–30 Hz  actief, alert
+// Gamma 30–90 Hz  intens, piek (CFF grens ~90 Hz)
+function brainwaveHz(overall, subN, midN, highN) {
+  const vol = Math.min(1, overall * 4);
+  const total = subN + midN + highN + 1e-9;
+  const subRatio  = subN  / total;
+  const midRatio  = midN  / total;
+  const highRatio = highN / total;
+  const spectral = midRatio * 0.5 + highRatio * 1.0;
+  const score = vol * 0.6 + spectral * 0.4;
+
+  if (score < 0.10) return { hz: 1  + score / 0.10 * 3,         zone: 'DELTA', range: '1–4 Hz'   };
+  if (score < 0.25) return { hz: 4  + (score-0.10)/0.15 * 4,    zone: 'THETA', range: '4–8 Hz'   };
+  if (score < 0.45) return { hz: 8  + (score-0.25)/0.20 * 4,    zone: 'ALPHA', range: '8–12 Hz'  };
+  if (score < 0.70) return { hz: 12 + (score-0.45)/0.25 * 18,   zone: 'BETA',  range: '12–30 Hz' };
+  return               { hz: 30 + (score-0.70)/0.30 * 60,   zone: 'GAMMA', range: '30–90 Hz' };
+}
+
 // === ANALYZE AUDIO ===
 async function analyzeAudio() {
-  setStatus('ANALYSEREN...', true);
+  setStatus('FFT ANALYSEREN...', true);
   const sampleRate = audioBuffer.sampleRate;
   const duration = audioBuffer.duration;
   const totalSeconds = Math.ceil(duration);
   const data = audioBuffer.getChannelData(0);
 
-  // FFT size
-  const fftSize = 2048;
-  const halfFFT = fftSize / 2;
-
-  // Sub: 20-250Hz, Mid: 250-4kHz, High: 4k-20kHz
-  const subBin = [Math.floor(20 * fftSize / sampleRate), Math.floor(250 * fftSize / sampleRate)];
-  const midBin = [Math.floor(250 * fftSize / sampleRate), Math.floor(4000 * fftSize / sampleRate)];
-  const highBin = [Math.floor(4000 * fftSize / sampleRate), Math.floor(20000 * fftSize / sampleRate)];
-
   timeline = [];
 
+  // Eerste pass: verzamel alle energiewaarden voor normalisatie
+  const rawData = [];
   for (let sec = 0; sec < totalSeconds; sec++) {
     const startSample = Math.floor(sec * sampleRate);
     const endSample = Math.min(startSample + sampleRate, data.length);
     const chunk = data.slice(startSample, endSample);
 
-    // RMS energy
+    // RMS
     let rmsSum = 0;
     for (let i = 0; i < chunk.length; i++) rmsSum += chunk[i] * chunk[i];
     const rms = Math.sqrt(rmsSum / chunk.length);
 
-    // Simple FFT (via OfflineAudioContext for accuracy)
-    let subEnergy = 0, midEnergy = 0, highEnergy = 0;
+    // Echte FFT via OfflineAudioContext
+    const bands = await fftAnalyseSec(chunk, sampleRate);
 
-    // Simple DFT sampling for band energy (fast approximation)
-    const samplesPerBand = 256;
-    const step = Math.max(1, Math.floor(chunk.length / samplesPerBand));
+    rawData.push({ rms, ...bands });
 
-    // Sub frequencies: look at slow oscillations
-    for (let bin = subBin[0]; bin < Math.min(subBin[1], halfFFT); bin++) {
-      let re = 0, im = 0;
-      const freq = bin * sampleRate / fftSize;
-      const omega = 2 * Math.PI * freq;
-      for (let i = 0; i < chunk.length; i += step) {
-        const t = i / sampleRate;
-        re += chunk[i] * Math.cos(omega * t);
-        im += chunk[i] * Math.sin(omega * t);
-      }
-      subEnergy += Math.sqrt(re*re + im*im);
-    }
+    loadingBar.style.width = `${60 + (sec / totalSeconds) * 35}%`;
+    // Yield elke seconde zodat de UI niet bevriest
+    await new Promise(r => setTimeout(r, 0));
+  }
 
-    // Mid
-    const midStep = Math.max(1, Math.floor((midBin[1] - midBin[0]) / 32));
-    for (let bin = midBin[0]; bin < Math.min(midBin[1], halfFFT); bin += midStep) {
-      let re = 0, im = 0;
-      const freq = bin * sampleRate / fftSize;
-      const omega = 2 * Math.PI * freq;
-      for (let i = 0; i < chunk.length; i += step * 4) {
-        const t = i / sampleRate;
-        re += chunk[i] * Math.cos(omega * t);
-        im += chunk[i] * Math.sin(omega * t);
-      }
-      midEnergy += Math.sqrt(re*re + im*im);
-    }
+  // Normaliseer bandenergiëen over het hele bestand
+  const maxSub  = Math.max(...rawData.map(r => r.sub))  || 1;
+  const maxMid  = Math.max(...rawData.map(r => r.mid))  || 1;
+  const maxHigh = Math.max(...rawData.map(r => r.high)) || 1;
 
-    // High (use zero-crossing rate as proxy for high freq content)
-    let zc = 0;
-    for (let i = 1; i < chunk.length; i++) {
-      if ((chunk[i] >= 0) !== (chunk[i-1] >= 0)) zc++;
-    }
-    highEnergy = zc / chunk.length; // normalized
+  // Tweede pass: bereken flits-Hz per seconde
+  for (let sec = 0; sec < totalSeconds; sec++) {
+    const { rms, sub, mid, high } = rawData[sec];
+    const subN  = sub  / maxSub;
+    const midN  = mid  / maxMid;
+    const highN = high / maxHigh;
 
-    // Normalize energies
-    const subNorm = Math.min(1, subEnergy / (subBin[1] - subBin[0]) / 50);
-    const midNorm = Math.min(1, midEnergy / 32 / 50);
-    const highNorm = Math.min(1, highEnergy * 4);
-
-    // Overall energy
     const overall = rms;
+    const { hz: flashHz, zone, range } = brainwaveHz(overall, subN, midN, highN);
 
-    // Flash rate: kwadratische curve zodat pieken 65 Hz halen
-    // Zacht geluid → laag (1 Hz), luid geluid → 65 Hz
-    // overall is typisch 0.0–0.5 voor normale audio (RMS)
-    // Normaliseer naar 0–1 met clamp, dan kwadraat voor betere spreiding
-    const normalised = Math.min(1, overall * 4); // RMS 0.25 = vol signaal
-    const flashHz = 1 + Math.pow(normalised, 1.5) * 64; // 1–65 Hz
-
-    // Licht altijd aan zodra er geluid is (drempel = 0 standaard)
-    const lightOn = overall > threshold;
-
-    // Dominant band
+    // Dominant band voor kleurcodering
     let dominantBand = 'mid';
-    if (subNorm > midNorm && subNorm > highNorm) dominantBand = 'sub';
-    else if (highNorm > midNorm && highNorm > subNorm) dominantBand = 'high';
+    if (subN > midN && subN > highN) dominantBand = 'sub';
+    else if (highN > midN && highN > subN) dominantBand = 'high';
+
+    const lightOn = overall > threshold;
 
     timeline.push({
       sec,
       time: sec,
       rms,
       overall,
-      sub: subNorm,
-      mid: midNorm,
-      high: highNorm,
+      sub: subN,
+      mid: midN,
+      high: highN,
       flashHz,
+      zone,     // 'DELTA' | 'THETA' | 'ALPHA' | 'BETA' | 'GAMMA'
+      range,    // '1–4 Hz' etc voor weergave
       lightOn,
       dominantBand,
-      // User can override
       userFlashHz: null,
-      userBands: null,
     });
 
-    // Progress
-    loadingBar.style.width = `${60 + (sec / totalSeconds) * 40}%`;
-    if (sec % 5 === 0) await new Promise(r => setTimeout(r, 0)); // yield
+    loadingBar.style.width = `${95 + (sec / totalSeconds) * 5}%`;
   }
 
   loadingBar.style.width = '0%';
@@ -1073,8 +1106,10 @@ async function analyzeAudio() {
 // === REBUILD (after settings change) ===
 function rebuildTimeline() {
   timeline.forEach(row => {
-    const normalised = Math.min(1, row.overall * 4);
-    row.flashHz = 1 + Math.pow(normalised, 1.5) * 64;
+    const { hz, zone, range } = brainwaveHz(row.overall, row.sub, row.mid, row.high);
+    row.flashHz = hz;
+    row.zone = zone;
+    row.range = range;
     row.lightOn = row.overall > threshold;
   });
   renderTimeline();
@@ -1108,11 +1143,17 @@ function renderTimeline() {
     if (row.high > 0.1) pills += `<span class="pill high">HI</span>`;
 
     // Flash options
-    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,65].map(hz =>
+    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,65,75,80,90].map(hz =>
       `<option value="${hz}" ${Math.abs(flashHz - hz) < 0.5 ? 'selected' : ''}>${hz} Hz</option>`
     ).join('');
 
-    return `<div class="timeline-row" id="row-${i}" data-sec="${i}">
+    // Zone kleur
+    const zoneColor = {
+      DELTA: '#4477ff', THETA: '#00bfff', ALPHA: '#00ffe1',
+      BETA:  '#a855f7', GAMMA: '#ff3cac'
+    }[row.zone] || '#00ffe1';
+
+    return `<div class="timeline-row" id="row-${i}" data-sec="${i}" style="grid-template-columns: 44px 52px 90px 1fr 60px 80px 70px 52px 100px">
       <span class="row-time" style="color:var(--text-dim)">${String(i+1).padStart(3,'0')}</span>
       <span class="row-time">${formatTime(row.time)}</span>
       <div class="energy-bar-wrap">
@@ -1120,14 +1161,14 @@ function renderTimeline() {
       </div>
       <div class="flash-vis">${flashBlocks}</div>
       <div class="freq-pills">${pills}</div>
-      <div class="flash-badge" style="color:${energyColor};border:1px solid ${energyColor}33;padding:2px 6px;font-family:'Share Tech Mono',monospace;font-size:10px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${zoneColor};border:1px solid ${zoneColor}44;padding:1px 4px;text-align:center;letter-spacing:1px">
+        ${row.zone || '—'}
+      </div>
+      <div class="flash-badge" style="color:${zoneColor};border:1px solid ${zoneColor}33;padding:2px 6px;font-family:'Share Tech Mono',monospace;font-size:10px">
         ${flashHz.toFixed(1)} Hz
       </div>
       <div class="light-on ${lightOn ? 'on' : ''}">
         <div class="light-led"></div>
-        <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${lightOn ? 'var(--accent3)' : 'var(--text-dim)'}">
-          ${lightOn ? 'AAN' : 'UIT'}
-        </span>
       </div>
       <select class="flash-select" data-row="${i}" onchange="setUserFlash(${i}, this.value)">
         <option value="auto" ${row.userFlashHz === null ? 'selected' : ''}>AUTO</option>
