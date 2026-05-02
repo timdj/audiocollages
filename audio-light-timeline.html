@@ -597,8 +597,8 @@
       <div class="sep"></div>
       <div class="threshold-control">
         <label>DREMPEL</label>
-        <input type="range" id="thresholdRange" min="0" max="100" value="20">
-        <span class="threshold-val" id="thresholdVal">20%</span>
+        <input type="range" id="thresholdRange" min="0" max="100" value="0">
+        <span class="threshold-val" id="thresholdVal">0%</span>
       </div>
       <div class="transport-right">
         <button class="btn" id="btnTorch">⚡ CAMERA LED</button>
@@ -681,7 +681,7 @@ let torchOn = false;         // current physical state
 // Settings
 let activeBands = { sub: true, mid: true, high: true };
 let speedMult = 2.0;
-let threshold = 0.20;
+let threshold = 0.0;
 
 // === DOM ===
 const dropZone = document.getElementById('dropZone');
@@ -974,13 +974,15 @@ async function analyzeAudio() {
     // Overall energy
     const overall = rms;
 
-    // Flash rate based on energy (more sound = faster flashes)
-    // Range: 0.5 Hz (slow) to 30 Hz (very fast), scaled by speedMult
-    const baseFlash = 0.5 + (overall * 25);
-    const flashHz = Math.min(30, baseFlash * speedMult);
+    // Flash rate: kwadratische curve zodat pieken 65 Hz halen
+    // Zacht geluid → laag (1 Hz), luid geluid → 65 Hz
+    // overall is typisch 0.0–0.5 voor normale audio (RMS)
+    // Normaliseer naar 0–1 met clamp, dan kwadraat voor betere spreiding
+    const normalised = Math.min(1, overall * 4); // RMS 0.25 = vol signaal
+    const flashHz = 1 + Math.pow(normalised, 1.5) * 64; // 1–65 Hz
 
-    // Light on threshold
-    const lightOn = overall >= threshold;
+    // Licht altijd aan zodra er geluid is (drempel = 0 standaard)
+    const lightOn = overall > threshold;
 
     // Dominant band
     let dominantBand = 'mid';
@@ -1016,12 +1018,9 @@ async function analyzeAudio() {
 // === REBUILD (after settings change) ===
 function rebuildTimeline() {
   timeline.forEach(row => {
-    const baseFlash = 0.5 + (row.overall * 25);
-    row.flashHz = Math.min(30, baseFlash * speedMult);
-    row.lightOn = row.overall >= threshold;
-    if (row.userFlashHz === null) {
-      // keep auto
-    }
+    const normalised = Math.min(1, row.overall * 4);
+    row.flashHz = 1 + Math.pow(normalised, 1.5) * 64;
+    row.lightOn = row.overall > threshold;
   });
   renderTimeline();
   updateStats();
@@ -1054,7 +1053,7 @@ function renderTimeline() {
     if (row.high > 0.1) pills += `<span class="pill high">HI</span>`;
 
     // Flash options
-    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30].map(hz =>
+    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,65].map(hz =>
       `<option value="${hz}" ${Math.abs(flashHz - hz) < 0.5 ? 'selected' : ''}>${hz} Hz</option>`
     ).join('');
 
