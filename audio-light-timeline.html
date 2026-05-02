@@ -473,7 +473,6 @@
     pointer-events: none;
     z-index: 9999;
     opacity: 0;
-    transition: opacity 0.02s;
   }
 
   /* === BOTTOM BAR === */
@@ -1036,12 +1035,14 @@ function updateStats() {
 // === PLAYBACK ===
 function togglePlay() {
   if (isPlaying) {
-    pauseOffset += audioCtx.currentTime - startTime;
+    // Save current position
+    pauseOffset = audioCtx.currentTime - startTime;
     sourceNode.stop();
     isPlaying = false;
     btnPlay.textContent = '▶ PLAY';
     cancelAnimationFrame(animFrame);
     clearFlashTimers();
+    document.getElementById('liveFlash').style.opacity = '0';
   } else {
     startPlayback();
   }
@@ -1055,6 +1056,7 @@ function startPlayback() {
   sourceNode.buffer = audioBuffer;
   sourceNode.connect(audioCtx.destination);
   sourceNode.start(0, pauseOffset);
+  // startTime is the AudioContext time when position=0 would be
   startTime = audioCtx.currentTime - pauseOffset;
   isPlaying = true;
   btnPlay.textContent = '⏸ PAUZE';
@@ -1083,7 +1085,7 @@ function stopAudio() {
 
 function updatePlayhead() {
   if (!isPlaying) return;
-  const elapsed = audioCtx.currentTime - startTime + pauseOffset;
+  const elapsed = audioCtx.currentTime - startTime;
   const pct = (elapsed / audioBuffer.duration) * 100;
   playhead.style.left = `${Math.min(100, pct)}%`;
   timeDisplay.textContent = formatTime(elapsed);
@@ -1097,57 +1099,59 @@ function updatePlayhead() {
     curRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
+  // === REAL-TIME FLASH via rAF ===
+  tickFlash(elapsed);
+
   animFrame = requestAnimationFrame(updatePlayhead);
 }
 
-// === FLASH SCHEDULING ===
+// === FLASH STATE ===
+let flashState = { lastFlipTime: -1, flashOn: false };
+
+function tickFlash(elapsed) {
+  const flash = document.getElementById('liveFlash');
+  const curSec = Math.floor(elapsed);
+  const row = timeline[curSec];
+
+  if (!row || !row.lightOn) {
+    flash.style.opacity = '0';
+    flashState.flashOn = false;
+    return;
+  }
+
+  const hz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
+  const period = 1 / hz; // seconds per full on+off cycle
+  // Phase within current period
+  const phase = (elapsed % period) / period;
+
+  // ON for first 40% of period, OFF for rest (duty cycle)
+  const shouldBeOn = phase < 0.4;
+
+  if (shouldBeOn !== flashState.flashOn) {
+    flashState.flashOn = shouldBeOn;
+    if (shouldBeOn) {
+      let color = '#00ffe1';
+      if (row.dominantBand === 'sub' && activeBands.sub) color = '#00bfff';
+      else if (row.dominantBand === 'mid' && activeBands.mid) color = '#a855f7';
+      else if (row.dominantBand === 'high' && activeBands.high) color = '#ff3cac';
+      const intensity = Math.min(0.85, row.overall * 0.7 + 0.15);
+      flash.style.background = color;
+      flash.style.opacity = intensity.toString();
+    } else {
+      flash.style.opacity = '0';
+    }
+  }
+}
+
+// === FLASH SCHEDULING (kept for cleanup only) ===
 function clearFlashTimers() {
   flashAnimTimers.forEach(t => clearTimeout(t));
   flashAnimTimers = [];
+  flashState = { lastFlipTime: -1, flashOn: false };
 }
 
 function scheduleFlashes() {
-  clearFlashTimers();
-  const flash = document.getElementById('liveFlash');
-
-  timeline.forEach(row => {
-    if (!row.lightOn) return;
-    const hz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
-    const interval = 1000 / hz;
-    const rowStart = row.sec * 1000;
-    const rowEnd = rowStart + 1000;
-
-    // Check active bands
-    const useSub = activeBands.sub && row.sub > 0.05;
-    const useMid = activeBands.mid && row.mid > 0.05;
-    const useHigh = activeBands.high && row.high > 0.05;
-
-    let color = '#00ffe1';
-    if (row.dominantBand === 'sub' && useSub) color = '#00bfff';
-    else if (row.dominantBand === 'mid' && useMid) color = '#a855f7';
-    else if (row.dominantBand === 'high' && useHigh) color = '#ff3cac';
-
-    for (let t = 0; t < 1000; t += interval) {
-      const absTime = rowStart + t;
-      // Schedule relative to current playback position
-      const delay = absTime - pauseOffset * 1000;
-      if (delay < 0) continue;
-
-      const onTimer = setTimeout(() => {
-        const elapsed = audioCtx.currentTime - startTime;
-        if (!isPlaying || elapsed < row.sec || elapsed > row.sec + 1) return;
-        flash.style.background = color;
-        flash.style.opacity = (row.overall * 0.6 + 0.1).toString();
-      }, delay);
-
-      const offDelay = delay + Math.max(8, interval * 0.4);
-      const offTimer = setTimeout(() => {
-        flash.style.opacity = '0';
-      }, offDelay);
-
-      flashAnimTimers.push(onTimer, offTimer);
-    }
-  });
+  // No-op: flash is now driven by tickFlash() inside updatePlayhead rAF loop
 }
 
 // === WAVEFORM CLICK ===
