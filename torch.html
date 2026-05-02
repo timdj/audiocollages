@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Lumina — Light Sequencer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060608;
+    --surface: #0d0d12;
+    --panel: #12121a;
+    --border: #1e1e2e;
+    --accent: #c8f0ff;
+    --accent2: #7fd4c1;
+    --accent3: #f0c87f;
+    --muted: #3a3a55;
+    --text: #d0d0e8;
+    --text-dim: #6060a0;
+    --danger: #ff6b6b;
+    --glow: 0 0 20px rgba(200,240,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(127,212,193,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 60% at 80% 80%, rgba(200,240,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-bottom: 40px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-shadow: 0 0 30px rgba(200,240,255,0.4);
+  }
+
+  .subtitle {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* Flash preview orb */
+  .orb-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+  }
+
+  .orb {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #ffffff 0%, #c8f0ff 30%, #2a4a6a 70%, #060608 100%);
+    box-shadow: 
+      0 0 0 1px rgba(200,240,255,0.1),
+      0 0 40px rgba(200,240,255,0.0),
+      0 0 80px rgba(200,240,255,0.0);
+    transition: box-shadow 0.05s, background 0.05s;
+    position: relative;
+  }
+
+  .orb.flash-on {
+    background: radial-gradient(circle at 40% 35%, #ffffff 0%, #fffde0 20%, #c8f0ff 50%, #4a8aaa 80%);
+    box-shadow:
+      0 0 0 1px rgba(200,240,255,0.4),
+      0 0 40px rgba(200,240,255,0.6),
+      0 0 100px rgba(200,240,255,0.3),
+      0 0 160px rgba(200,240,255,0.15);
+  }
+
+  .orb-ring {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid rgba(200,240,255,0.08);
+  }
+  .orb-ring2 {
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    border: 1px solid rgba(200,240,255,0.04);
+  }
+
+  /* Status */
+  .status {
+    text-align: center;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    min-height: 16px;
+  }
+
+  .status.active { color: var(--accent2); }
+  .status.error { color: var(--danger); }
+
+  /* Main controls */
+  .main-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .btn {
+    padding: 14px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 4px;
+  }
+
+  .btn:hover { border-color: var(--muted); background: #18181f; }
+
+  .btn-start {
+    background: var(--accent);
+    color: #060608;
+    border-color: var(--accent);
+    font-weight: 700;
+    grid-column: 1 / -1;
+    font-size: 0.85rem;
+    padding: 18px;
+  }
+  .btn-start:hover { background: #a8d8ef; border-color: #a8d8ef; }
+  .btn-start.running {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .btn-start.running:hover { background: rgba(255,107,107,0.1); }
+
+  /* Section headers */
+  .section-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Presets */
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .preset-btn {
+    padding: 10px 6px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-align: center;
+    border-radius: 4px;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+
+  .preset-btn:hover { border-color: var(--muted); color: var(--text); }
+  .preset-btn.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(127,212,193,0.08);
+  }
+
+  .preset-hz {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: inherit;
+  }
+
+  /* Step sequencer */
+  .steps-container {
+    margin-bottom: 20px;
+  }
+
+  .steps-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 24px 1fr 80px 70px 32px;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: border-color 0.15s;
+  }
+
+  .step.current {
+    border-color: var(--accent);
+    background: rgba(200,240,255,0.04);
+  }
+
+  .step-num {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .step-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--muted);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .step-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(200,240,255,0.4);
+  }
+
+  .step-hz {
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-align: right;
+    min-width: 45px;
+  }
+
+  .step-dur {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .step-dur input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 4px 6px;
+    border-radius: 3px;
+    text-align: center;
+  }
+
+  .step-del {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .step-del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Duty cycle + mode */
+  .param-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .param-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+  }
+
+  .param-label {
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .param-box input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--muted);
+    border-radius: 2px;
+    outline: none;
+    margin-bottom: 4px;
+  }
+
+  .param-box input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent3);
+    cursor: pointer;
+  }
+
+  .param-val {
+    font-size: 0.75rem;
+    color: var(--accent3);
+    text-align: right;
+  }
+
+  .mode-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 6px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    width: 0%;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(200,240,255,0.5);
+  }
+
+  /* Oscilloscope */
+  .scope {
+    width: 100%;
+    height: 60px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .scope canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Warning */
+  .warning {
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.2);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 0.6rem;
+    color: rgba(255,107,107,0.8);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  .add-step-btn {
+    width: 100%;
+    padding: 10px;
+    border: 1px dashed var(--muted);
+    background: none;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    margin-top: 6px;
+  }
+  .add-step-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Loop toggle */
+  .loop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+
+  .loop-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .toggle {
+    width: 40px;
+    height: 22px;
+    background: var(--muted);
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: none;
+    outline: none;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on {
+    background: var(--accent2);
+  }
+
+  .toggle.on::after {
+    transform: translateX(18px);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>LUMINA</h1>
+    <span class="subtitle">Light Sequencer</span>
+  </header>
+
+  <div class="orb-container">
+    <div class="orb" id="orb">
+      <div class="orb-ring"></div>
+      <div class="orb-ring2"></div>
+    </div>
+  </div>
+
+  <div class="status" id="status">Klaar om te starten</div>
+
+  <div class="scope">
+    <canvas id="scope" width="440" height="60"></canvas>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress"></div>
+  </div>
+
+  <button class="btn btn-start" id="startBtn" onclick="toggleSession()">▶ START SESSIE</button>
+
+  <br><br>
+
+  <div class="section-label">Presets</div>
+  <div class="presets">
+    <button class="preset-btn" onclick="loadPreset('delta')">
+      <span class="preset-hz">2 Hz</span>Delta
+    </button>
+    <button class="preset-btn" onclick="loadPreset('theta')">
+      <span class="preset-hz">6 Hz</span>Theta
+    </button>
+    <button class="preset-btn" onclick="loadPreset('alpha')">
+      <span class="preset-hz">10 Hz</span>Alpha
+    </button>
+    <button class="preset-btn" onclick="loadPreset('gamma')">
+      <span class="preset-hz">40 Hz</span>Gamma
+    </button>
+    <button class="preset-btn" onclick="loadPreset('lumenate')">
+      <span class="preset-hz">3→10</span>Lumenate
+    </button>
+    <button class="preset-btn" onclick="loadPreset('descent')">
+      <span class="preset-hz">10→4</span>Descent
+    </button>
+    <button class="preset-btn" onclick="loadPreset('pulse')">
+      <span class="preset-hz">8↔12</span>Pulse
+    </button>
+    <button class="preset-btn" onclick="loadPreset('wake')">
+      <span class="preset-hz">5→18</span>Wake
+    </button>
+  </div>
+
+  <div class="section-label">Parameters</div>
+  <div class="param-row">
+    <div class="param-box">
+      <div class="param-label">Duty Cycle</div>
+      <input type="range" id="dutyCycle" min="5" max="90" value="30" oninput="updateDuty()">
+      <div class="param-val" id="dutyVal">30%</div>
+    </div>
+    <div class="param-box">
+      <div class="param-label">Modus</div>
+      <select class="mode-select" id="modeSelect">
+        <option value="rhythmic">Rhythmisch</option>
+        <option value="arrhythmic">Aritmisch</option>
+        <option value="ramp">Ramp up</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="loop-row">
+    <span class="loop-label">Loop herhalen</span>
+    <button class="toggle" id="loopToggle" onclick="toggleLoop()"></button>
+  </div>
+
+  <div class="section-label">Sequentie</div>
+  <div class="steps-container">
+    <div class="steps-list" id="stepsList"></div>
+    <button class="add-step-btn" onclick="addStep()">+ Stap toevoegen</button>
+  </div>
+
+  <div class="warning">
+    ⚠ Niet gebruiken bij fotosensitieve epilepsie. Ogen altijd gesloten houden. Houd de telefoon op armlengte afstand.
+  </div>
+</div>
+
+<script>
+// State
+let steps = [
+  { hz: 3, dur: 30 },
+  { hz: 6, dur: 30 },
+  { hz: 10, dur: 60 },
+  { hz: 8, dur: 30 },
+];
+
+let running = false;
+let loopEnabled = false;
+let torchStream = null;
+let torchTrack = null;
+let flashInterval = null;
+let sessionTimeout = null;
+let currentStep = -1;
+let dutyCycle = 0.30;
+let flashState = false;
+
+// Scope
+const scopeCanvas = document.getElementById('scope');
+const ctx = scopeCanvas.getContext('2d');
+const scopeWidth = 440;
+const scopeHeight = 60;
+let scopeBuffer = new Array(scopeWidth).fill(0);
+let scopePos = 0;
+
+function pushScope(val) {
+  scopeBuffer[scopePos % scopeWidth] = val;
+  scopePos++;
+  drawScope();
+}
+
+function drawScope() {
+  ctx.clearRect(0, 0, scopeWidth, scopeHeight);
+  ctx.strokeStyle = 'rgba(200,240,255,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < scopeWidth; i++) {
+    const idx = (scopePos + i) % scopeWidth;
+    const y = scopeBuffer[idx] ? 8 : scopeHeight - 8;
+    if (i === 0) ctx.moveTo(i, y);
+    else ctx.lineTo(i, y);
+  }
+  ctx.stroke();
+
+  // Grid
+  ctx.strokeStyle = 'rgba(200,240,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let y = 0; y < scopeHeight; y += 20) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(scopeWidth, y);
+    ctx.stroke();
+  }
+}
+
+drawScope();
+
+// Render steps
+function renderSteps() {
+  const list = document.getElementById('stepsList');
+  list.innerHTML = '';
+  steps.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'step' + (i === currentStep ? ' current' : '');
+    div.innerHTML = `
+      <span class="step-num">${i + 1}</span>
+      <input type="range" class="step-slider" min="1" max="50" value="${s.hz}" 
+        oninput="steps[${i}].hz=+this.value; this.closest('.step').querySelector('.step-hz').textContent=this.value+' Hz'">
+      <span class="step-hz">${s.hz} Hz</span>
+      <div class="step-dur">
+        <input type="number" value="${s.dur}" min="1" max="600" 
+          oninput="steps[${i}].dur=+this.value" style="width:55px"> s
+      </div>
+      <button class="step-del" onclick="removeStep(${i})">×</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function addStep() {
+  steps.push({ hz: 8, dur: 30 });
+  renderSteps();
+}
+
+function removeStep(i) {
+  if (steps.length <= 1) return;
+  steps.splice(i, 1);
+  renderSteps();
+}
+
+function updateDuty() {
+  dutyCycle = document.getElementById('dutyCycle').value / 100;
+  document.getElementById('dutyVal').textContent = Math.round(dutyCycle * 100) + '%';
+}
+
+let loopOn = false;
+function toggleLoop() {
+  loopOn = !loopOn;
+  const btn = document.getElementById('loopToggle');
+  btn.classList.toggle('on', loopOn);
+}
+
+// Presets
+const presets = {
+  delta: [{ hz: 2, dur: 120 }],
+  theta: [{ hz: 4, dur: 60 }, { hz: 6, dur: 60 }, { hz: 7, dur: 60 }],
+  alpha: [{ hz: 8, dur: 60 }, { hz: 10, dur: 60 }, { hz: 12, dur: 60 }],
+  gamma: [{ hz: 40, dur: 60 }],
+  lumenate: [{ hz: 3, dur: 30 }, { hz: 6, dur: 30 }, { hz: 8, dur: 60 }, { hz: 10, dur: 60 }, { hz: 12, dur: 30 }],
+  descent: [{ hz: 10, dur: 40 }, { hz: 8, dur: 40 }, { hz: 6, dur: 40 }, { hz: 4, dur: 60 }],
+  pulse: [{ hz: 8, dur: 30 }, { hz: 12, dur: 30 }, { hz: 8, dur: 30 }, { hz: 12, dur: 30 }],
+  wake: [{ hz: 5, dur: 30 }, { hz: 10, dur: 30 }, { hz: 15, dur: 30 }, { hz: 18, dur: 30 }],
+};
+
+function loadPreset(name) {
+  if (running) return;
+  steps = presets[name].map(s => ({ ...s }));
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.closest('.preset-btn').classList.add('active');
+  renderSteps();
+}
+
+// Flash control
+function setFlash(on) {
+  flashState = on;
+  document.getElementById('orb').classList.toggle('flash-on', on);
+  pushScope(on ? 1 : 0);
+
+  if (torchTrack && torchTrack.getCapabilities().torch) {
+    torchTrack.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+  }
+}
+
+// Session
+async function toggleSession() {
+  if (running) {
+    stopSession();
+  } else {
+    await startSession();
+  }
+}
+
+async function startSession() {
+  // Check secure context
+  if (!window.isSecureContext) {
+    setStatus('⚠ HTTPS vereist voor torch — open via HTTPS of localhost', 'error');
+    // Still run in visual-only mode
+  }
+
+  // Try to get torch access
+  try {
+    torchStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1 }, height: { ideal: 1 } }
+    });
+    torchTrack = torchStream.getVideoTracks()[0];
+
+    // Wait a moment for capabilities to populate (Android needs this)
+    await new Promise(r => setTimeout(r, 300));
+
+    const caps = torchTrack.getCapabilities();
+    console.log('Camera caps:', JSON.stringify(caps));
+
+    if (!caps.torch) {
+      setStatus('Torch niet beschikbaar op dit apparaat — visuele modus', 'active');
+      torchTrack = null;
+    } else {
+      // Test torch immediately
+      try {
+        await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+        await new Promise(r => setTimeout(r, 100));
+        await torchTrack.applyConstraints({ advanced: [{ torch: false }] });
+        setStatus('Torch actief ✓', 'active');
+      } catch(e2) {
+        setStatus('Torch error: ' + e2.message, 'error');
+        torchTrack = null;
+      }
+    }
+  } catch (e) {
+    setStatus('Camera: ' + e.message + ' — visuele modus', 'active');
+    torchTrack = null;
+  }
+
+  running = true;
+  document.getElementById('startBtn').textContent = '■ STOP SESSIE';
+  document.getElementById('startBtn').classList.add('running');
+  runSequence();
+}
+
+function stopSession() {
+  running = false;
+  currentStep = -1;
+  clearTimeout(sessionTimeout);
+  clearInterval(flashInterval);
+  setFlash(false);
+
+  if (torchTrack) {
+    torchTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+    torchStream.getTracks().forEach(t => t.stop());
+    torchTrack = null;
+    torchStream = null;
+  }
+
+  document.getElementById('startBtn').textContent = '▶ START SESSIE';
+  document.getElementById('startBtn').classList.remove('running');
+  document.getElementById('progress').style.width = '0%';
+  setStatus('Gestopt', '');
+  renderSteps();
+}
+
+function runSequence(stepIndex = 0) {
+  if (!running) return;
+
+  if (stepIndex >= steps.length) {
+    if (loopOn) {
+      runSequence(0);
+    } else {
+      stopSession();
+      setStatus('Sessie voltooid', '');
+    }
+    return;
+  }
+
+  currentStep = stepIndex;
+  renderSteps();
+
+  const step = steps[stepIndex];
+  const mode = document.getElementById('modeSelect').value;
+  const totalStepMs = step.dur * 1000;
+  const startTime = Date.now();
+
+  setStatus(`Stap ${stepIndex + 1}/${steps.length} — ${step.hz} Hz`, 'active');
+
+  // Progress update
+  const progressInterval = setInterval(() => {
+    if (!running) { clearInterval(progressInterval); return; }
+    const elapsed = Date.now() - startTime;
+    const stepProgress = elapsed / totalStepMs;
+    const overallProgress = (stepIndex + stepProgress) / steps.length;
+    document.getElementById('progress').style.width = (overallProgress * 100) + '%';
+  }, 100);
+
+  // Flash loop
+  clearInterval(flashInterval);
+  let phaseStart = Date.now();
+
+  function doFlash() {
+    if (!running) return;
+
+    let hz = step.hz;
+    const elapsed = Date.now() - startTime;
+
+    // Ramp mode: linearly interpolate toward next step's hz
+    if (mode === 'ramp' && stepIndex + 1 < steps.length) {
+      const nextHz = steps[stepIndex + 1].hz;
+      hz = step.hz + (nextHz - step.hz) * (elapsed / totalStepMs);
+    }
+
+    // Arrhythmic: jitter the interval slightly
+    let period = 1000 / hz;
+    if (mode === 'arrhythmic') {
+      period *= (0.7 + Math.random() * 0.6);
+    }
+
+    const onTime = period * dutyCycle;
+    const offTime = period * (1 - dutyCycle);
+
+    setFlash(true);
+    setTimeout(() => {
+      if (!running) { setFlash(false); return; }
+      setFlash(false);
+      if (running) {
+        flashInterval = setTimeout(doFlash, offTime);
+      }
+    }, onTime);
+  }
+
+  doFlash();
+
+  sessionTimeout = setTimeout(() => {
+    clearInterval(progressInterval);
+    clearInterval(flashInterval);
+    setFlash(false);
+    runSequence(stepIndex + 1);
+  }, totalStepMs);
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + (cls || '');
+}
+
+// Init
+renderSteps();
+</script>
+</body>
+</html>
