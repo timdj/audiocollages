@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMENATE — Audio Light Sequencer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap');
+
+  :root {
+    --bg: #050508;
+    --panel: #0a0a12;
+    --border: #1a1a2e;
+    --accent: #00ffe1;
+    --accent2: #ff3cac;
+    --accent3: #ffb700;
+    --dim: #2a2a3e;
+    --text: #c8d0e0;
+    --text-dim: #4a5068;
+    --flash-sub: #00bfff;
+    --flash-mid: #a855f7;
+    --flash-high: #ff3cac;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* === HEADER === */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, #050508 0%, #0d0d1a 100%);
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent);
+  }
+
+  .logo span { color: var(--accent2); }
+
+  .status-bar {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .status-bar .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-right: 6px;
+    vertical-align: middle;
+    transition: all 0.3s;
+  }
+
+  .status-bar.active .dot {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* === MAIN LAYOUT === */
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: calc(100vh - 57px);
+  }
+
+  /* === DROP ZONE === */
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(0,255,225,0.015) 10px,
+      rgba(0,255,225,0.015) 20px
+    );
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 160px;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    background: rgba(0,255,225,0.04);
+    border-color: var(--accent);
+  }
+
+  .drop-zone.loaded {
+    min-height: 80px;
+    padding: 20px 40px;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .drop-icon {
+    font-size: 48px;
+    opacity: 0.4;
+    line-height: 1;
+  }
+
+  .drop-text {
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .drop-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .file-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .file-meta {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 16px;
+  }
+
+  /* === WAVEFORM === */
+  .waveform-section {
+    padding: 0 28px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .waveform-wrap {
+    position: relative;
+    height: 60px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  #waveformCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    pointer-events: none;
+    left: 0;
+    transition: left 0.05s linear;
+  }
+
+  /* === TRANSPORT === */
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 28px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--dim);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 10px rgba(0,255,225,0.3); }
+  .btn.danger { border-color: var(--accent2); color: var(--accent2); }
+
+  .time-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    min-width: 80px;
+  }
+
+  .transport-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* === FREQ CONTROLS === */
+  .freq-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 28px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .freq-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-right: 8px;
+  }
+
+  .freq-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-dim);
+  }
+
+  .freq-chip .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  .freq-chip.active { border-color: var(--accent); color: var(--text); }
+  .freq-chip[data-band="sub"] .dot { background: var(--flash-sub); }
+  .freq-chip[data-band="mid"] .dot { background: var(--flash-mid); }
+  .freq-chip[data-band="high"] .dot { background: var(--flash-high); }
+  .freq-chip[data-band="all"] .dot { background: var(--accent3); }
+
+  .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+  }
+
+  .speed-control label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .speed-control input[type=range] {
+    width: 80px;
+    accent-color: var(--accent);
+  }
+
+  .speed-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    min-width: 30px;
+  }
+
+  /* === TIMELINE === */
+  .timeline-section {
+    overflow-y: auto;
+    padding: 16px 28px;
+    background: var(--bg);
+    scrollbar-width: thin;
+    scrollbar-color: var(--dim) transparent;
+  }
+
+  .timeline-header {
+    display: grid;
+    grid-template-columns: 52px 60px 100px 1fr 80px 80px 60px 120px;
+    gap: 8px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 52px 60px 100px 1fr 80px 80px 60px 120px;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(26,26,46,0.5);
+    align-items: center;
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+
+  .timeline-row:hover { background: rgba(0,255,225,0.03); }
+
+  .timeline-row.active-row { background: rgba(0,255,225,0.06); border-color: rgba(0,255,225,0.2); }
+
+  .timeline-row.playing-row {
+    background: rgba(0,255,225,0.08);
+    border-color: var(--accent);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  .row-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .row-energy {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+
+  /* Energy bar */
+  .energy-bar-wrap {
+    position: relative;
+    height: 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    border-radius: 1px;
+  }
+
+  .energy-bar-fill {
+    height: 100%;
+    transition: width 0.3s;
+    border-radius: 1px;
+  }
+
+  /* Flash interval selector */
+  .flash-select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 2px 4px;
+    width: 100%;
+    letter-spacing: 1px;
+  }
+
+  .flash-select:focus { outline: none; border-color: var(--accent); }
+
+  /* Freq band pills in row */
+  .freq-pills {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 1px;
+    letter-spacing: 1px;
+    opacity: 0.7;
+  }
+
+  .pill.sub { background: rgba(0,191,255,0.2); color: var(--flash-sub); }
+  .pill.mid { background: rgba(168,85,247,0.2); color: var(--flash-mid); }
+  .pill.high { background: rgba(255,60,172,0.2); color: var(--flash-high); }
+
+  /* Light-on indicator */
+  .light-on {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+
+  .light-led {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .light-on.on .light-led {
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+  }
+
+  /* Flash speed badge */
+  .flash-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 1px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* === FLASH VISUALIZER === */
+  .flash-vis {
+    position: relative;
+    height: 18px;
+    display: flex;
+    gap: 1px;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .flash-block {
+    flex-shrink: 0;
+    height: 100%;
+    border-radius: 1px;
+    opacity: 0.8;
+  }
+
+  /* === LIVE FLASH OVERLAY === */
+  #liveFlash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.02s;
+  }
+
+  /* === BOTTOM BAR === */
+  .bottom-bar {
+    padding: 10px 28px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .stats {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 20px;
+  }
+
+  .stats span { color: var(--accent); }
+
+  /* Scrollbar */
+  .timeline-section::-webkit-scrollbar { width: 4px; }
+  .timeline-section::-webkit-scrollbar-track { background: transparent; }
+  .timeline-section::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+  /* Hidden file input */
+  #fileInput { display: none; }
+
+  /* Loading */
+  .loading-bar {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s;
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .empty-timeline {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  .threshold-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .threshold-control label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .threshold-control input[type=range] {
+    width: 70px;
+    accent-color: var(--accent2);
+  }
+
+  .threshold-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent2);
+    min-width: 28px;
+  }
+</style>
+</head>
+<body>
+
+<div id="liveFlash"></div>
+
+<header>
+  <div class="logo">LUM<span>E</span>NATE</div>
+  <div class="status-bar" id="statusBar">
+    <span class="dot"></span>
+    <span id="statusText">WACHT OP AUDIO</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">◈</div>
+    <div class="drop-text">Drop WAV of MP3 hier</div>
+    <div class="drop-sub">of klik om een bestand te kiezen</div>
+    <div class="loading-bar" id="loadingBar"></div>
+  </div>
+  <input type="file" id="fileInput" accept=".wav,.mp3,audio/wav,audio/mpeg">
+
+  <!-- WAVEFORM + TRANSPORT (hidden until loaded) -->
+  <div id="controlArea" style="display:none">
+    <div class="waveform-section">
+      <div class="waveform-wrap" id="waveformWrap">
+        <canvas id="waveformCanvas"></canvas>
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button class="btn" id="btnPlay">▶ PLAY</button>
+      <button class="btn" id="btnStop">■ STOP</button>
+      <div class="time-display" id="timeDisplay">0:00.0</div>
+      <div class="sep"></div>
+      <div class="threshold-control">
+        <label>DREMPEL</label>
+        <input type="range" id="thresholdRange" min="0" max="100" value="20">
+        <span class="threshold-val" id="thresholdVal">20%</span>
+      </div>
+      <div class="transport-right">
+        <button class="btn" id="btnExport">⬇ EXPORT JSON</button>
+        <button class="btn danger" id="btnReset">✕ RESET</button>
+      </div>
+    </div>
+
+    <!-- FREQ BAND CONTROLS -->
+    <div class="freq-controls">
+      <span class="freq-label">FREQUENTIES:</span>
+      <div class="freq-chip active" data-band="sub" id="chipSub">
+        <span class="dot"></span>SUB 20-250Hz
+      </div>
+      <div class="freq-chip active" data-band="mid" id="chipMid">
+        <span class="dot"></span>MID 250-4kHz
+      </div>
+      <div class="freq-chip active" data-band="high" id="chipHigh">
+        <span class="dot"></span>HIGH 4k-20kHz
+      </div>
+      <div class="freq-chip" data-band="all" id="chipAll">
+        <span class="dot"></span>ALLE
+      </div>
+      <div class="sep"></div>
+      <div class="speed-control">
+        <label>LUMENATE MULT.</label>
+        <input type="range" id="speedMult" min="1" max="8" step="0.5" value="2">
+        <span class="speed-val" id="speedVal">×2.0</span>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="timeline-section" id="timelineSection">
+      <div class="timeline-header">
+        <span>#</span>
+        <span>TIJD</span>
+        <span>ENERGIE</span>
+        <span>PATROON</span>
+        <span>FREQUENTIE</span>
+        <span>FLITS/SEC</span>
+        <span>LICHT</span>
+        <span>INTERVAL</span>
+      </div>
+      <div id="timelineRows">
+        <div class="empty-timeline">— LAAD EEN AUDIOBESTAND —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="stats">
+      <span>DUUR: <span id="statDuration">—</span></span>
+      <span>SECONDEN: <span id="statSeconds">—</span></span>
+      <span>LICHT-AAN: <span id="statLight">—</span></span>
+      <span>GEM. FLITS: <span id="statAvgFlash">—</span></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// === STATE ===
+let audioCtx = null;
+let audioBuffer = null;
+let sourceNode = null;
+let startTime = 0;
+let pauseOffset = 0;
+let isPlaying = false;
+let animFrame = null;
+let timeline = []; // per-second data
+let flashAnimTimers = [];
+
+// Settings
+let activeBands = { sub: true, mid: true, high: true };
+let speedMult = 2.0;
+let threshold = 0.20;
+
+// === DOM ===
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const controlArea = document.getElementById('controlArea');
+const waveformCanvas = document.getElementById('waveformCanvas');
+const playhead = document.getElementById('playhead');
+const btnPlay = document.getElementById('btnPlay');
+const btnStop = document.getElementById('btnStop');
+const btnReset = document.getElementById('btnReset');
+const btnExport = document.getElementById('btnExport');
+const timeDisplay = document.getElementById('timeDisplay');
+const timelineRows = document.getElementById('timelineRows');
+const statusBar = document.getElementById('statusBar');
+const statusText = document.getElementById('statusText');
+const loadingBar = document.getElementById('loadingBar');
+const speedVal = document.getElementById('speedVal');
+const thresholdVal = document.getElementById('thresholdVal');
+
+// === DROP ZONE ===
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) loadAudio(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadAudio(e.target.files[0]);
+});
+
+// === TRANSPORT ===
+btnPlay.addEventListener('click', () => { if (audioBuffer) togglePlay(); });
+btnStop.addEventListener('click', stopAudio);
+btnReset.addEventListener('click', resetAll);
+btnExport.addEventListener('click', exportJSON);
+
+// === SPEED + THRESHOLD ===
+document.getElementById('speedMult').addEventListener('input', e => {
+  speedMult = parseFloat(e.target.value);
+  speedVal.textContent = `×${speedMult.toFixed(1)}`;
+  if (timeline.length) rebuildTimeline();
+});
+
+document.getElementById('thresholdRange').addEventListener('input', e => {
+  threshold = parseInt(e.target.value) / 100;
+  thresholdVal.textContent = `${e.target.value}%`;
+  if (timeline.length) rebuildTimeline();
+});
+
+// === FREQ CHIPS ===
+document.querySelectorAll('.freq-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const band = chip.dataset.band;
+    if (band === 'all') {
+      const allOn = activeBands.sub && activeBands.mid && activeBands.high;
+      activeBands.sub = activeBands.mid = activeBands.high = !allOn;
+      document.getElementById('chipSub').classList.toggle('active', !allOn);
+      document.getElementById('chipMid').classList.toggle('active', !allOn);
+      document.getElementById('chipHigh').classList.toggle('active', !allOn);
+    } else {
+      activeBands[band] = !activeBands[band];
+      chip.classList.toggle('active', activeBands[band]);
+    }
+    if (timeline.length) rebuildTimeline();
+  });
+});
+
+// === LOAD AUDIO ===
+async function loadAudio(file) {
+  if (!['audio/wav', 'audio/mpeg', 'audio/mp3'].includes(file.type) &&
+      !file.name.match(/\.(wav|mp3)$/i)) {
+    setStatus('FOUT: ALLEEN WAV/MP3', false);
+    return;
+  }
+
+  setStatus('LADEN...', true);
+  loadingBar.style.width = '30%';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    loadingBar.style.width = '60%';
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    loadingBar.style.width = '100%';
+
+    // Update drop zone
+    dropZone.classList.add('loaded');
+    dropZone.innerHTML = `
+      <div class="file-info">
+        <div class="file-name">◈ ${file.name}</div>
+        <div class="file-meta">
+          <span>${audioBuffer.numberOfChannels}ch</span>
+          <span>${audioBuffer.sampleRate}Hz</span>
+          <span>${formatTime(audioBuffer.duration)}</span>
+        </div>
+      </div>
+      <button class="btn" onclick="document.getElementById('fileInput').click()" style="font-size:10px">WIJZIG</button>
+    `;
+
+    controlArea.style.display = 'block';
+    drawWaveform();
+    await analyzeAudio();
+
+    setStatus('KLAAR', true);
+  } catch(err) {
+    setStatus('FOUT BIJ LADEN', false);
+    loadingBar.style.width = '0%';
+    console.error(err);
+  }
+}
+
+// === WAVEFORM ===
+function drawWaveform() {
+  const canvas = waveformCanvas;
+  const wrap = document.getElementById('waveformWrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  const ctx = canvas.getContext('2d');
+  const data = audioBuffer.getChannelData(0);
+  const step = Math.ceil(data.length / canvas.width);
+  const amp = canvas.height / 2;
+
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw seconds markers
+  const secWidth = canvas.width / audioBuffer.duration;
+  ctx.strokeStyle = 'rgba(26,26,46,0.8)';
+  ctx.lineWidth = 1;
+  for (let s = 0; s < audioBuffer.duration; s++) {
+    const x = s * secWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+
+  // Draw waveform with energy color
+  for (let i = 0; i < canvas.width; i++) {
+    let min = 1, max = -1;
+    for (let j = 0; j < step; j++) {
+      const val = data[(i * step) + j] || 0;
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+    const energy = Math.max(Math.abs(min), Math.abs(max));
+    const h = energy > 0.6 ? '#ff3cac' : energy > 0.3 ? '#a855f7' : '#00ffe1';
+    ctx.fillStyle = h;
+    ctx.fillRect(i, amp - max * amp * 0.9, 1, (max - min) * amp * 0.9);
+  }
+}
+
+// === ANALYZE AUDIO ===
+async function analyzeAudio() {
+  setStatus('ANALYSEREN...', true);
+  const sampleRate = audioBuffer.sampleRate;
+  const duration = audioBuffer.duration;
+  const totalSeconds = Math.ceil(duration);
+  const data = audioBuffer.getChannelData(0);
+
+  // FFT size
+  const fftSize = 2048;
+  const halfFFT = fftSize / 2;
+
+  // Sub: 20-250Hz, Mid: 250-4kHz, High: 4k-20kHz
+  const subBin = [Math.floor(20 * fftSize / sampleRate), Math.floor(250 * fftSize / sampleRate)];
+  const midBin = [Math.floor(250 * fftSize / sampleRate), Math.floor(4000 * fftSize / sampleRate)];
+  const highBin = [Math.floor(4000 * fftSize / sampleRate), Math.floor(20000 * fftSize / sampleRate)];
+
+  timeline = [];
+
+  for (let sec = 0; sec < totalSeconds; sec++) {
+    const startSample = Math.floor(sec * sampleRate);
+    const endSample = Math.min(startSample + sampleRate, data.length);
+    const chunk = data.slice(startSample, endSample);
+
+    // RMS energy
+    let rmsSum = 0;
+    for (let i = 0; i < chunk.length; i++) rmsSum += chunk[i] * chunk[i];
+    const rms = Math.sqrt(rmsSum / chunk.length);
+
+    // Simple FFT (via OfflineAudioContext for accuracy)
+    let subEnergy = 0, midEnergy = 0, highEnergy = 0;
+
+    // Simple DFT sampling for band energy (fast approximation)
+    const samplesPerBand = 256;
+    const step = Math.max(1, Math.floor(chunk.length / samplesPerBand));
+
+    // Sub frequencies: look at slow oscillations
+    for (let bin = subBin[0]; bin < Math.min(subBin[1], halfFFT); bin++) {
+      let re = 0, im = 0;
+      const freq = bin * sampleRate / fftSize;
+      const omega = 2 * Math.PI * freq;
+      for (let i = 0; i < chunk.length; i += step) {
+        const t = i / sampleRate;
+        re += chunk[i] * Math.cos(omega * t);
+        im += chunk[i] * Math.sin(omega * t);
+      }
+      subEnergy += Math.sqrt(re*re + im*im);
+    }
+
+    // Mid
+    const midStep = Math.max(1, Math.floor((midBin[1] - midBin[0]) / 32));
+    for (let bin = midBin[0]; bin < Math.min(midBin[1], halfFFT); bin += midStep) {
+      let re = 0, im = 0;
+      const freq = bin * sampleRate / fftSize;
+      const omega = 2 * Math.PI * freq;
+      for (let i = 0; i < chunk.length; i += step * 4) {
+        const t = i / sampleRate;
+        re += chunk[i] * Math.cos(omega * t);
+        im += chunk[i] * Math.sin(omega * t);
+      }
+      midEnergy += Math.sqrt(re*re + im*im);
+    }
+
+    // High (use zero-crossing rate as proxy for high freq content)
+    let zc = 0;
+    for (let i = 1; i < chunk.length; i++) {
+      if ((chunk[i] >= 0) !== (chunk[i-1] >= 0)) zc++;
+    }
+    highEnergy = zc / chunk.length; // normalized
+
+    // Normalize energies
+    const subNorm = Math.min(1, subEnergy / (subBin[1] - subBin[0]) / 50);
+    const midNorm = Math.min(1, midEnergy / 32 / 50);
+    const highNorm = Math.min(1, highEnergy * 4);
+
+    // Overall energy
+    const overall = rms;
+
+    // Flash rate based on energy (more sound = faster flashes)
+    // Range: 0.5 Hz (slow) to 30 Hz (very fast), scaled by speedMult
+    const baseFlash = 0.5 + (overall * 25);
+    const flashHz = Math.min(30, baseFlash * speedMult);
+
+    // Light on threshold
+    const lightOn = overall >= threshold;
+
+    // Dominant band
+    let dominantBand = 'mid';
+    if (subNorm > midNorm && subNorm > highNorm) dominantBand = 'sub';
+    else if (highNorm > midNorm && highNorm > subNorm) dominantBand = 'high';
+
+    timeline.push({
+      sec,
+      time: sec,
+      rms,
+      overall,
+      sub: subNorm,
+      mid: midNorm,
+      high: highNorm,
+      flashHz,
+      lightOn,
+      dominantBand,
+      // User can override
+      userFlashHz: null,
+      userBands: null,
+    });
+
+    // Progress
+    loadingBar.style.width = `${60 + (sec / totalSeconds) * 40}%`;
+    if (sec % 5 === 0) await new Promise(r => setTimeout(r, 0)); // yield
+  }
+
+  loadingBar.style.width = '0%';
+  renderTimeline();
+  updateStats();
+}
+
+// === REBUILD (after settings change) ===
+function rebuildTimeline() {
+  timeline.forEach(row => {
+    const baseFlash = 0.5 + (row.overall * 25);
+    row.flashHz = Math.min(30, baseFlash * speedMult);
+    row.lightOn = row.overall >= threshold;
+    if (row.userFlashHz === null) {
+      // keep auto
+    }
+  });
+  renderTimeline();
+  updateStats();
+}
+
+// === RENDER TIMELINE ===
+function renderTimeline() {
+  const maxEnergy = Math.max(...timeline.map(r => r.overall)) || 1;
+  const rows = timeline.map((row, i) => {
+    const energyPct = (row.overall / maxEnergy * 100).toFixed(0);
+    const flashHz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
+    const lightOn = row.lightOn;
+
+    // Energy color
+    const energyColor = row.overall > 0.6 ? '#ff3cac' :
+                        row.overall > 0.3 ? '#a855f7' : '#00ffe1';
+
+    // Flash visualization blocks
+    const blockCount = Math.min(40, Math.round(flashHz * 2));
+    const flashBlocks = Array.from({length: blockCount}, (_, bi) => {
+      const col = row.dominantBand === 'sub' ? '#00bfff' :
+                  row.dominantBand === 'high' ? '#ff3cac' : '#a855f7';
+      return `<div class="flash-block" style="width:${Math.max(2,36/blockCount)}px;background:${col};opacity:${0.4 + Math.random()*0.5}"></div>`;
+    }).join('');
+
+    // Freq pills
+    let pills = '';
+    if (row.sub > 0.1) pills += `<span class="pill sub">SUB</span>`;
+    if (row.mid > 0.1) pills += `<span class="pill mid">MID</span>`;
+    if (row.high > 0.1) pills += `<span class="pill high">HI</span>`;
+
+    // Flash options
+    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30].map(hz =>
+      `<option value="${hz}" ${Math.abs(flashHz - hz) < 0.5 ? 'selected' : ''}>${hz} Hz</option>`
+    ).join('');
+
+    return `<div class="timeline-row" id="row-${i}" data-sec="${i}">
+      <span class="row-time" style="color:var(--text-dim)">${String(i+1).padStart(3,'0')}</span>
+      <span class="row-time">${formatTime(row.time)}</span>
+      <div class="energy-bar-wrap">
+        <div class="energy-bar-fill" style="width:${energyPct}%;background:${energyColor}"></div>
+      </div>
+      <div class="flash-vis">${flashBlocks}</div>
+      <div class="freq-pills">${pills}</div>
+      <div class="flash-badge" style="color:${energyColor};border:1px solid ${energyColor}33;padding:2px 6px;font-family:'Share Tech Mono',monospace;font-size:10px">
+        ${flashHz.toFixed(1)} Hz
+      </div>
+      <div class="light-on ${lightOn ? 'on' : ''}">
+        <div class="light-led"></div>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${lightOn ? 'var(--accent3)' : 'var(--text-dim)'}">
+          ${lightOn ? 'AAN' : 'UIT'}
+        </span>
+      </div>
+      <select class="flash-select" data-row="${i}" onchange="setUserFlash(${i}, this.value)">
+        <option value="auto" ${row.userFlashHz === null ? 'selected' : ''}>AUTO</option>
+        ${flashOptions}
+      </select>
+    </div>`;
+  }).join('');
+
+  timelineRows.innerHTML = rows || '<div class="empty-timeline">— GEEN DATA —</div>';
+}
+
+function setUserFlash(rowIdx, val) {
+  if (val === 'auto') {
+    timeline[rowIdx].userFlashHz = null;
+  } else {
+    timeline[rowIdx].userFlashHz = parseFloat(val);
+  }
+}
+
+// === STATS ===
+function updateStats() {
+  const dur = audioBuffer ? audioBuffer.duration : 0;
+  const lightOnCount = timeline.filter(r => r.lightOn).length;
+  const avgFlash = timeline.length ?
+    (timeline.reduce((a,r) => a + r.flashHz, 0) / timeline.length).toFixed(1) : 0;
+
+  document.getElementById('statDuration').textContent = formatTime(dur);
+  document.getElementById('statSeconds').textContent = timeline.length;
+  document.getElementById('statLight').textContent = lightOnCount;
+  document.getElementById('statAvgFlash').textContent = `${avgFlash} Hz`;
+}
+
+// === PLAYBACK ===
+function togglePlay() {
+  if (isPlaying) {
+    pauseOffset += audioCtx.currentTime - startTime;
+    sourceNode.stop();
+    isPlaying = false;
+    btnPlay.textContent = '▶ PLAY';
+    cancelAnimationFrame(animFrame);
+    clearFlashTimers();
+  } else {
+    startPlayback();
+  }
+}
+
+function startPlayback() {
+  if (!audioBuffer) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  sourceNode = audioCtx.createBufferSource();
+  sourceNode.buffer = audioBuffer;
+  sourceNode.connect(audioCtx.destination);
+  sourceNode.start(0, pauseOffset);
+  startTime = audioCtx.currentTime - pauseOffset;
+  isPlaying = true;
+  btnPlay.textContent = '⏸ PAUZE';
+
+  sourceNode.onended = () => {
+    if (isPlaying) stopAudio();
+  };
+
+  scheduleFlashes();
+  updatePlayhead();
+}
+
+function stopAudio() {
+  if (sourceNode) { try { sourceNode.stop(); } catch(e) {} }
+  isPlaying = false;
+  pauseOffset = 0;
+  startTime = 0;
+  btnPlay.textContent = '▶ PLAY';
+  cancelAnimationFrame(animFrame);
+  clearFlashTimers();
+  playhead.style.left = '0%';
+  timeDisplay.textContent = '0:00.0';
+  document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
+  document.getElementById('liveFlash').style.opacity = '0';
+}
+
+function updatePlayhead() {
+  if (!isPlaying) return;
+  const elapsed = audioCtx.currentTime - startTime + pauseOffset;
+  const pct = (elapsed / audioBuffer.duration) * 100;
+  playhead.style.left = `${Math.min(100, pct)}%`;
+  timeDisplay.textContent = formatTime(elapsed);
+
+  // Highlight current row
+  const curSec = Math.floor(elapsed);
+  document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
+  const curRow = document.getElementById(`row-${curSec}`);
+  if (curRow) {
+    curRow.classList.add('playing-row');
+    curRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  animFrame = requestAnimationFrame(updatePlayhead);
+}
+
+// === FLASH SCHEDULING ===
+function clearFlashTimers() {
+  flashAnimTimers.forEach(t => clearTimeout(t));
+  flashAnimTimers = [];
+}
+
+function scheduleFlashes() {
+  clearFlashTimers();
+  const flash = document.getElementById('liveFlash');
+
+  timeline.forEach(row => {
+    if (!row.lightOn) return;
+    const hz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
+    const interval = 1000 / hz;
+    const rowStart = row.sec * 1000;
+    const rowEnd = rowStart + 1000;
+
+    // Check active bands
+    const useSub = activeBands.sub && row.sub > 0.05;
+    const useMid = activeBands.mid && row.mid > 0.05;
+    const useHigh = activeBands.high && row.high > 0.05;
+
+    let color = '#00ffe1';
+    if (row.dominantBand === 'sub' && useSub) color = '#00bfff';
+    else if (row.dominantBand === 'mid' && useMid) color = '#a855f7';
+    else if (row.dominantBand === 'high' && useHigh) color = '#ff3cac';
+
+    for (let t = 0; t < 1000; t += interval) {
+      const absTime = rowStart + t;
+      // Schedule relative to current playback position
+      const delay = absTime - pauseOffset * 1000;
+      if (delay < 0) continue;
+
+      const onTimer = setTimeout(() => {
+        const elapsed = audioCtx.currentTime - startTime;
+        if (!isPlaying || elapsed < row.sec || elapsed > row.sec + 1) return;
+        flash.style.background = color;
+        flash.style.opacity = (row.overall * 0.6 + 0.1).toString();
+      }, delay);
+
+      const offDelay = delay + Math.max(8, interval * 0.4);
+      const offTimer = setTimeout(() => {
+        flash.style.opacity = '0';
+      }, offDelay);
+
+      flashAnimTimers.push(onTimer, offTimer);
+    }
+  });
+}
+
+// === WAVEFORM CLICK ===
+document.getElementById('waveformWrap').addEventListener('click', e => {
+  if (!audioBuffer) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  pauseOffset = pct * audioBuffer.duration;
+  if (isPlaying) {
+    sourceNode.stop();
+    isPlaying = false;
+    startPlayback();
+  } else {
+    playhead.style.left = `${pct * 100}%`;
+    timeDisplay.textContent = formatTime(pauseOffset);
+  }
+});
+
+// === EXPORT ===
+function exportJSON() {
+  if (!timeline.length) return;
+  const out = {
+    filename: 'lumenate-export',
+    duration: audioBuffer.duration,
+    sampleRate: audioBuffer.sampleRate,
+    speedMultiplier: speedMult,
+    threshold,
+    activeBands,
+    timeline: timeline.map(r => ({
+      second: r.sec,
+      time: r.time,
+      energy: parseFloat(r.overall.toFixed(4)),
+      sub: parseFloat(r.sub.toFixed(4)),
+      mid: parseFloat(r.mid.toFixed(4)),
+      high: parseFloat(r.high.toFixed(4)),
+      lightOn: r.lightOn,
+      flashHz: parseFloat((r.userFlashHz !== null ? r.userFlashHz : r.flashHz).toFixed(2)),
+      dominantBand: r.dominantBand
+    }))
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'lumenate-timeline.json';
+  a.click();
+}
+
+// === RESET ===
+function resetAll() {
+  stopAudio();
+  audioBuffer = null;
+  timeline = [];
+  dropZone.classList.remove('loaded');
+  dropZone.innerHTML = `
+    <div class="drop-icon">◈</div>
+    <div class="drop-text">Drop WAV of MP3 hier</div>
+    <div class="drop-sub">of klik om een bestand te kiezen</div>
+    <div class="loading-bar" id="loadingBar"></div>
+  `;
+  controlArea.style.display = 'none';
+  timelineRows.innerHTML = '<div class="empty-timeline">— LAAD EEN AUDIOBESTAND —</div>';
+  setStatus('WACHT OP AUDIO', false);
+  document.getElementById('statDuration').textContent = '—';
+  document.getElementById('statSeconds').textContent = '—';
+  document.getElementById('statLight').textContent = '—';
+  document.getElementById('statAvgFlash').textContent = '—';
+}
+
+// === HELPERS ===
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2,'0')}.${(s % 1).toFixed(1).slice(2)}`;
+}
+
+function setStatus(txt, active) {
+  statusText.textContent = txt;
+  statusBar.classList.toggle('active', active);
+}
+
+// Window resize → redraw waveform
+window.addEventListener('resize', () => {
+  if (audioBuffer) drawWaveform();
+});
+</script>
+</body>
+</html>
