@@ -466,13 +466,24 @@
     opacity: 0.8;
   }
 
-  /* === LIVE FLASH OVERLAY === */
-  #liveFlash {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9999;
-    opacity: 0;
+  /* === TORCH STATUS === */
+  #torchStatus {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    display: inline-block;
+  }
+  #torchStatus.on {
+    border-color: var(--accent3);
+    color: var(--accent3);
+    box-shadow: 0 0 10px rgba(255,183,0,0.4);
+  }
+  #torchStatus.error {
+    border-color: var(--accent2);
+    color: var(--accent2);
   }
 
   /* === BOTTOM BAR === */
@@ -551,8 +562,6 @@
 </head>
 <body>
 
-<div id="liveFlash"></div>
-
 <header>
   <div class="logo">LUM<span>E</span>NATE</div>
   <div class="status-bar" id="statusBar">
@@ -592,6 +601,8 @@
         <span class="threshold-val" id="thresholdVal">20%</span>
       </div>
       <div class="transport-right">
+        <button class="btn" id="btnTorch">⚡ CAMERA LED</button>
+        <span id="torchStatus">● UIT</span>
         <button class="btn" id="btnExport">⬇ EXPORT JSON</button>
         <button class="btn danger" id="btnReset">✕ RESET</button>
       </div>
@@ -659,8 +670,13 @@ let startTime = 0;
 let pauseOffset = 0;
 let isPlaying = false;
 let animFrame = null;
-let timeline = []; // per-second data
+let timeline = [];
 let flashAnimTimers = [];
+
+// Torch
+let torchTrack = null;       // MediaStreamTrack with torch capability
+let torchEnabled = false;    // user toggled torch on
+let torchOn = false;         // current physical state
 
 // Settings
 let activeBands = { sub: true, mid: true, high: true };
@@ -677,6 +693,8 @@ const btnPlay = document.getElementById('btnPlay');
 const btnStop = document.getElementById('btnStop');
 const btnReset = document.getElementById('btnReset');
 const btnExport = document.getElementById('btnExport');
+const btnTorch = document.getElementById('btnTorch');
+const torchStatus = document.getElementById('torchStatus');
 const timeDisplay = document.getElementById('timeDisplay');
 const timelineRows = document.getElementById('timelineRows');
 const statusBar = document.getElementById('statusBar');
@@ -684,6 +702,62 @@ const statusText = document.getElementById('statusText');
 const loadingBar = document.getElementById('loadingBar');
 const speedVal = document.getElementById('speedVal');
 const thresholdVal = document.getElementById('thresholdVal');
+
+// === TORCH INIT ===
+async function initTorch() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities();
+    if (!caps.torch) {
+      torchStatus.textContent = '✕ GEEN TORCH';
+      torchStatus.className = 'error';
+      torchTrack = null;
+      return;
+    }
+    torchTrack = track;
+    torchEnabled = true;
+    torchStatus.textContent = '● GEREED';
+    torchStatus.className = '';
+    btnTorch.classList.add('active');
+  } catch(e) {
+    torchStatus.textContent = '✕ GEEN TOEGANG';
+    torchStatus.className = 'error';
+    console.warn('Torch init failed:', e);
+  }
+}
+
+async function setTorch(on) {
+  if (!torchTrack || !torchEnabled) return;
+  if (torchOn === on) return;
+  torchOn = on;
+  try {
+    await torchTrack.applyConstraints({ advanced: [{ torch: on }] });
+    torchStatus.textContent = on ? '◉ AAN' : '● UIT';
+    torchStatus.className = on ? 'on' : '';
+  } catch(e) {
+    console.warn('Torch set failed:', e);
+  }
+}
+
+btnTorch.addEventListener('click', async () => {
+  if (!torchTrack) {
+    await initTorch();
+  } else {
+    torchEnabled = !torchEnabled;
+    if (!torchEnabled) {
+      await setTorch(false);
+      torchStatus.textContent = '● UITGESCHAKELD';
+      torchStatus.className = '';
+      btnTorch.classList.remove('active');
+    } else {
+      torchStatus.textContent = '● GEREED';
+      btnTorch.classList.add('active');
+    }
+  }
+});
 
 // === DROP ZONE ===
 dropZone.addEventListener('click', () => fileInput.click());
@@ -1077,6 +1151,7 @@ function stopAudio() {
   btnPlay.textContent = '▶ PLAY';
   cancelAnimationFrame(animFrame);
   clearFlashTimers();
+  setTorch(false);
   playhead.style.left = '0%';
   timeDisplay.textContent = '0:00.0';
   document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
@@ -1106,40 +1181,25 @@ function updatePlayhead() {
 }
 
 // === FLASH STATE ===
-let flashState = { lastFlipTime: -1, flashOn: false };
+let flashState = { flashOn: false };
 
 function tickFlash(elapsed) {
-  const flash = document.getElementById('liveFlash');
   const curSec = Math.floor(elapsed);
   const row = timeline[curSec];
 
   if (!row || !row.lightOn) {
-    flash.style.opacity = '0';
-    flashState.flashOn = false;
+    if (flashState.flashOn) { flashState.flashOn = false; setTorch(false); }
     return;
   }
 
   const hz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
-  const period = 1 / hz; // seconds per full on+off cycle
-  // Phase within current period
+  const period = 1 / hz;
   const phase = (elapsed % period) / period;
-
-  // ON for first 40% of period, OFF for rest (duty cycle)
-  const shouldBeOn = phase < 0.4;
+  const shouldBeOn = phase < 0.45; // 45% duty cycle
 
   if (shouldBeOn !== flashState.flashOn) {
     flashState.flashOn = shouldBeOn;
-    if (shouldBeOn) {
-      let color = '#00ffe1';
-      if (row.dominantBand === 'sub' && activeBands.sub) color = '#00bfff';
-      else if (row.dominantBand === 'mid' && activeBands.mid) color = '#a855f7';
-      else if (row.dominantBand === 'high' && activeBands.high) color = '#ff3cac';
-      const intensity = Math.min(0.85, row.overall * 0.7 + 0.15);
-      flash.style.background = color;
-      flash.style.opacity = intensity.toString();
-    } else {
-      flash.style.opacity = '0';
-    }
+    setTorch(shouldBeOn);
   }
 }
 
