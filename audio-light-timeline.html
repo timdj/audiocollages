@@ -703,6 +703,61 @@ const loadingBar = document.getElementById('loadingBar');
 const speedVal = document.getElementById('speedVal');
 const thresholdVal = document.getElementById('thresholdVal');
 
+// === WAKE LOCK ===
+let wakeLock = null;
+
+async function requestWakeLock() {
+  // Methode 1: Screen Wake Lock API (Chrome Android 84+)
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => {
+        // Automatisch opnieuw aanvragen als het vrijgegeven wordt (bijv. tab-wissel)
+        if (isPlaying) requestWakeLock();
+      });
+      return;
+    } catch(e) { /* val door naar fallback */ }
+  }
+  // Methode 2: Onzichtbare video loop als fallback
+  startNoSleepVideo();
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  stopNoSleepVideo();
+}
+
+// Fallback: tiny canvas → video stream → play() houdt scherm wakker
+let noSleepVideo = null;
+let noSleepStream = null;
+
+function startNoSleepVideo() {
+  if (noSleepVideo) return;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1; canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    ctx.fillRect(0, 0, 1, 1);
+    // Teken elke seconde een pixel zodat de stream actief blijft
+    setInterval(() => ctx.fillRect(0, 0, 1, 1), 1000);
+    noSleepStream = canvas.captureStream(1);
+    noSleepVideo = document.createElement('video');
+    noSleepVideo.srcObject = noSleepStream;
+    noSleepVideo.muted = true;
+    noSleepVideo.loop = true;
+    noSleepVideo.play().catch(() => {});
+  } catch(e) {}
+}
+
+function stopNoSleepVideo() {
+  if (noSleepVideo) { noSleepVideo.pause(); noSleepVideo = null; }
+}
+
+// Heractiveer wake lock na tab-wissel terug
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isPlaying) requestWakeLock();
+});
+
 // === TORCH INIT ===
 async function initTorch() {
   try {
@@ -1129,10 +1184,11 @@ function startPlayback() {
   sourceNode.buffer = audioBuffer;
   sourceNode.connect(audioCtx.destination);
   sourceNode.start(0, pauseOffset);
-  // startTime is the AudioContext time when position=0 would be
   startTime = audioCtx.currentTime - pauseOffset;
   isPlaying = true;
   btnPlay.textContent = '⏸ PAUZE';
+
+  requestWakeLock();
 
   sourceNode.onended = () => {
     if (isPlaying) stopAudio();
@@ -1151,10 +1207,10 @@ function stopAudio() {
   cancelAnimationFrame(animFrame);
   clearFlashTimers();
   setTorch(false);
+  releaseWakeLock();
   playhead.style.left = '0%';
   timeDisplay.textContent = '0:00.0';
   document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
-  document.getElementById('liveFlash').style.opacity = '0';
 }
 
 function updatePlayhead() {
