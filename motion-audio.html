@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BEWEGING / KLANK</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #2a2a3a;
+    --accent1: #ff3c6e;
+    --accent2: #00e5ff;
+    --accent3: #b8ff57;
+    --text: #e8e8f0;
+    --muted: #5a5a7a;
+    --motion: 0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER / EFFECTS BAR ── */
+  #effects-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+  }
+
+  #effects-bar h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(1.4rem, 5vw, 2.2rem);
+    letter-spacing: 0.15em;
+    color: var(--accent1);
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+
+  #effects-bar h1 span { color: var(--accent2); }
+
+  .fx-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .fx-channel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+
+  .fx-channel h3 {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .fx-channel h3 em {
+    color: var(--accent1);
+    font-style: normal;
+  }
+
+  .fx-channel:nth-child(2) h3 em { color: var(--accent2); }
+
+  .fx-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+
+  .fx-label {
+    font-size: 0.55rem;
+    color: var(--muted);
+    width: 52px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .fx-select {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    padding: 3px 5px;
+    border-radius: 3px;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .fx-select:focus { outline: none; border-color: var(--accent1); }
+
+  .fx-knob-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .knob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .knob-wrap label {
+    font-size: 0.5rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .knob-wrap input[type=range] {
+    width: 52px;
+    accent-color: var(--accent1);
+  }
+
+  .fx-channel:nth-child(2) .knob-wrap input[type=range] { accent-color: var(--accent2); }
+
+  /* ── MOTION METER ── */
+  #motion-bar-wrap {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #motion-label {
+    font-size: 0.55rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  #motion-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  #motion-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent1));
+    border-radius: 3px;
+    transition: width 0.1s ease;
+  }
+
+  #motion-val {
+    font-size: 0.55rem;
+    color: var(--accent3);
+    width: 32px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CONTENT ── */
+  #main {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ── CAMERA ── */
+  #camera-section {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+    border: 1px solid var(--border);
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    display: block;
+  }
+
+  #canvas-diff {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.35;
+    mix-blend-mode: screen;
+    transform: scaleX(-1);
+  }
+
+  #camera-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,10,15,0.85);
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  #camera-overlay p {
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 280px;
+  }
+
+  .pulse-ring {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--accent1);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.1); }
+  }
+
+  #start-btn {
+    background: var(--accent1);
+    color: #fff;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    padding: 10px 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  #start-btn:hover { opacity: 0.85; }
+
+  /* motion glow on camera */
+  #camera-section::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    box-shadow: inset 0 0 calc(var(--motion) * 40px) rgba(255,60,110,calc(var(--motion) * 0.6));
+    transition: box-shadow 0.1s;
+  }
+
+  /* ── TRACK LOADERS ── */
+  .tracks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .track-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .track-card h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+  }
+
+  .track-card:first-child h3 { color: var(--accent1); }
+  .track-card:last-child h3 { color: var(--accent2); }
+
+  .file-btn {
+    display: block;
+    width: 100%;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    padding: 8px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .file-btn:hover { border-color: var(--accent1); color: var(--text); }
+
+  .track-card:last-child .file-btn:hover { border-color: var(--accent2); }
+
+  .track-status {
+    font-size: 0.52rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    min-height: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .track-card:first-child .track-status.loaded { color: var(--accent1); }
+  .track-card:last-child .track-status.loaded { color: var(--accent2); }
+
+  .vol-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .vol-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    transition: width 0.08s;
+  }
+
+  .track-card:first-child .vol-fill { background: var(--accent1); }
+  .track-card:last-child .vol-fill { background: var(--accent2); }
+
+  /* ── PLAY TOGGLE ── */
+  #play-section {
+    display: flex;
+    justify-content: center;
+  }
+
+  #play-toggle {
+    background: none;
+    border: 2px solid var(--border);
+    color: var(--muted);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    padding: 10px 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  #play-toggle.active {
+    border-color: var(--accent3);
+    color: var(--accent3);
+    box-shadow: 0 0 16px rgba(184,255,87,0.2);
+  }
+
+  /* ── INFO ── */
+  #info {
+    font-size: 0.52rem;
+    color: var(--muted);
+    line-height: 1.7;
+    text-align: center;
+    letter-spacing: 0.06em;
+  }
+
+  #info strong { color: var(--accent3); }
+
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ EFFECTS BAR -->
+<div id="effects-bar">
+  <h1>BEWEGING <span>/</span> KLANK</h1>
+
+  <div class="fx-grid">
+
+    <!-- CHANNEL A -->
+    <div class="fx-channel" id="fx-a">
+      <h3>Kanaal <em>A</em></h3>
+
+      <div class="fx-row">
+        <span class="fx-label">Effect</span>
+        <select class="fx-select" id="a-effect">
+          <option value="none">Geen</option>
+          <option value="reverb">Hall Reverb</option>
+          <option value="delay">Ping-Pong Delay</option>
+          <option value="distortion">Distortion</option>
+          <option value="bitcrush">Bitcrusher</option>
+          <option value="chorus">Chorus</option>
+          <option value="filter">LP Filter</option>
+          <option value="ring">Ring Mod</option>
+          <option value="pitch">Pitch Shift</option>
+        </select>
+      </div>
+
+      <div class="fx-knob-row">
+        <div class="knob-wrap">
+          <label>Droog/Nat</label>
+          <input type="range" id="a-wet" min="0" max="100" value="50">
+        </div>
+        <div class="knob-wrap">
+          <label>Intensiteit</label>
+          <input type="range" id="a-amount" min="0" max="100" value="50">
+        </div>
+        <div class="knob-wrap">
+          <label>Pan</label>
+          <input type="range" id="a-pan" min="-100" max="100" value="-30">
+        </div>
+      </div>
+    </div>
+
+    <!-- CHANNEL B -->
+    <div class="fx-channel" id="fx-b">
+      <h3>Kanaal <em style="color:var(--accent2)">B</em></h3>
+
+      <div class="fx-row">
+        <span class="fx-label">Effect</span>
+        <select class="fx-select" id="b-effect">
+          <option value="none">Geen</option>
+          <option value="reverb" selected>Hall Reverb</option>
+          <option value="delay">Ping-Pong Delay</option>
+          <option value="distortion">Distortion</option>
+          <option value="bitcrush">Bitcrusher</option>
+          <option value="chorus">Chorus</option>
+          <option value="filter">LP Filter</option>
+          <option value="ring">Ring Mod</option>
+          <option value="pitch">Pitch Shift</option>
+        </select>
+      </div>
+
+      <div class="fx-knob-row">
+        <div class="knob-wrap">
+          <label>Droog/Nat</label>
+          <input type="range" id="b-wet" min="0" max="100" value="70">
+        </div>
+        <div class="knob-wrap">
+          <label>Intensiteit</label>
+          <input type="range" id="b-amount" min="0" max="100" value="60">
+        </div>
+        <div class="knob-wrap">
+          <label>Pan</label>
+          <input type="range" id="b-pan" min="-100" max="100" value="30">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MOTION METER -->
+  <div id="motion-bar-wrap">
+    <span id="motion-label">Beweging</span>
+    <div id="motion-track"><div id="motion-fill"></div></div>
+    <span id="motion-val">0%</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ MAIN -->
+<div id="main">
+
+  <!-- CAMERA -->
+  <div id="camera-section">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas-diff"></canvas>
+    <div id="camera-overlay">
+      <div class="pulse-ring"></div>
+      <p>Camera toegang vereist.<br>Beweging = geluid. Stilstand = stilte.</p>
+      <button id="start-btn">▶ Camera Starten</button>
+    </div>
+  </div>
+
+  <!-- TRACK LOADERS -->
+  <div class="tracks">
+    <div class="track-card">
+      <h3>Track A</h3>
+      <label class="file-btn" for="file-a">＋ Laad Audio</label>
+      <input type="file" id="file-a" accept="audio/*">
+      <div class="track-status" id="status-a">Geen bestand</div>
+      <div class="vol-bar"><div class="vol-fill" id="vol-a"></div></div>
+    </div>
+    <div class="track-card">
+      <h3>Track B</h3>
+      <label class="file-btn" for="file-b">＋ Laad Audio</label>
+      <input type="file" id="file-b" accept="audio/*">
+      <div class="track-status" id="status-b">Geen bestand</div>
+      <div class="vol-bar"><div class="vol-fill" id="vol-b"></div></div>
+    </div>
+  </div>
+
+  <div id="play-section">
+    <button id="play-toggle">⏸ Pauzeer / Speel</button>
+  </div>
+
+  <p id="info">
+    Laad twee audiosporen · beweeg voor de camera<br>
+    <strong>Beweging</strong> stuurt volume & effectdiepte · <strong>Stilstand</strong> is stilte
+  </p>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SCRIPT -->
+<script>
+(function () {
+  'use strict';
+
+  // ── DOM refs ──────────────────────────────────────────────────────
+  const video       = document.getElementById('video');
+  const canvasDiff  = document.getElementById('canvas-diff');
+  const ctxDiff     = canvasDiff.getContext('2d');
+  const overlay     = document.getElementById('camera-overlay');
+  const startBtn    = document.getElementById('start-btn');
+  const motionFill  = document.getElementById('motion-fill');
+  const motionVal   = document.getElementById('motion-val');
+  const playToggle  = document.getElementById('play-toggle');
+  const fileA       = document.getElementById('file-a');
+  const fileB       = document.getElementById('file-b');
+  const statusA     = document.getElementById('status-a');
+  const statusB     = document.getElementById('status-b');
+  const volA        = document.getElementById('vol-a');
+  const volB        = document.getElementById('vol-b');
+  const cameraSection = document.getElementById('camera-section');
+
+  // effect controls
+  const aEffect  = document.getElementById('a-effect');
+  const bEffect  = document.getElementById('b-effect');
+  const aWet     = document.getElementById('a-wet');
+  const aAmount  = document.getElementById('a-amount');
+  const aPan     = document.getElementById('a-pan');
+  const bWet     = document.getElementById('b-wet');
+  const bAmount  = document.getElementById('b-amount');
+  const bPan     = document.getElementById('b-pan');
+
+  // ── Audio Context ─────────────────────────────────────────────────
+  let ctx = null;
+
+  function ensureCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  // ── Channel structure ─────────────────────────────────────────────
+  // Each channel: { buffer, source, gainNode, panNode, dryGain, wetGain, fxNode, fxParams }
+  const channels = { a: null, b: null };
+  let playing = false;
+  let motionValue = 0; // 0..1
+
+  // ── Effect factory ────────────────────────────────────────────────
+  function buildEffect(type, ac) {
+    // Returns { input, output, setAmount }
+    switch (type) {
+
+      case 'reverb': {
+        const conv = ac.createConvolver();
+        const len = ac.sampleRate * 3;
+        const buf = ac.createBuffer(2, len, ac.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = buf.getChannelData(ch);
+          for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2);
+        }
+        conv.buffer = buf;
+        return { input: conv, output: conv, setAmount() {} };
+      }
+
+      case 'delay': {
+        const delay = ac.createDelay(2);
+        const fb    = ac.createGain();
+        delay.delayTime.value = 0.35;
+        fb.gain.value = 0.5;
+        delay.connect(fb);
+        fb.connect(delay);
+        return {
+          input: delay, output: delay,
+          setAmount(v) { delay.delayTime.value = 0.1 + v * 0.8; fb.gain.value = v * 0.7; }
+        };
+      }
+
+      case 'distortion': {
+        const ws = ac.createWaveShaper();
+        function makeClip(amount) {
+          const n = 256, curve = new Float32Array(n);
+          const k = amount * 400;
+          for (let i=0; i<n; i++) {
+            const x = (i*2/n)-1;
+            curve[i] = (Math.PI+k)*x / (Math.PI+k*Math.abs(x));
+          }
+          return curve;
+        }
+        ws.curve = makeClip(0.5);
+        ws.oversample = '4x';
+        return {
+          input: ws, output: ws,
+          setAmount(v) { ws.curve = makeClip(v); }
+        };
+      }
+
+      case 'bitcrush': {
+        // ScriptProcessor for bitcrushing
+        const proc = ac.createScriptProcessor(2048, 1, 1);
+        let step = 0.125;
+        proc.onaudioprocess = (e) => {
+          const inp = e.inputBuffer.getChannelData(0);
+          const out = e.outputBuffer.getChannelData(0);
+          for (let i=0; i<inp.length; i++) out[i] = Math.round(inp[i]/step)*step;
+        };
+        return {
+          input: proc, output: proc,
+          setAmount(v) { step = Math.pow(2, -Math.round(1 + v*7)); }
+        };
+      }
+
+      case 'chorus': {
+        const delay = ac.createDelay(0.05);
+        const lfo   = ac.createOscillator();
+        const lfoG  = ac.createGain();
+        lfo.frequency.value = 1.5;
+        lfoG.gain.value = 0.004;
+        lfo.connect(lfoG);
+        lfoG.connect(delay.delayTime);
+        lfo.start();
+        return {
+          input: delay, output: delay,
+          setAmount(v) { lfo.frequency.value = 0.5 + v*4; lfoG.gain.value = v*0.012; }
+        };
+      }
+
+      case 'filter': {
+        const filt = ac.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.frequency.value = 2000;
+        filt.Q.value = 2;
+        return {
+          input: filt, output: filt,
+          setAmount(v) { filt.frequency.value = 80 + v * 8000; filt.Q.value = 1 + v*10; }
+        };
+      }
+
+      case 'ring': {
+        const osc = ac.createOscillator();
+        const ring = ac.createGain();
+        osc.frequency.value = 220;
+        osc.connect(ring.gain);
+        osc.start();
+        return {
+          input: ring, output: ring,
+          setAmount(v) { osc.frequency.value = 30 + v * 1000; }
+        };
+      }
+
+      case 'pitch': {
+        // Simple pitch via playbackRate isn't available as a node; use detune on source
+        // We'll simulate with a bandpass + delay harmonic trick for the effect node
+        const delay = ac.createDelay(0.1);
+        delay.delayTime.value = 0.02;
+        return {
+          input: delay, output: delay,
+          setAmount(v) { delay.delayTime.value = 0.001 + v * 0.08; }
+        };
+      }
+
+      default: {
+        // 'none' – pass-through
+        const g = ac.createGain();
+        return { input: g, output: g, setAmount() {} };
+      }
+    }
+  }
+
+  // ── Build channel graph ───────────────────────────────────────────
+  function buildGraph(id, buffer, effectType, wet, amount, pan) {
+    const ac = ensureCtx();
+
+    const source   = ac.createBufferSource();
+    source.buffer  = buffer;
+    source.loop    = true;
+
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+
+    const panNode  = ac.createStereoPanner();
+    panNode.pan.value = pan / 100;
+
+    const dryGain  = ac.createGain();
+    const wetGain  = ac.createGain();
+    const fxObj    = buildEffect(effectType, ac);
+
+    dryGain.gain.value = 1 - wet/100;
+    wetGain.gain.value = wet/100;
+
+    fxObj.setAmount(amount / 100);
+
+    // source → gainNode → panner → dry/wet split
+    source.connect(gainNode);
+    gainNode.connect(panNode);
+    panNode.connect(dryGain);
+    panNode.connect(fxObj.input);
+    fxObj.output.connect(wetGain);
+    dryGain.connect(ac.destination);
+    wetGain.connect(ac.destination);
+
+    source.start(0);
+
+    return { source, gainNode, panNode, dryGain, wetGain, fxObj };
+  }
+
+  function destroyChannel(id) {
+    const ch = channels[id];
+    if (!ch) return;
+    try { ch.source.stop(); } catch(e) {}
+    channels[id] = null;
+  }
+
+  function restartChannel(id) {
+    const info = channels[id];
+    if (!info || !info.buffer) return;
+    destroyChannel(id);
+    const cfg = id === 'a'
+      ? { effect: aEffect.value, wet: +aWet.value, amount: +aAmount.value, pan: +aPan.value }
+      : { effect: bEffect.value, wet: +bWet.value, amount: +bAmount.value, pan: +bPan.value };
+
+    channels[id] = { buffer: info.buffer, ...buildGraph(id, info.buffer, cfg.effect, cfg.wet, cfg.amount, cfg.pan) };
+    channels[id].gainNode.gain.value = playing ? motionValue : 0;
+  }
+
+  // ── Load audio file ───────────────────────────────────────────────
+  function loadFile(id, file, statusEl) {
+    const ac = ensureCtx();
+    statusEl.textContent = 'Laden…';
+    statusEl.className = 'track-status';
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      ac.decodeAudioData(e.target.result, (buffer) => {
+        destroyChannel(id);
+        const cfg = id === 'a'
+          ? { effect: aEffect.value, wet: +aWet.value, amount: +aAmount.value, pan: +aPan.value }
+          : { effect: bEffect.value, wet: +bWet.value, amount: +bAmount.value, pan: +bPan.value };
+
+        channels[id] = { buffer, ...buildGraph(id, buffer, cfg.effect, cfg.wet, cfg.amount, cfg.pan) };
+        if (!playing) channels[id].gainNode.gain.value = 0;
+
+        const dur = Math.round(buffer.duration);
+        statusEl.textContent = `${file.name} (${dur}s)`;
+        statusEl.className = 'track-status loaded';
+      }, () => {
+        statusEl.textContent = 'Fout bij laden';
+        statusEl.className = 'track-status';
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  fileA.addEventListener('change', e => { if(e.target.files[0]) loadFile('a', e.target.files[0], statusA); });
+  fileB.addEventListener('change', e => { if(e.target.files[0]) loadFile('b', e.target.files[0], statusB); });
+
+  // ── Play toggle ───────────────────────────────────────────────────
+  playToggle.addEventListener('click', () => {
+    ensureCtx();
+    playing = !playing;
+    playToggle.classList.toggle('active', playing);
+    playToggle.textContent = playing ? '⏸ Pauzeer' : '▶ Speel';
+    if (!playing) {
+      ['a','b'].forEach(id => { if(channels[id]) channels[id].gainNode.gain.value = 0; });
+    }
+  });
+
+  // ── Effect change listeners ───────────────────────────────────────
+  [aEffect, aWet, aAmount, aPan].forEach(el => el.addEventListener('input', () => restartChannel('a')));
+  [bEffect, bWet, bAmount, bPan].forEach(el => el.addEventListener('input', () => restartChannel('b')));
+
+  // ── Camera & Motion Detection ─────────────────────────────────────
+  let prevFrame = null;
+  const MOTION_SMOOTH = 0.12;
+  let smoothMotion = 0;
+  let animRAF = null;
+  const diffCanvas = document.createElement('canvas');
+  const diffCtx    = diffCanvas.getContext('2d');
+
+  startBtn.addEventListener('click', () => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          overlay.style.display = 'none';
+          canvasDiff.width  = video.videoWidth;
+          canvasDiff.height = video.videoHeight;
+          diffCanvas.width  = 80; // small for perf
+          diffCanvas.height = 60;
+          startMotionLoop();
+        };
+      })
+      .catch(() => {
+        overlay.querySelector('p').textContent = 'Camera toegang geweigerd. Controleer browserrechten.';
+      });
+  });
+
+  function startMotionLoop() {
+    function loop() {
+      animRAF = requestAnimationFrame(loop);
+
+      if (video.readyState < 2) return;
+
+      // Draw small frame for diff
+      diffCtx.drawImage(video, 0, 0, diffCanvas.width, diffCanvas.height);
+      const cur = diffCtx.getImageData(0, 0, diffCanvas.width, diffCanvas.height);
+
+      let diff = 0;
+      if (prevFrame) {
+        const d1 = cur.data, d2 = prevFrame.data;
+        for (let i=0; i<d1.length; i+=4) {
+          const dr = Math.abs(d1[i]   - d2[i]);
+          const dg = Math.abs(d1[i+1] - d2[i+1]);
+          const db = Math.abs(d1[i+2] - d2[i+2]);
+          diff += (dr+dg+db)/3;
+        }
+        diff /= (d1.length/4);
+        diff = Math.min(diff / 30, 1); // normalize 0..1
+      }
+      prevFrame = cur;
+
+      // Smooth
+      smoothMotion += (diff - smoothMotion) * MOTION_SMOOTH;
+      motionValue = smoothMotion;
+
+      // Update UI meter
+      const pct = Math.round(motionValue * 100);
+      motionFill.style.width = pct + '%';
+      motionVal.textContent  = pct + '%';
+      cameraSection.style.setProperty('--motion', motionValue);
+
+      // Draw diff overlay on main canvas
+      drawDiffOverlay(cur, prevFrame);
+
+      // Update audio gains
+      if (playing) {
+        ['a','b'].forEach(id => {
+          if (channels[id]) {
+            channels[id].gainNode.gain.setTargetAtTime(motionValue, ctx.currentTime, 0.08);
+          }
+        });
+      }
+
+      // Update volume bars
+      if (channels['a']) volA.style.width = (motionValue*100) + '%';
+      if (channels['b']) volB.style.width = (motionValue*100) + '%';
+    }
+    loop();
+  }
+
+  function drawDiffOverlay(cur, prev) {
+    if (!prev) return;
+    const W = canvasDiff.width, H = canvasDiff.height;
+    ctxDiff.drawImage(diffCanvas, 0, 0, W, H);
+    // tint red on high motion
+    ctxDiff.fillStyle = `rgba(255,60,110,${motionValue * 0.5})`;
+    ctxDiff.fillRect(0,0,W,H);
+  }
+
+})();
+</script>
+</body>
+</html>
