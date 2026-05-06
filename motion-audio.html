@@ -191,7 +191,7 @@
     border-radius: 8px;
     overflow: hidden;
     background: #000;
-    aspect-ratio: 4/3;
+    aspect-ratio: 3/4;
     border: 1px solid var(--border);
   }
 
@@ -797,7 +797,7 @@
   const diffCtx    = diffCanvas.getContext('2d');
 
   startBtn.addEventListener('click', () => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } }, audio: false })
       .then(stream => {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
