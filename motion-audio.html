@@ -5,403 +5,126 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BEWEGING / KLANK</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+:root {
+  --bg:#0a0a0f; --surface:#12121a; --border:#2a2a3a;
+  --accent1:#ff3c6e; --accent2:#00e5ff; --accent3:#b8ff57;
+  --text:#e8e8f0; --muted:#5a5a7a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;min-height:100vh;overflow-x:hidden;}
 
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --border: #2a2a3a;
-    --accent1: #ff3c6e;
-    --accent2: #00e5ff;
-    --accent3: #b8ff57;
-    --text: #e8e8f0;
-    --muted: #5a5a7a;
-    --motion: 0;
-  }
+/* TOP BAR */
+#top-bar{position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:8px 12px;}
+#top-bar h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(1.1rem,5vw,1.7rem);letter-spacing:.15em;color:var(--accent1);line-height:1;margin-bottom:7px;}
+#top-bar h1 span{color:var(--accent2);}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+.osc-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.osc-row label{font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;flex-shrink:0;}
+.osc-row select{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Space Mono',monospace;font-size:.52rem;padding:3px 6px;border-radius:3px;appearance:none;cursor:pointer;}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Space Mono', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+.fx-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.fx-ch{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:7px 8px;}
+.fx-ch h3{font-size:.52rem;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:5px;}
+.fx-ch:first-child h3 em{color:var(--accent1);font-style:normal;}
+.fx-ch:last-child  h3 em{color:var(--accent2);font-style:normal;}
+.fx-row{display:flex;align-items:center;gap:5px;}
+.fx-label{font-size:.48rem;color:var(--muted);width:44px;flex-shrink:0;text-transform:uppercase;letter-spacing:.08em;}
+.fx-sel{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Space Mono',monospace;font-size:.48rem;padding:3px 4px;border-radius:3px;appearance:none;cursor:pointer;}
 
-  /* ── HEADER / EFFECTS BAR ── */
-  #effects-bar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(10,10,15,0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 16px;
-  }
+#motion-bar-wrap{margin-top:7px;display:flex;align-items:center;gap:7px;}
+#motion-label{font-size:.5rem;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;flex-shrink:0;}
+#motion-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+#motion-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent1));border-radius:3px;transition:width .08s;}
+#motion-val{font-size:.5rem;color:var(--accent3);width:30px;text-align:right;flex-shrink:0;}
 
-  #effects-bar h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(1.4rem, 5vw, 2.2rem);
-    letter-spacing: 0.15em;
-    color: var(--accent1);
-    line-height: 1;
-    margin-bottom: 10px;
-  }
+/* MAIN */
+#main{padding:11px;display:flex;flex-direction:column;gap:11px;}
 
-  #effects-bar h1 span { color: var(--accent2); }
+/* CAMERA */
+#cam-wrap{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:3/4;border:1px solid var(--border);}
+#video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;}
+#canvas-ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.qlabel{position:absolute;font-family:'Bebas Neue',sans-serif;font-size:.7rem;letter-spacing:.12em;pointer-events:none;padding:4px 7px;border-radius:3px;background:rgba(10,10,15,0.6);line-height:1.3;}
+#ql-tl{top:8px;left:8px;color:var(--accent1);}
+#ql-tr{top:8px;right:8px;color:var(--accent2);text-align:right;}
+#ql-bl{bottom:8px;left:8px;color:var(--accent1);}
+#ql-br{bottom:8px;right:8px;color:var(--accent2);text-align:right;}
+#cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,15,.88);flex-direction:column;gap:12px;text-align:center;padding:20px;}
+#cam-overlay p{font-size:.62rem;color:var(--muted);line-height:1.75;max-width:280px;}
+.pulse-ring{width:50px;height:50px;border-radius:50%;border:2px solid var(--accent1);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.1);}}
+#start-btn{background:var(--accent1);color:#fff;border:none;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.15em;padding:9px 26px;border-radius:4px;cursor:pointer;transition:opacity .2s;}
+#start-btn:hover{opacity:.85;}
 
-  .fx-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
+/* TRACKS */
+.tracks{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.track-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:6px;}
+.track-header{display:flex;align-items:center;justify-content:space-between;}
+.track-header h3{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:.12em;}
+.track-card:first-child .track-header h3{color:var(--accent1);}
+.track-card:last-child  .track-header h3{color:var(--accent2);}
+.btn-rew0{background:none;border:1px solid var(--border);color:var(--muted);font-size:.75rem;width:22px;height:22px;border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s,border-color .15s;}
+.btn-rew0:hover{color:var(--text);border-color:var(--text);}
+.transport{display:flex;gap:4px;}
+.tbtn{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:.55rem;padding:5px 2px;border-radius:3px;cursor:pointer;text-align:center;transition:color .15s,border-color .15s;user-select:none;}
+.tbtn:hover{color:var(--text);border-color:var(--muted);}
+.tbtn.paused{color:var(--accent3);border-color:var(--accent3);}
+.stream-row{display:flex;gap:4px;}
+.stream-inp{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Space Mono',monospace;font-size:.45rem;padding:4px 5px;border-radius:3px;min-width:0;}
+.stream-inp::placeholder{color:var(--muted);}
+.stream-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:.45rem;padding:4px 6px;border-radius:3px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s;}
+.stream-btn:hover{color:var(--text);border-color:var(--muted);}
+.or-row{display:flex;align-items:center;gap:5px;}
+.or-line{flex:1;height:1px;background:var(--border);}
+.or-txt{font-size:.43rem;color:var(--muted);letter-spacing:.1em;}
+.file-btn{display:block;width:100%;background:var(--bg);border:1px dashed var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:.48rem;padding:6px 4px;border-radius:4px;cursor:pointer;text-align:center;text-transform:uppercase;letter-spacing:.1em;transition:border-color .2s,color .2s;}
+.file-btn:hover{border-color:var(--muted);color:var(--text);}
+.track-status{font-size:.46rem;color:var(--muted);letter-spacing:.05em;min-height:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.track-card:first-child .track-status.loaded{color:var(--accent1);}
+.track-card:last-child  .track-status.loaded{color:var(--accent2);}
+.vol-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.vol-fill{height:100%;width:0%;border-radius:2px;transition:width .08s;}
+.track-card:first-child .vol-fill{background:var(--accent1);}
+.track-card:last-child  .vol-fill{background:var(--accent2);}
 
-  .fx-channel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
-  }
+/* GLOBAL PLAY */
+#play-section{display:flex;justify-content:center;}
+#play-toggle{background:none;border:2px solid var(--border);color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.2em;padding:9px 32px;border-radius:4px;cursor:pointer;transition:all .2s;}
+#play-toggle.active{border-color:var(--accent3);color:var(--accent3);box-shadow:0 0 14px rgba(184,255,87,.2);}
 
-  .fx-channel h3 {
-    font-size: 0.6rem;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-
-  .fx-channel h3 em {
-    color: var(--accent1);
-    font-style: normal;
-  }
-
-  .fx-channel:nth-child(2) h3 em { color: var(--accent2); }
-
-  .fx-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 5px;
-  }
-
-  .fx-label {
-    font-size: 0.55rem;
-    color: var(--muted);
-    width: 52px;
-    flex-shrink: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .fx-select {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.55rem;
-    padding: 3px 5px;
-    border-radius: 3px;
-    appearance: none;
-    cursor: pointer;
-  }
-
-  .fx-select:focus { outline: none; border-color: var(--accent1); }
-
-  .fx-knob-row {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .knob-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .knob-wrap label {
-    font-size: 0.5rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .knob-wrap input[type=range] {
-    width: 52px;
-    accent-color: var(--accent1);
-  }
-
-  .fx-channel:nth-child(2) .knob-wrap input[type=range] { accent-color: var(--accent2); }
-
-  /* ── MOTION METER ── */
-  #motion-bar-wrap {
-    margin-top: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  #motion-label {
-    font-size: 0.55rem;
-    color: var(--muted);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-
-  #motion-track {
-    flex: 1;
-    height: 6px;
-    background: var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  #motion-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--accent2), var(--accent1));
-    border-radius: 3px;
-    transition: width 0.1s ease;
-  }
-
-  #motion-val {
-    font-size: 0.55rem;
-    color: var(--accent3);
-    width: 32px;
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  /* ── MAIN CONTENT ── */
-  #main {
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  /* ── CAMERA ── */
-  #camera-section {
-    position: relative;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #000;
-    aspect-ratio: 3/4;
-    border: 1px solid var(--border);
-  }
-
-  #video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-    display: block;
-  }
-
-  #canvas-diff {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.35;
-    mix-blend-mode: screen;
-    transform: scaleX(-1);
-  }
-
-  #camera-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(10,10,15,0.85);
-    flex-direction: column;
-    gap: 12px;
-    text-align: center;
-    padding: 20px;
-  }
-
-  #camera-overlay p {
-    font-size: 0.7rem;
-    color: var(--muted);
-    line-height: 1.6;
-    max-width: 280px;
-  }
-
-  .pulse-ring {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: 2px solid var(--accent1);
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(1.1); }
-  }
-
-  #start-btn {
-    background: var(--accent1);
-    color: #fff;
-    border: none;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.1rem;
-    letter-spacing: 0.15em;
-    padding: 10px 28px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  #start-btn:hover { opacity: 0.85; }
-
-  /* motion glow on camera */
-  #camera-section::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 8px;
-    pointer-events: none;
-    box-shadow: inset 0 0 calc(var(--motion) * 40px) rgba(255,60,110,calc(var(--motion) * 0.6));
-    transition: box-shadow 0.1s;
-  }
-
-  /* ── TRACK LOADERS ── */
-  .tracks {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .track-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .track-card h3 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.1rem;
-    letter-spacing: 0.12em;
-  }
-
-  .track-card:first-child h3 { color: var(--accent1); }
-  .track-card:last-child h3 { color: var(--accent2); }
-
-  .file-btn {
-    display: block;
-    width: 100%;
-    background: var(--bg);
-    border: 1px dashed var(--border);
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.55rem;
-    padding: 8px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    transition: border-color 0.2s, color 0.2s;
-  }
-
-  .file-btn:hover { border-color: var(--accent1); color: var(--text); }
-
-  .track-card:last-child .file-btn:hover { border-color: var(--accent2); }
-
-  .track-status {
-    font-size: 0.52rem;
-    color: var(--muted);
-    letter-spacing: 0.06em;
-    min-height: 14px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .track-card:first-child .track-status.loaded { color: var(--accent1); }
-  .track-card:last-child .track-status.loaded { color: var(--accent2); }
-
-  .vol-bar {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .vol-fill {
-    height: 100%;
-    width: 0%;
-    border-radius: 2px;
-    transition: width 0.08s;
-  }
-
-  .track-card:first-child .vol-fill { background: var(--accent1); }
-  .track-card:last-child .vol-fill { background: var(--accent2); }
-
-  /* ── PLAY TOGGLE ── */
-  #play-section {
-    display: flex;
-    justify-content: center;
-  }
-
-  #play-toggle {
-    background: none;
-    border: 2px solid var(--border);
-    color: var(--muted);
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1rem;
-    letter-spacing: 0.2em;
-    padding: 10px 32px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  #play-toggle.active {
-    border-color: var(--accent3);
-    color: var(--accent3);
-    box-shadow: 0 0 16px rgba(184,255,87,0.2);
-  }
-
-  /* ── INFO ── */
-  #info {
-    font-size: 0.52rem;
-    color: var(--muted);
-    line-height: 1.7;
-    text-align: center;
-    letter-spacing: 0.06em;
-  }
-
-  #info strong { color: var(--accent3); }
-
-  input[type=file] { display: none; }
+#info{font-size:.48rem;color:var(--muted);line-height:1.85;text-align:center;letter-spacing:.06em;}
+#info strong{color:var(--accent3);}
+input[type=file]{display:none;}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════ EFFECTS BAR -->
-<div id="effects-bar">
+<!-- TOP BAR -->
+<div id="top-bar">
   <h1>BEWEGING <span>/</span> KLANK</h1>
 
+  <div class="osc-row">
+    <label>Bewegingsgolf</label>
+    <select id="osc-type">
+      <option value="sine">Sinusgolf</option>
+      <option value="square">Blokgolf</option>
+      <option value="sawtooth">Zaagtand</option>
+      <option value="triangle">Driehoeksgolf</option>
+      <option value="pulse">Pulsgolf (25%)</option>
+      <option value="noise">Witte ruis</option>
+      <option value="chaos">Chaotische golf</option>
+      <option value="formant">Formantgolf</option>
+      <option value="additive">Additief (8 harm.)</option>
+    </select>
+  </div>
+
   <div class="fx-grid">
-
-    <!-- CHANNEL A -->
-    <div class="fx-channel" id="fx-a">
+    <div class="fx-ch">
       <h3>Kanaal <em>A</em></h3>
-
       <div class="fx-row">
         <span class="fx-label">Effect</span>
-        <select class="fx-select" id="a-effect">
+        <select class="fx-sel" id="a-effect">
           <option value="none">Geen</option>
           <option value="reverb">Hall Reverb</option>
           <option value="delay">Ping-Pong Delay</option>
@@ -410,33 +133,16 @@
           <option value="chorus">Chorus</option>
           <option value="filter">LP Filter</option>
           <option value="ring">Ring Mod</option>
-          <option value="pitch">Pitch Shift</option>
+          <option value="flanger">Flanger</option>
+          <option value="tremolo">Tremolo</option>
         </select>
       </div>
-
-      <div class="fx-knob-row">
-        <div class="knob-wrap">
-          <label>Droog/Nat</label>
-          <input type="range" id="a-wet" min="0" max="100" value="50">
-        </div>
-        <div class="knob-wrap">
-          <label>Intensiteit</label>
-          <input type="range" id="a-amount" min="0" max="100" value="50">
-        </div>
-        <div class="knob-wrap">
-          <label>Pan</label>
-          <input type="range" id="a-pan" min="-100" max="100" value="-30">
-        </div>
-      </div>
     </div>
-
-    <!-- CHANNEL B -->
-    <div class="fx-channel" id="fx-b">
-      <h3>Kanaal <em style="color:var(--accent2)">B</em></h3>
-
+    <div class="fx-ch">
+      <h3>Kanaal <em>B</em></h3>
       <div class="fx-row">
         <span class="fx-label">Effect</span>
-        <select class="fx-select" id="b-effect">
+        <select class="fx-sel" id="b-effect">
           <option value="none">Geen</option>
           <option value="reverb" selected>Hall Reverb</option>
           <option value="delay">Ping-Pong Delay</option>
@@ -445,29 +151,13 @@
           <option value="chorus">Chorus</option>
           <option value="filter">LP Filter</option>
           <option value="ring">Ring Mod</option>
-          <option value="pitch">Pitch Shift</option>
+          <option value="flanger">Flanger</option>
+          <option value="tremolo">Tremolo</option>
         </select>
       </div>
-
-      <div class="fx-knob-row">
-        <div class="knob-wrap">
-          <label>Droog/Nat</label>
-          <input type="range" id="b-wet" min="0" max="100" value="70">
-        </div>
-        <div class="knob-wrap">
-          <label>Intensiteit</label>
-          <input type="range" id="b-amount" min="0" max="100" value="60">
-        </div>
-        <div class="knob-wrap">
-          <label>Pan</label>
-          <input type="range" id="b-pan" min="-100" max="100" value="30">
-        </div>
-      </div>
     </div>
-
   </div>
 
-  <!-- MOTION METER -->
   <div id="motion-bar-wrap">
     <span id="motion-label">Beweging</span>
     <div id="motion-track"><div id="motion-fill"></div></div>
@@ -475,406 +165,511 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════ MAIN -->
+<!-- MAIN -->
 <div id="main">
 
   <!-- CAMERA -->
-  <div id="camera-section">
+  <div id="cam-wrap">
     <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas-diff"></canvas>
-    <div id="camera-overlay">
+    <canvas id="canvas-ov"></canvas>
+
+    <div class="qlabel" id="ql-tl">A WET<br><span id="v-aw">0%</span></div>
+    <div class="qlabel" id="ql-tr">B WET<br><span id="v-bw">0%</span></div>
+    <div class="qlabel" id="ql-bl">A INTENSITEIT<br><span id="v-aa">0%</span></div>
+    <div class="qlabel" id="ql-br">B INTENSITEIT<br><span id="v-ba">0%</span></div>
+
+    <div id="cam-overlay">
       <div class="pulse-ring"></div>
-      <p>Camera toegang vereist.<br>Beweging = geluid. Stilstand = stilte.</p>
+      <p>Camera toegang vereist.<br>
+         Beweging linksboven → droog/nat kanaal A<br>
+         Beweging rechtsboven → droog/nat kanaal B<br>
+         Linksonder → intensiteit A · Rechtsonder → intensiteit B<br>
+         Stilstand = stilte.</p>
       <button id="start-btn">▶ Camera Starten</button>
     </div>
   </div>
 
-  <!-- TRACK LOADERS -->
+  <!-- TRACKS -->
   <div class="tracks">
     <div class="track-card">
-      <h3>Track A</h3>
-      <label class="file-btn" for="file-a">＋ Laad Audio</label>
-      <input type="file" id="file-a" accept="audio/*">
-      <div class="track-status" id="status-a">Geen bestand</div>
+      <div class="track-header">
+        <h3>Track A</h3>
+        <button class="btn-rew0" id="rew0-a" title="Terug naar begin">⏮</button>
+      </div>
+      <div class="transport">
+        <button class="tbtn" id="back-a">−1s</button>
+        <button class="tbtn" id="pause-a">⏸</button>
+        <button class="tbtn" id="fwd-a">+1s</button>
+      </div>
+      <div class="stream-row">
+        <input class="stream-inp" id="url-a" type="url" placeholder="Stream URL…">
+        <button class="stream-btn" id="url-load-a">▶ URL</button>
+      </div>
+      <div class="or-row"><div class="or-line"></div><span class="or-txt">OF</span><div class="or-line"></div></div>
+      <label class="file-btn" for="file-a">＋ Laad bestand</label>
+      <input type="file" id="file-a" accept="audio/*,video/*">
+      <div class="track-status" id="status-a">Geen bron</div>
       <div class="vol-bar"><div class="vol-fill" id="vol-a"></div></div>
     </div>
     <div class="track-card">
-      <h3>Track B</h3>
-      <label class="file-btn" for="file-b">＋ Laad Audio</label>
-      <input type="file" id="file-b" accept="audio/*">
-      <div class="track-status" id="status-b">Geen bestand</div>
+      <div class="track-header">
+        <h3>Track B</h3>
+        <button class="btn-rew0" id="rew0-b" title="Terug naar begin">⏮</button>
+      </div>
+      <div class="transport">
+        <button class="tbtn" id="back-b">−1s</button>
+        <button class="tbtn" id="pause-b">⏸</button>
+        <button class="tbtn" id="fwd-b">+1s</button>
+      </div>
+      <div class="stream-row">
+        <input class="stream-inp" id="url-b" type="url" placeholder="Stream URL…">
+        <button class="stream-btn" id="url-load-b">▶ URL</button>
+      </div>
+      <div class="or-row"><div class="or-line"></div><span class="or-txt">OF</span><div class="or-line"></div></div>
+      <label class="file-btn" for="file-b">＋ Laad bestand</label>
+      <input type="file" id="file-b" accept="audio/*,video/*">
+      <div class="track-status" id="status-b">Geen bron</div>
       <div class="vol-bar"><div class="vol-fill" id="vol-b"></div></div>
     </div>
   </div>
 
   <div id="play-section">
-    <button id="play-toggle">⏸ Pauzeer / Speel</button>
+    <button id="play-toggle">▶ Speel</button>
   </div>
 
   <p id="info">
-    Laad twee audiosporen · beweeg voor de camera<br>
-    <strong>Beweging</strong> stuurt volume & effectdiepte · <strong>Stilstand</strong> is stilte
+    Laad bronnen (bestand of URL) · start camera · beweeg<br>
+    <strong>Linksboven</strong> = Wet A &nbsp;·&nbsp; <strong>Rechtsboven</strong> = Wet B<br>
+    <strong>Linksonder</strong> = Intensiteit A &nbsp;·&nbsp; <strong>Rechtsonder</strong> = Intensiteit B
   </p>
-
 </div>
 
-<!-- ═══════════════════════════════════════════════════ SCRIPT -->
 <script>
-(function () {
-  'use strict';
+(function(){
+'use strict';
 
-  // ── DOM refs ──────────────────────────────────────────────────────
-  const video       = document.getElementById('video');
-  const canvasDiff  = document.getElementById('canvas-diff');
-  const ctxDiff     = canvasDiff.getContext('2d');
-  const overlay     = document.getElementById('camera-overlay');
-  const startBtn    = document.getElementById('start-btn');
-  const motionFill  = document.getElementById('motion-fill');
-  const motionVal   = document.getElementById('motion-val');
-  const playToggle  = document.getElementById('play-toggle');
-  const fileA       = document.getElementById('file-a');
-  const fileB       = document.getElementById('file-b');
-  const statusA     = document.getElementById('status-a');
-  const statusB     = document.getElementById('status-b');
-  const volA        = document.getElementById('vol-a');
-  const volB        = document.getElementById('vol-b');
-  const cameraSection = document.getElementById('camera-section');
+// ── AudioContext ───────────────────────────────────────────────────
+let AC = null;
+function ensureAC(){
+  if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended') AC.resume();
+  return AC;
+}
 
-  // effect controls
-  const aEffect  = document.getElementById('a-effect');
-  const bEffect  = document.getElementById('b-effect');
-  const aWet     = document.getElementById('a-wet');
-  const aAmount  = document.getElementById('a-amount');
-  const aPan     = document.getElementById('a-pan');
-  const bWet     = document.getElementById('b-wet');
-  const bAmount  = document.getElementById('b-amount');
-  const bPan     = document.getElementById('b-pan');
+// ── State ──────────────────────────────────────────────────────────
+let playing = false;
+let motionValue = 0;
+// Quadrants: [0]=TL, [1]=TR, [2]=BL, [3]=BR
+let smoothQ = [0,0,0,0];
 
-  // ── Audio Context ─────────────────────────────────────────────────
-  let ctx = null;
+// Channels: { type, buffer?, src?, htmlAudio?, mediaNode?, masterGain, panN, fxObj, paused, pauseOffset, startedAt }
+const CH = { a: null, b: null };
 
-  function ensureCtx() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
-  }
+// ── Oscillator layer ──────────────────────────────────────────────
+let oscNodes = [];
+let oscGain  = null;
+const oscTypeEl = document.getElementById('osc-type');
 
-  // ── Channel structure ─────────────────────────────────────────────
-  // Each channel: { buffer, source, gainNode, panNode, dryGain, wetGain, fxNode, fxParams }
-  const channels = { a: null, b: null };
-  let playing = false;
-  let motionValue = 0; // 0..1
+function buildOscLayer(){
+  const ac = ensureAC();
+  oscNodes.forEach(n=>{ try{n.disconnect(); if(n.stop) n.stop();}catch(e){} });
+  oscNodes = [];
 
-  // ── Effect factory ────────────────────────────────────────────────
-  function buildEffect(type, ac) {
-    // Returns { input, output, setAmount }
-    switch (type) {
+  if(!oscGain){ oscGain = ac.createGain(); oscGain.connect(ac.destination); }
+  oscGain.gain.value = 0;
 
-      case 'reverb': {
-        const conv = ac.createConvolver();
-        const len = ac.sampleRate * 3;
-        const buf = ac.createBuffer(2, len, ac.sampleRate);
-        for (let ch = 0; ch < 2; ch++) {
-          const d = buf.getChannelData(ch);
-          for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2);
-        }
-        conv.buffer = buf;
-        return { input: conv, output: conv, setAmount() {} };
+  const type = oscTypeEl.value;
+
+  if(type==='noise'){
+    const len=ac.sampleRate*2, buf=ac.createBuffer(1,len,ac.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const s=ac.createBufferSource(); s.buffer=buf; s.loop=true; s.connect(oscGain); s.start();
+    oscNodes.push(s);
+
+  } else if(type==='chaos'){
+    const proc=ac.createScriptProcessor(512,0,1);
+    let x=0.1,y=0,z=0,dt=0.005;
+    proc.onaudioprocess=e=>{
+      const o=e.outputBuffer.getChannelData(0);
+      for(let i=0;i<o.length;i++){
+        const dx=10*(y-x),dy=x*(28-z)-y,dz=x*y-(8/3)*z;
+        x+=dx*dt; y+=dy*dt; z+=dz*dt;
+        o[i]=Math.tanh(x*0.05);
       }
-
-      case 'delay': {
-        const delay = ac.createDelay(2);
-        const fb    = ac.createGain();
-        delay.delayTime.value = 0.35;
-        fb.gain.value = 0.5;
-        delay.connect(fb);
-        fb.connect(delay);
-        return {
-          input: delay, output: delay,
-          setAmount(v) { delay.delayTime.value = 0.1 + v * 0.8; fb.gain.value = v * 0.7; }
-        };
-      }
-
-      case 'distortion': {
-        const ws = ac.createWaveShaper();
-        function makeClip(amount) {
-          const n = 256, curve = new Float32Array(n);
-          const k = amount * 400;
-          for (let i=0; i<n; i++) {
-            const x = (i*2/n)-1;
-            curve[i] = (Math.PI+k)*x / (Math.PI+k*Math.abs(x));
-          }
-          return curve;
-        }
-        ws.curve = makeClip(0.5);
-        ws.oversample = '4x';
-        return {
-          input: ws, output: ws,
-          setAmount(v) { ws.curve = makeClip(v); }
-        };
-      }
-
-      case 'bitcrush': {
-        // ScriptProcessor for bitcrushing
-        const proc = ac.createScriptProcessor(2048, 1, 1);
-        let step = 0.125;
-        proc.onaudioprocess = (e) => {
-          const inp = e.inputBuffer.getChannelData(0);
-          const out = e.outputBuffer.getChannelData(0);
-          for (let i=0; i<inp.length; i++) out[i] = Math.round(inp[i]/step)*step;
-        };
-        return {
-          input: proc, output: proc,
-          setAmount(v) { step = Math.pow(2, -Math.round(1 + v*7)); }
-        };
-      }
-
-      case 'chorus': {
-        const delay = ac.createDelay(0.05);
-        const lfo   = ac.createOscillator();
-        const lfoG  = ac.createGain();
-        lfo.frequency.value = 1.5;
-        lfoG.gain.value = 0.004;
-        lfo.connect(lfoG);
-        lfoG.connect(delay.delayTime);
-        lfo.start();
-        return {
-          input: delay, output: delay,
-          setAmount(v) { lfo.frequency.value = 0.5 + v*4; lfoG.gain.value = v*0.012; }
-        };
-      }
-
-      case 'filter': {
-        const filt = ac.createBiquadFilter();
-        filt.type = 'lowpass';
-        filt.frequency.value = 2000;
-        filt.Q.value = 2;
-        return {
-          input: filt, output: filt,
-          setAmount(v) { filt.frequency.value = 80 + v * 8000; filt.Q.value = 1 + v*10; }
-        };
-      }
-
-      case 'ring': {
-        const osc = ac.createOscillator();
-        const ring = ac.createGain();
-        osc.frequency.value = 220;
-        osc.connect(ring.gain);
-        osc.start();
-        return {
-          input: ring, output: ring,
-          setAmount(v) { osc.frequency.value = 30 + v * 1000; }
-        };
-      }
-
-      case 'pitch': {
-        // Simple pitch via playbackRate isn't available as a node; use detune on source
-        // We'll simulate with a bandpass + delay harmonic trick for the effect node
-        const delay = ac.createDelay(0.1);
-        delay.delayTime.value = 0.02;
-        return {
-          input: delay, output: delay,
-          setAmount(v) { delay.delayTime.value = 0.001 + v * 0.08; }
-        };
-      }
-
-      default: {
-        // 'none' – pass-through
-        const g = ac.createGain();
-        return { input: g, output: g, setAmount() {} };
-      }
-    }
-  }
-
-  // ── Build channel graph ───────────────────────────────────────────
-  function buildGraph(id, buffer, effectType, wet, amount, pan) {
-    const ac = ensureCtx();
-
-    const source   = ac.createBufferSource();
-    source.buffer  = buffer;
-    source.loop    = true;
-
-    const gainNode = ac.createGain();
-    gainNode.gain.value = 0;
-
-    const panNode  = ac.createStereoPanner();
-    panNode.pan.value = pan / 100;
-
-    const dryGain  = ac.createGain();
-    const wetGain  = ac.createGain();
-    const fxObj    = buildEffect(effectType, ac);
-
-    dryGain.gain.value = 1 - wet/100;
-    wetGain.gain.value = wet/100;
-
-    fxObj.setAmount(amount / 100);
-
-    // source → gainNode → panner → dry/wet split
-    source.connect(gainNode);
-    gainNode.connect(panNode);
-    panNode.connect(dryGain);
-    panNode.connect(fxObj.input);
-    fxObj.output.connect(wetGain);
-    dryGain.connect(ac.destination);
-    wetGain.connect(ac.destination);
-
-    source.start(0);
-
-    return { source, gainNode, panNode, dryGain, wetGain, fxObj };
-  }
-
-  function destroyChannel(id) {
-    const ch = channels[id];
-    if (!ch) return;
-    try { ch.source.stop(); } catch(e) {}
-    channels[id] = null;
-  }
-
-  function restartChannel(id) {
-    const info = channels[id];
-    if (!info || !info.buffer) return;
-    destroyChannel(id);
-    const cfg = id === 'a'
-      ? { effect: aEffect.value, wet: +aWet.value, amount: +aAmount.value, pan: +aPan.value }
-      : { effect: bEffect.value, wet: +bWet.value, amount: +bAmount.value, pan: +bPan.value };
-
-    channels[id] = { buffer: info.buffer, ...buildGraph(id, info.buffer, cfg.effect, cfg.wet, cfg.amount, cfg.pan) };
-    channels[id].gainNode.gain.value = playing ? motionValue : 0;
-  }
-
-  // ── Load audio file ───────────────────────────────────────────────
-  function loadFile(id, file, statusEl) {
-    const ac = ensureCtx();
-    statusEl.textContent = 'Laden…';
-    statusEl.className = 'track-status';
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      ac.decodeAudioData(e.target.result, (buffer) => {
-        destroyChannel(id);
-        const cfg = id === 'a'
-          ? { effect: aEffect.value, wet: +aWet.value, amount: +aAmount.value, pan: +aPan.value }
-          : { effect: bEffect.value, wet: +bWet.value, amount: +bAmount.value, pan: +bPan.value };
-
-        channels[id] = { buffer, ...buildGraph(id, buffer, cfg.effect, cfg.wet, cfg.amount, cfg.pan) };
-        if (!playing) channels[id].gainNode.gain.value = 0;
-
-        const dur = Math.round(buffer.duration);
-        statusEl.textContent = `${file.name} (${dur}s)`;
-        statusEl.className = 'track-status loaded';
-      }, () => {
-        statusEl.textContent = 'Fout bij laden';
-        statusEl.className = 'track-status';
-      });
     };
-    reader.readAsArrayBuffer(file);
-  }
+    proc.connect(oscGain); oscNodes.push(proc);
 
-  fileA.addEventListener('change', e => { if(e.target.files[0]) loadFile('a', e.target.files[0], statusA); });
-  fileB.addEventListener('change', e => { if(e.target.files[0]) loadFile('b', e.target.files[0], statusB); });
+  } else if(type==='formant'){
+    [[800,110],[1200,165],[2500,220]].forEach(([fq,oq],i)=>{
+      const o=ac.createOscillator(),g=ac.createGain(),fl=ac.createBiquadFilter();
+      fl.type='bandpass'; fl.frequency.value=fq; fl.Q.value=5;
+      o.frequency.value=oq; g.gain.value=[1,.6,.3][i];
+      o.connect(fl); fl.connect(g); g.connect(oscGain); o.start(); oscNodes.push(o);
+    });
 
-  // ── Play toggle ───────────────────────────────────────────────────
-  playToggle.addEventListener('click', () => {
-    ensureCtx();
-    playing = !playing;
-    playToggle.classList.toggle('active', playing);
-    playToggle.textContent = playing ? '⏸ Pauzeer' : '▶ Speel';
-    if (!playing) {
-      ['a','b'].forEach(id => { if(channels[id]) channels[id].gainNode.gain.value = 0; });
+  } else if(type==='additive'){
+    for(let h=1;h<=8;h++){
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='sine'; o.frequency.value=110*h; g.gain.value=0.5/h;
+      o.connect(g); g.connect(oscGain); o.start(); oscNodes.push(o);
     }
+
+  } else if(type==='pulse'){
+    const proc=ac.createScriptProcessor(512,0,1);
+    let ph=0;
+    proc.onaudioprocess=e=>{
+      const o=e.outputBuffer.getChannelData(0), inc=110/ac.sampleRate;
+      for(let i=0;i<o.length;i++){ o[i]=ph<0.25?1:-1; ph=(ph+inc)%1; }
+    };
+    proc.connect(oscGain); oscNodes.push(proc);
+
+  } else {
+    const o=ac.createOscillator(); o.type=type; o.frequency.value=110;
+    o.connect(oscGain); o.start(); oscNodes.push(o);
+  }
+}
+
+oscTypeEl.addEventListener('change', buildOscLayer);
+
+// ── Effect factory ─────────────────────────────────────────────────
+function makeEffect(type, ac){
+  const dry=ac.createGain(), wet=ac.createGain();
+  dry.gain.value=1; wet.gain.value=0;
+  let fxIn, fxOut, amountFn=()=>{}, stopFn=()=>{};
+
+  switch(type){
+    case 'reverb':{
+      const c=ac.createConvolver(), len=ac.sampleRate*3, b=ac.createBuffer(2,len,ac.sampleRate);
+      for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);}
+      c.buffer=b; fxIn=fxOut=c; break;
+    }
+    case 'delay':{
+      const d=ac.createDelay(2),fb=ac.createGain(); d.delayTime.value=.35; fb.gain.value=.5;
+      d.connect(fb); fb.connect(d); fxIn=fxOut=d;
+      amountFn=v=>{ d.delayTime.value=.08+v*.7; fb.gain.value=v*.75; }; break;
+    }
+    case 'distortion':{
+      const ws=ac.createWaveShaper(); ws.oversample='4x';
+      const clip=v=>{const k=v*400,n=256,c=new Float32Array(n); for(let i=0;i<n;i++){const x=(i*2/n)-1; c[i]=(Math.PI+k)*x/(Math.PI+k*Math.abs(x));} return c;};
+      ws.curve=clip(.5); fxIn=fxOut=ws; amountFn=v=>ws.curve=clip(v); break;
+    }
+    case 'bitcrush':{
+      const p=ac.createScriptProcessor(2048,1,1); let step=.125;
+      p.onaudioprocess=e=>{const i=e.inputBuffer.getChannelData(0),o=e.outputBuffer.getChannelData(0); for(let j=0;j<i.length;j++) o[j]=Math.round(i[j]/step)*step;};
+      fxIn=fxOut=p; amountFn=v=>step=Math.pow(2,-Math.round(1+v*7)); stopFn=()=>p.disconnect(); break;
+    }
+    case 'chorus':{
+      const d=ac.createDelay(.05),l=ac.createOscillator(),lg=ac.createGain();
+      l.frequency.value=1.5; lg.gain.value=.004; l.connect(lg); lg.connect(d.delayTime); l.start();
+      fxIn=fxOut=d; amountFn=v=>{l.frequency.value=.5+v*5; lg.gain.value=v*.015;}; stopFn=()=>{try{l.stop();}catch(e){}}; break;
+    }
+    case 'filter':{
+      const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=2000; f.Q.value=2;
+      fxIn=fxOut=f; amountFn=v=>{f.frequency.value=60+v*8000; f.Q.value=.5+v*12;}; break;
+    }
+    case 'ring':{
+      const o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=200; o.connect(g.gain); o.start();
+      fxIn=fxOut=g; amountFn=v=>o.frequency.value=20+v*1200; stopFn=()=>{try{o.stop();}catch(e){}}; break;
+    }
+    case 'flanger':{
+      const d=ac.createDelay(.02),l=ac.createOscillator(),lg=ac.createGain(),fb=ac.createGain();
+      l.frequency.value=.3; lg.gain.value=.002; fb.gain.value=.7;
+      l.connect(lg); lg.connect(d.delayTime); l.start(); d.connect(fb); fb.connect(d);
+      fxIn=fxOut=d; amountFn=v=>{l.frequency.value=.1+v*4; lg.gain.value=v*.008; fb.gain.value=v*.85;}; stopFn=()=>{try{l.stop();}catch(e){}}; break;
+    }
+    case 'tremolo':{
+      const tg=ac.createGain(),l=ac.createOscillator(),ld=ac.createGain();
+      l.frequency.value=4; ld.gain.value=.5; tg.gain.value=.5;
+      l.connect(ld); ld.connect(tg.gain); l.start();
+      fxIn=fxOut=tg; amountFn=v=>{l.frequency.value=.5+v*15; ld.gain.value=v;}; stopFn=()=>{try{l.stop();}catch(e){}}; break;
+    }
+    default:{ const g=ac.createGain(); fxIn=fxOut=g; break; }
+  }
+  return { dry, wet, fxIn, fxOut, amountFn, stopFn };
+}
+
+// ── Routing helper ─────────────────────────────────────────────────
+function routeChannel(ch, ac, src /* AudioNode */){
+  // src → masterGain → panN → (dry | fxIn→fxOut→wet) → destination
+  const id = ch._id;
+  const eff = document.getElementById(id+'-effect').value;
+  const fx = makeEffect(eff, ac);
+  ch.fxObj = fx;
+  ch.masterGain.connect(ch.panN);
+  ch.panN.connect(fx.dry);
+  ch.panN.connect(fx.fxIn);
+  fx.fxOut.connect(fx.wet);
+  fx.dry.connect(ac.destination);
+  fx.wet.connect(ac.destination);
+}
+
+// ── Channel build ──────────────────────────────────────────────────
+function buildBufferChannel(id, buffer){
+  const ac = ensureAC();
+  const masterGain = ac.createGain(); masterGain.gain.value = playing ? motionValue : 0;
+  const panN = ac.createStereoPanner(); panN.pan.value = id==='a' ? -.4 : .4;
+  const src = ac.createBufferSource(); src.buffer=buffer; src.loop=true;
+  src.connect(masterGain);
+  const ch = { _id:id, type:'buffer', buffer, src, masterGain, panN, fxObj:null, paused:false, pauseOffset:0, startedAt:0 };
+  routeChannel(ch, ac, masterGain);
+  src.start(0); ch.startedAt = ac.currentTime;
+  return ch;
+}
+
+function buildStreamChannel(id, audio){
+  const ac = ensureAC();
+  const masterGain = ac.createGain(); masterGain.gain.value = playing ? motionValue : 0;
+  const panN = ac.createStereoPanner(); panN.pan.value = id==='a' ? -.4 : .4;
+  const mediaNode = ac.createMediaElementSource(audio);
+  mediaNode.connect(masterGain);
+  const ch = { _id:id, type:'stream', htmlAudio:audio, mediaNode, masterGain, panN, fxObj:null };
+  routeChannel(ch, ac, masterGain);
+  audio.play().catch(()=>{});
+  return ch;
+}
+
+function destroyChannel(id){
+  const ch=CH[id]; if(!ch) return;
+  ch.fxObj.stopFn();
+  try{ ch.masterGain.disconnect(); ch.panN.disconnect(); ch.fxObj.dry.disconnect(); ch.fxObj.wet.disconnect(); ch.fxObj.fxIn.disconnect(); }catch(e){}
+  if(ch.type==='buffer'){ try{ ch.src.stop(); }catch(e){} }
+  else { ch.htmlAudio.pause(); try{ ch.mediaNode.disconnect(); }catch(e){} }
+  CH[id]=null;
+}
+
+// ── Effect hot-swap (no restart) ───────────────────────────────────
+function swapEffect(id){
+  const ch=CH[id]; if(!ch) return;
+  const ac=ensureAC();
+  ch.fxObj.stopFn();
+  try{ ch.panN.disconnect(); ch.fxObj.dry.disconnect(); ch.fxObj.wet.disconnect(); ch.fxObj.fxIn.disconnect(); ch.fxObj.fxOut.disconnect(); }catch(e){}
+  const eff=document.getElementById(id+'-effect').value;
+  const fx=makeEffect(eff,ac);
+  ch.fxObj=fx;
+  ch.panN.connect(fx.dry); ch.panN.connect(fx.fxIn);
+  fx.fxOut.connect(fx.wet); fx.dry.connect(ac.destination); fx.wet.connect(ac.destination);
+  // reapply current motion values
+  const wet = id==='a' ? smoothQ[0] : smoothQ[1];
+  const amt = id==='a' ? smoothQ[2] : smoothQ[3];
+  fx.dry.gain.value=1-wet; fx.wet.gain.value=wet; fx.amountFn(amt);
+}
+
+// ── Load file ──────────────────────────────────────────────────────
+function loadFile(id, file){
+  const ac=ensureAC(), statusEl=document.getElementById('status-'+id);
+  statusEl.textContent='Laden…'; statusEl.className='track-status';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    ac.decodeAudioData(e.target.result, buf=>{
+      destroyChannel(id);
+      CH[id]=buildBufferChannel(id, buf);
+      statusEl.textContent=file.name+' ('+Math.round(buf.duration)+'s)';
+      statusEl.className='track-status loaded';
+    }, ()=>{ statusEl.textContent='Decoderen mislukt'; });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Load stream URL ────────────────────────────────────────────────
+function loadStream(id, url){
+  const statusEl=document.getElementById('status-'+id);
+  statusEl.textContent='Verbinden…'; statusEl.className='track-status';
+  destroyChannel(id);
+  const audio=new Audio(); audio.crossOrigin='anonymous'; audio.src=url; audio.loop=true;
+  ensureAC();
+  CH[id]=buildStreamChannel(id, audio);
+  audio.addEventListener('canplay',()=>{ statusEl.textContent='🔴 '+url.substring(0,22)+'…'; statusEl.className='track-status loaded'; },{once:true});
+  audio.addEventListener('error',()=>{ statusEl.textContent='Stream fout'; },{once:true});
+}
+
+document.getElementById('file-a').addEventListener('change',e=>{ if(e.target.files[0]) loadFile('a',e.target.files[0]); });
+document.getElementById('file-b').addEventListener('change',e=>{ if(e.target.files[0]) loadFile('b',e.target.files[0]); });
+document.getElementById('url-load-a').addEventListener('click',()=>{ const u=document.getElementById('url-a').value.trim(); if(u) loadStream('a',u); });
+document.getElementById('url-load-b').addEventListener('click',()=>{ const u=document.getElementById('url-b').value.trim(); if(u) loadStream('b',u); });
+document.getElementById('a-effect').addEventListener('change',()=>swapEffect('a'));
+document.getElementById('b-effect').addEventListener('change',()=>swapEffect('b'));
+
+// ── Transport ──────────────────────────────────────────────────────
+function seekCh(id, delta){
+  const ch=CH[id]; if(!ch) return;
+  const ac=ensureAC();
+  if(ch.type==='stream'){
+    if(isFinite(ch.htmlAudio.duration)) ch.htmlAudio.currentTime=Math.max(0,ch.htmlAudio.currentTime+delta);
+  } else {
+    if(ch.paused){
+      ch.pauseOffset=Math.max(0,(ch.pauseOffset+delta)%ch.buffer.duration);
+    } else {
+      const elapsed=(ac.currentTime-ch.startedAt)+ch.pauseOffset;
+      const newOff=Math.max(0,(elapsed+delta)%ch.buffer.duration);
+      try{ ch.src.stop(); }catch(e){}
+      const ns=ac.createBufferSource(); ns.buffer=ch.buffer; ns.loop=true; ns.connect(ch.masterGain); ns.start(0,newOff);
+      ch.src=ns; ch.startedAt=ac.currentTime; ch.pauseOffset=newOff;
+    }
+  }
+}
+
+function rewindCh(id){
+  const ch=CH[id]; if(!ch) return;
+  const ac=ensureAC();
+  if(ch.type==='stream'){
+    ch.htmlAudio.currentTime=0;
+  } else {
+    ch.pauseOffset=0;
+    if(!ch.paused){
+      try{ ch.src.stop(); }catch(e){}
+      const ns=ac.createBufferSource(); ns.buffer=ch.buffer; ns.loop=true; ns.connect(ch.masterGain); ns.start(0,0);
+      ch.src=ns; ch.startedAt=ac.currentTime;
+    }
+  }
+}
+
+function togglePauseCh(id){
+  const ch=CH[id]; if(!ch) return;
+  const ac=ensureAC();
+  const btn=document.getElementById('pause-'+id);
+  if(ch.type==='stream'){
+    if(ch.htmlAudio.paused){ ch.htmlAudio.play(); btn.textContent='⏸'; btn.classList.remove('paused'); }
+    else { ch.htmlAudio.pause(); btn.textContent='▶'; btn.classList.add('paused'); }
+  } else {
+    if(ch.paused){
+      const ns=ac.createBufferSource(); ns.buffer=ch.buffer; ns.loop=true; ns.connect(ch.masterGain); ns.start(0,ch.pauseOffset);
+      ch.src=ns; ch.startedAt=ac.currentTime; ch.paused=false;
+      btn.textContent='⏸'; btn.classList.remove('paused');
+    } else {
+      ch.pauseOffset=((ac.currentTime-ch.startedAt)+ch.pauseOffset)%ch.buffer.duration;
+      try{ ch.src.stop(); }catch(e){}
+      ch.paused=true;
+      btn.textContent='▶'; btn.classList.add('paused');
+    }
+  }
+}
+
+['a','b'].forEach(id=>{
+  document.getElementById('rew0-'+id).addEventListener('click',()=>rewindCh(id));
+  document.getElementById('back-'+id).addEventListener('click',()=>seekCh(id,-1));
+  document.getElementById('fwd-'+id).addEventListener('click',()=>seekCh(id,1));
+  document.getElementById('pause-'+id).addEventListener('click',()=>togglePauseCh(id));
+});
+
+// ── Global play toggle ─────────────────────────────────────────────
+const playToggle=document.getElementById('play-toggle');
+playToggle.addEventListener('click',()=>{
+  ensureAC();
+  playing=!playing;
+  playToggle.classList.toggle('active',playing);
+  playToggle.textContent=playing?'⏸ Pauzeer':'▶ Speel';
+  if(!playing){
+    ['a','b'].forEach(id=>{ if(CH[id]) CH[id].masterGain.gain.setTargetAtTime(0,AC.currentTime,.05); });
+    if(oscGain) oscGain.gain.setTargetAtTime(0,AC.currentTime,.05);
+  }
+  if(playing && oscNodes.length===0) buildOscLayer();
+});
+
+// ── Camera ─────────────────────────────────────────────────────────
+const video=document.getElementById('video');
+const canvasOv=document.getElementById('canvas-ov');
+const ctxOv=canvasOv.getContext('2d');
+const camOverlay=document.getElementById('cam-overlay');
+const startBtn=document.getElementById('start-btn');
+const motionFill=document.getElementById('motion-fill');
+const motionValEl=document.getElementById('motion-val');
+const volA=document.getElementById('vol-a'), volB=document.getElementById('vol-b');
+
+const SMALL_W=80, SMALL_H=107;
+const diffCv=document.createElement('canvas'); diffCv.width=SMALL_W; diffCv.height=SMALL_H;
+const diffCtx=diffCv.getContext('2d');
+let prevFrame=null;
+const SMOOTH=0.1;
+
+startBtn.addEventListener('click',()=>{
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:1280}},audio:false})
+    .then(stream=>{
+      video.srcObject=stream;
+      video.onloadedmetadata=()=>{
+        camOverlay.style.display='none';
+        canvasOv.width=video.videoWidth; canvasOv.height=video.videoHeight;
+        if(oscNodes.length===0) buildOscLayer();
+        motionLoop();
+      };
+    })
+    .catch(()=>{ camOverlay.querySelector('p').textContent='Camera geweigerd.'; });
+});
+
+function motionLoop(){
+  requestAnimationFrame(motionLoop);
+  if(video.readyState<2) return;
+
+  diffCtx.drawImage(video,0,0,SMALL_W,SMALL_H);
+  const cur=diffCtx.getImageData(0,0,SMALL_W,SMALL_H);
+
+  const raw=[0,0,0,0], cnt=[0,0,0,0];
+  const hx=Math.floor(SMALL_W/2), hy=Math.floor(SMALL_H/2);
+
+  if(prevFrame){
+    const d1=cur.data, d2=prevFrame.data;
+    for(let y=0;y<SMALL_H;y++) for(let x=0;x<SMALL_W;x++){
+      const qi=(y<hy?0:2)+(x<hx?0:1);
+      const idx=(y*SMALL_W+x)*4;
+      raw[qi]+=(Math.abs(d1[idx]-d2[idx])+Math.abs(d1[idx+1]-d2[idx+1])+Math.abs(d1[idx+2]-d2[idx+2]))/3;
+      cnt[qi]++;
+    }
+    for(let i=0;i<4;i++){
+      const v=Math.min((raw[i]/cnt[i])/22,1);
+      smoothQ[i]+=(v-smoothQ[i])*SMOOTH;
+    }
+  }
+  prevFrame=cur;
+
+  motionValue=(smoothQ[0]+smoothQ[1]+smoothQ[2]+smoothQ[3])/4;
+
+  const pct=Math.round(motionValue*100);
+  motionFill.style.width=pct+'%'; motionValEl.textContent=pct+'%';
+
+  document.getElementById('v-aw').textContent=Math.round(smoothQ[0]*100)+'%';
+  document.getElementById('v-bw').textContent=Math.round(smoothQ[1]*100)+'%';
+  document.getElementById('v-aa').textContent=Math.round(smoothQ[2]*100)+'%';
+  document.getElementById('v-ba').textContent=Math.round(smoothQ[3]*100)+'%';
+
+  drawOverlay();
+
+  if(!playing) return;
+  const ac=AC; if(!ac) return;
+
+  ['a','b'].forEach(id=>{
+    const ch=CH[id];
+    if(!ch||(ch.type==='buffer'&&ch.paused)) return;
+    ch.masterGain.gain.setTargetAtTime(motionValue, ac.currentTime, .08);
+    const wet = id==='a' ? smoothQ[0] : smoothQ[1];
+    const amt = id==='a' ? smoothQ[2] : smoothQ[3];
+    ch.fxObj.dry.gain.setTargetAtTime(1-wet, ac.currentTime, .05);
+    ch.fxObj.wet.gain.setTargetAtTime(wet,   ac.currentTime, .05);
+    ch.fxObj.amountFn(amt);
   });
 
-  // ── Effect change listeners ───────────────────────────────────────
-  [aEffect, aWet, aAmount, aPan].forEach(el => el.addEventListener('input', () => restartChannel('a')));
-  [bEffect, bWet, bAmount, bPan].forEach(el => el.addEventListener('input', () => restartChannel('b')));
+  if(oscGain) oscGain.gain.setTargetAtTime(motionValue*.22, ac.currentTime, .08);
+  if(CH['a']) volA.style.width=(motionValue*100)+'%';
+  if(CH['b']) volB.style.width=(motionValue*100)+'%';
+}
 
-  // ── Camera & Motion Detection ─────────────────────────────────────
-  let prevFrame = null;
-  const MOTION_SMOOTH = 0.12;
-  let smoothMotion = 0;
-  let animRAF = null;
-  const diffCanvas = document.createElement('canvas');
-  const diffCtx    = diffCanvas.getContext('2d');
-
-  startBtn.addEventListener('click', () => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } }, audio: false })
-      .then(stream => {
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          overlay.style.display = 'none';
-          canvasDiff.width  = video.videoWidth;
-          canvasDiff.height = video.videoHeight;
-          diffCanvas.width  = 80; // small for perf
-          diffCanvas.height = 60;
-          startMotionLoop();
-        };
-      })
-      .catch(() => {
-        overlay.querySelector('p').textContent = 'Camera toegang geweigerd. Controleer browserrechten.';
-      });
+function drawOverlay(){
+  const W=canvasOv.width, H=canvasOv.height;
+  ctxOv.clearRect(0,0,W,H);
+  // quadrant glows
+  const data=[
+    [0,    0,    W/2, H/2, 255, 60,  110, smoothQ[0]], // TL accent1
+    [W/2,  0,    W/2, H/2, 0,   229, 255, smoothQ[1]], // TR accent2
+    [0,    H/2,  W/2, H/2, 255, 60,  110, smoothQ[2]], // BL accent1
+    [W/2,  H/2,  W/2, H/2, 0,   229, 255, smoothQ[3]], // BR accent2
+  ];
+  data.forEach(([x,y,w,h,r,g,b,q])=>{
+    ctxOv.fillStyle=`rgba(${r},${g},${b},${q*.42})`;
+    ctxOv.fillRect(x,y,w,h);
   });
-
-  function startMotionLoop() {
-    function loop() {
-      animRAF = requestAnimationFrame(loop);
-
-      if (video.readyState < 2) return;
-
-      // Draw small frame for diff
-      diffCtx.drawImage(video, 0, 0, diffCanvas.width, diffCanvas.height);
-      const cur = diffCtx.getImageData(0, 0, diffCanvas.width, diffCanvas.height);
-
-      let diff = 0;
-      if (prevFrame) {
-        const d1 = cur.data, d2 = prevFrame.data;
-        for (let i=0; i<d1.length; i+=4) {
-          const dr = Math.abs(d1[i]   - d2[i]);
-          const dg = Math.abs(d1[i+1] - d2[i+1]);
-          const db = Math.abs(d1[i+2] - d2[i+2]);
-          diff += (dr+dg+db)/3;
-        }
-        diff /= (d1.length/4);
-        diff = Math.min(diff / 30, 1); // normalize 0..1
-      }
-      prevFrame = cur;
-
-      // Smooth
-      smoothMotion += (diff - smoothMotion) * MOTION_SMOOTH;
-      motionValue = smoothMotion;
-
-      // Update UI meter
-      const pct = Math.round(motionValue * 100);
-      motionFill.style.width = pct + '%';
-      motionVal.textContent  = pct + '%';
-      cameraSection.style.setProperty('--motion', motionValue);
-
-      // Draw diff overlay on main canvas
-      drawDiffOverlay(cur, prevFrame);
-
-      // Update audio gains
-      if (playing) {
-        ['a','b'].forEach(id => {
-          if (channels[id]) {
-            channels[id].gainNode.gain.setTargetAtTime(motionValue, ctx.currentTime, 0.08);
-          }
-        });
-      }
-
-      // Update volume bars
-      if (channels['a']) volA.style.width = (motionValue*100) + '%';
-      if (channels['b']) volB.style.width = (motionValue*100) + '%';
-    }
-    loop();
-  }
-
-  function drawDiffOverlay(cur, prev) {
-    if (!prev) return;
-    const W = canvasDiff.width, H = canvasDiff.height;
-    ctxDiff.drawImage(diffCanvas, 0, 0, W, H);
-    // tint red on high motion
-    ctxDiff.fillStyle = `rgba(255,60,110,${motionValue * 0.5})`;
-    ctxDiff.fillRect(0,0,W,H);
-  }
+  // crosshair
+  ctxOv.strokeStyle='rgba(255,255,255,0.12)'; ctxOv.lineWidth=1;
+  ctxOv.beginPath(); ctxOv.moveTo(W/2,0); ctxOv.lineTo(W/2,H); ctxOv.stroke();
+  ctxOv.beginPath(); ctxOv.moveTo(0,H/2); ctxOv.lineTo(W,H/2); ctxOv.stroke();
+}
 
 })();
 </script>
