@@ -1,0 +1,23 @@
+# ── Beveilig gevoelige mappen ────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Blokkeer directe toegang tot /gerbenkolkena/ bestanden
+    RewriteRule ^gerbenkolkena/ - [F,L]
+
+    # Blokkeer toegang tot /orders/
+    RewriteRule ^orders/ - [F,L]
+</IfModule>
+
+# Blokkeer directory listing
+Options -Indexes
+
+# Beveilig JSON orderbestanden
+<FilesMatch "\.json$">
+    Require all denied
+</FilesMatch>
+
+# Alleen index.php en webhook.php zijn direct bereikbaar
+<FilesMatch "^(checkout|download|mollie_return)\.php$">
+    Require all denied
+</FilesMatch>
