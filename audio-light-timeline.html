@@ -2,1396 +2,692 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LUMENATE — Audio Light Sequencer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Lumina — Light Sequencer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap');
-
   :root {
-    --bg: #050508;
-    --panel: #0a0a12;
-    --border: #1a1a2e;
-    --accent: #00ffe1;
-    --accent2: #ff3cac;
-    --accent3: #ffb700;
-    --dim: #2a2a3e;
-    --text: #c8d0e0;
-    --text-dim: #4a5068;
-    --flash-sub: #00bfff;
-    --flash-mid: #a855f7;
-    --flash-high: #ff3cac;
+    --bg: #060608; --surface: #0d0d12; --panel: #12121a; --border: #1e1e2e;
+    --accent: #c8f0ff; --accent2: #7fd4c1; --accent3: #f0c87f;
+    --muted: #3a3a55; --text: #d0d0e8; --text-dim: #6060a0;
+    --danger: #ff6b6b; --rec: #ff4444;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 500;
-    min-height: 100vh;
-    overflow-x: hidden;
+  body { background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(127,212,193,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 60% at 80% 80%, rgba(200,240,255,0.05) 0%, transparent 60%);
   }
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 60px; }
+
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; letter-spacing: 0.1em; color: var(--accent); text-shadow: 0 0 30px rgba(200,240,255,0.4); }
+  .subtitle { font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; }
+
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .tab { padding: 10px; background: var(--panel); color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border: none; transition: all 0.15s; text-align: center; }
+  .tab.active { background: var(--accent); color: #060608; font-weight: 700; }
+
+  .orb-container { display: flex; justify-content: center; margin: 16px 0; }
+  .orb { width: 110px; height: 110px; border-radius: 50%; position: relative; background: radial-gradient(circle at 40% 35%, #ffffff 0%, #c8f0ff 30%, #2a4a6a 70%, #060608 100%); box-shadow: 0 0 0 1px rgba(200,240,255,0.1); transition: box-shadow 0.03s, background 0.03s; }
+  .orb.flash-on { background: radial-gradient(circle at 40% 35%, #ffffff 0%, #fffde0 20%, #c8f0ff 50%, #4a8aaa 80%); box-shadow: 0 0 0 1px rgba(200,240,255,0.4), 0 0 40px rgba(200,240,255,0.6), 0 0 100px rgba(200,240,255,0.3); }
+  .orb-ring { position: absolute; inset: -8px; border-radius: 50%; border: 1px solid rgba(200,240,255,0.08); }
+  .orb-ring2 { position: absolute; inset: -20px; border-radius: 50%; border: 1px solid rgba(200,240,255,0.04); }
+
+  .hz-badge { text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; color: var(--accent3); letter-spacing: 0.1em; min-height: 2rem; margin-bottom: 4px; }
+  .status { text-align: center; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px; min-height: 14px; }
+  .status.active { color: var(--accent2); }
+  .status.error { color: var(--danger); }
+  .status.rec { color: var(--rec); }
+
+  .scopes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .scope-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; position: relative; }
+  .scope-label { position: absolute; top: 3px; left: 6px; font-size: 0.5rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; z-index: 1; }
+  canvas { display: block; width: 100%; height: 60px; }
+
+  .progress-bar { width: 100%; height: 2px; background: var(--border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); width: 0%; transition: width 0.1s linear; }
+
+  .btn { padding: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; border-radius: 4px; }
+  .btn:hover { border-color: var(--muted); background: #18181f; }
+  .btn-primary { background: var(--accent); color: #060608; border-color: var(--accent); font-weight: 700; font-size: 0.8rem; padding: 16px; width: 100%; margin-bottom: 8px; }
+  .btn-primary:hover { background: #a8d8ef; }
+  .btn-primary.running { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn-rec { background: transparent; color: var(--rec); border-color: var(--rec); width: 100%; margin-bottom: 16px; }
+  .btn-rec:hover { background: rgba(255,68,68,0.08); }
+  .btn-rec.recording { background: rgba(255,68,68,0.15); }
+
+  .section-label { font-size: 0.58rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 16px; }
+  .preset-btn { padding: 8px 4px; border: 1px solid var(--border); background: var(--panel); color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 0.55rem; cursor: pointer; text-align: center; border-radius: 4px; transition: all 0.15s; line-height: 1.4; }
+  .preset-btn:hover { border-color: var(--muted); color: var(--text); }
+  .preset-btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(127,212,193,0.08); }
+  .preset-hz { display: block; font-size: 0.72rem; font-weight: 700; }
+
+  .steps-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  .step { display: grid; grid-template-columns: 20px 1fr 72px 64px 28px; gap: 5px; align-items: center; padding: 7px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
+  .step.current { border-color: var(--accent); background: rgba(200,240,255,0.04); }
+  .step-num { font-size: 0.55rem; color: var(--text-dim); text-align: center; }
+  .step-slider { -webkit-appearance: none; width: 100%; height: 3px; background: var(--muted); border-radius: 2px; outline: none; }
+  .step-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+  .step-hz { font-size: 0.7rem; color: var(--accent); text-align: right; }
+  .step-dur { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; }
+  .step-dur input { width: 48px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 0.6rem; padding: 3px 4px; border-radius: 3px; text-align: center; }
+  .step-del { background: none; border: 1px solid var(--border); color: var(--text-dim); font-size: 0.75rem; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 3px; transition: all 0.15s; }
+  .step-del:hover { border-color: var(--danger); color: var(--danger); }
+  .add-step-btn { width: 100%; padding: 9px; border: 1px dashed var(--muted); background: none; color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 0.6rem; cursor: pointer; border-radius: 4px; transition: all 0.15s; margin-bottom: 16px; }
+  .add-step-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .param-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .param-box { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px; }
+  .param-label { font-size: 0.55rem; color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 7px; }
+  .param-box input[type=range] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--muted); border-radius: 2px; outline: none; margin-bottom: 3px; }
+  .param-box input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--accent3); cursor: pointer; }
+  .param-val { font-size: 0.7rem; color: var(--accent3); text-align: right; }
+  .mode-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 0.6rem; padding: 5px; border-radius: 3px; outline: none; cursor: pointer; }
+
+  .loop-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 16px; }
+  .loop-label { font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+  .toggle { width: 38px; height: 20px; background: var(--muted); border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; border: none; outline: none; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.2s; }
+  .toggle.on { background: var(--accent2); }
+  .toggle.on::after { transform: translateX(18px); }
+
+  .json-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+
+  /* Stream panel */
+  #streamPanel { display: none; }
+  #streamPanel.visible { display: block; }
+  #seqPanel.hidden { display: none; }
+
+  .stream-url-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .stream-url-input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 0.6rem; padding: 10px; border-radius: 4px; outline: none; }
+  .stream-url-input::placeholder { color: var(--text-dim); }
+  .stream-url-input:focus { border-color: var(--muted); }
+
+  .stream-presets { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+  .stream-preset { padding: 5px 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 0.55rem; cursor: pointer; border-radius: 4px; transition: all 0.15s; }
+  .stream-preset:hover { border-color: var(--muted); color: var(--text); }
+
+  .fft-params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .fft-box { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px; }
+
+  .energy-bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 14px; }
+  .energy-bar-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 8px; text-align: center; }
+  .energy-bar-label { font-size: 0.5rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+  .energy-bar-track { height: 40px; background: var(--bg); border-radius: 3px; overflow: hidden; display: flex; align-items: flex-end; }
+  .energy-bar-fill { width: 100%; background: var(--accent2); border-radius: 3px; height: 0%; }
+  .energy-bar-fill.mid { background: var(--accent3); }
+  .energy-bar-fill.high { background: var(--accent); }
+  .energy-bar-val { font-size: 0.6rem; color: var(--text-dim); margin-top: 3px; }
 
-  /* === HEADER === */
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 28px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(90deg, #050508 0%, #0d0d1a 100%);
-  }
+  audio { width: 100%; margin-bottom: 10px; filter: invert(0.85) hue-rotate(180deg); border-radius: 4px; }
 
-  .logo {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 22px;
-    letter-spacing: 6px;
-    color: var(--accent);
-    text-shadow: 0 0 20px var(--accent);
-  }
-
-  .logo span { color: var(--accent2); }
-
-  .status-bar {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-  }
-
-  .status-bar .dot {
-    display: inline-block;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    margin-right: 6px;
-    vertical-align: middle;
-    transition: all 0.3s;
-  }
-
-  .status-bar.active .dot {
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-    animation: pulse 1s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  /* === MAIN LAYOUT === */
-  .app {
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    height: calc(100vh - 57px);
-  }
-
-  /* === DROP ZONE === */
-  .drop-zone {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
-    gap: 16px;
-    border-bottom: 1px solid var(--border);
-    background: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 10px,
-      rgba(0,255,225,0.015) 10px,
-      rgba(0,255,225,0.015) 20px
-    );
-    cursor: pointer;
-    transition: all 0.3s;
-    min-height: 160px;
-    position: relative;
-  }
-
-  .drop-zone:hover, .drop-zone.dragover {
-    background: rgba(0,255,225,0.04);
-    border-color: var(--accent);
-  }
-
-  .drop-zone.loaded {
-    min-height: 80px;
-    padding: 20px 40px;
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .drop-icon {
-    font-size: 48px;
-    opacity: 0.4;
-    line-height: 1;
-  }
-
-  .drop-text {
-    font-size: 18px;
-    letter-spacing: 3px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-  }
-
-  .drop-sub {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-  }
-
-  .file-info {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-  }
-
-  .file-name {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 13px;
-    color: var(--accent);
-  }
-
-  .file-meta {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    display: flex;
-    gap: 16px;
-  }
-
-  /* === WAVEFORM === */
-  .waveform-section {
-    padding: 0 28px 12px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .waveform-wrap {
-    position: relative;
-    height: 60px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    cursor: pointer;
-  }
-
-  #waveformCanvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  .playhead {
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 2px;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-    pointer-events: none;
-    left: 0;
-    transition: left 0.05s linear;
-  }
-
-  /* === TRANSPORT === */
-  .transport {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 10px 28px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .btn {
-    background: transparent;
-    border: 1px solid var(--dim);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 6px 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 10px rgba(0,255,225,0.3); }
-  .btn.danger { border-color: var(--accent2); color: var(--accent2); }
-
-  .time-display {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 14px;
-    color: var(--accent);
-    letter-spacing: 2px;
-    min-width: 80px;
-  }
-
-  .transport-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  /* === FREQ CONTROLS === */
-  .freq-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding: 8px 28px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
-
-  .freq-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-right: 8px;
-  }
-
-  .freq-chip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 4px 10px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 1px;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: var(--text-dim);
-  }
-
-  .freq-chip .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-  }
-
-  .freq-chip.active { border-color: var(--accent); color: var(--text); }
-  .freq-chip[data-band="sub"] .dot { background: var(--flash-sub); }
-  .freq-chip[data-band="mid"] .dot { background: var(--flash-mid); }
-  .freq-chip[data-band="high"] .dot { background: var(--flash-high); }
-  .freq-chip[data-band="all"] .dot { background: var(--accent3); }
-
-  .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-
-  .speed-control {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: 8px;
-  }
-
-  .speed-control label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-  }
-
-  .speed-control input[type=range] {
-    width: 80px;
-    accent-color: var(--accent);
-  }
-
-  .speed-val {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--accent);
-    min-width: 30px;
-  }
-
-  /* === TIMELINE === */
-  .timeline-section {
-    overflow-y: auto;
-    padding: 16px 28px;
-    background: var(--bg);
-    scrollbar-width: thin;
-    scrollbar-color: var(--dim) transparent;
-  }
-
-  .timeline-header {
-    display: grid;
-    grid-template-columns: 52px 60px 100px 1fr 80px 80px 60px 120px;
-    gap: 8px;
-    padding: 0 0 8px;
-    border-bottom: 1px solid var(--border);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  .timeline-row {
-    display: grid;
-    grid-template-columns: 52px 60px 100px 1fr 80px 80px 60px 120px;
-    gap: 8px;
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(26,26,46,0.5);
-    align-items: center;
-    transition: background 0.15s;
-    cursor: pointer;
-  }
-
-  .timeline-row:hover { background: rgba(0,255,225,0.03); }
-
-  .timeline-row.active-row { background: rgba(0,255,225,0.06); border-color: rgba(0,255,225,0.2); }
-
-  .timeline-row.playing-row {
-    background: rgba(0,255,225,0.08);
-    border-color: var(--accent);
-    box-shadow: inset 2px 0 0 var(--accent);
-  }
-
-  .row-time {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-
-  .row-energy {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-  }
-
-  /* Energy bar */
-  .energy-bar-wrap {
-    position: relative;
-    height: 14px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    overflow: hidden;
-    border-radius: 1px;
-  }
-
-  .energy-bar-fill {
-    height: 100%;
-    transition: width 0.3s;
-    border-radius: 1px;
-  }
-
-  /* Flash interval selector */
-  .flash-select {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    padding: 2px 4px;
-    width: 100%;
-    letter-spacing: 1px;
-  }
-
-  .flash-select:focus { outline: none; border-color: var(--accent); }
-
-  /* Freq band pills in row */
-  .freq-pills {
-    display: flex;
-    gap: 3px;
-    flex-wrap: wrap;
-  }
-
-  .pill {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 1px;
-    letter-spacing: 1px;
-    opacity: 0.7;
-  }
-
-  .pill.sub { background: rgba(0,191,255,0.2); color: var(--flash-sub); }
-  .pill.mid { background: rgba(168,85,247,0.2); color: var(--flash-mid); }
-  .pill.high { background: rgba(255,60,172,0.2); color: var(--flash-high); }
-
-  /* Light-on indicator */
-  .light-on {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-  }
-
-  .light-led {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    background: var(--dim);
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .light-on.on .light-led {
-    background: var(--accent3);
-    box-shadow: 0 0 8px var(--accent3);
-  }
-
-  /* Flash speed badge */
-  .flash-badge {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 1px;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  /* === FLASH VISUALIZER === */
-  .flash-vis {
-    position: relative;
-    height: 18px;
-    display: flex;
-    gap: 1px;
-    align-items: center;
-    overflow: hidden;
-  }
-
-  .flash-block {
-    flex-shrink: 0;
-    height: 100%;
-    border-radius: 1px;
-    opacity: 0.8;
-  }
-
-  /* === TORCH STATUS === */
-  #torchStatus {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 4px 12px;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    display: inline-block;
-  }
-  #torchStatus.on {
-    border-color: var(--accent3);
-    color: var(--accent3);
-    box-shadow: 0 0 10px rgba(255,183,0,0.4);
-  }
-  #torchStatus.error {
-    border-color: var(--accent2);
-    color: var(--accent2);
-  }
-
-  /* === BOTTOM BAR === */
-  .bottom-bar {
-    padding: 10px 28px;
-    border-top: 1px solid var(--border);
-    background: var(--panel);
-    display: flex;
-    align-items: center;
-    gap: 24px;
-  }
-
-  .stats {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    display: flex;
-    gap: 20px;
-  }
-
-  .stats span { color: var(--accent); }
-
-  /* Scrollbar */
-  .timeline-section::-webkit-scrollbar { width: 4px; }
-  .timeline-section::-webkit-scrollbar-track { background: transparent; }
-  .timeline-section::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
-
-  /* Hidden file input */
-  #fileInput { display: none; }
-
-  /* Loading */
-  .loading-bar {
-    position: absolute;
-    bottom: 0; left: 0;
-    height: 2px;
-    background: var(--accent);
-    width: 0%;
-    transition: width 0.3s;
-    box-shadow: 0 0 6px var(--accent);
-  }
-
-  .empty-timeline {
-    text-align: center;
-    padding: 60px 0;
-    color: var(--text-dim);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 2px;
-  }
-
-  .threshold-control {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .threshold-control label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-  }
-
-  .threshold-control input[type=range] {
-    width: 70px;
-    accent-color: var(--accent2);
-  }
-
-  .threshold-val {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--accent2);
-    min-width: 28px;
-  }
+  .warning { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.2); border-radius: 4px; padding: 9px 11px; font-size: 0.58rem; color: rgba(255,107,107,0.8); line-height: 1.6; margin-top: 16px; }
 </style>
 </head>
 <body>
-
-<header>
-  <div class="logo">LUM<span>E</span>NATE</div>
-  <div class="status-bar" id="statusBar">
-    <span class="dot"></span>
-    <span id="statusText">WACHT OP AUDIO</span>
-  </div>
-</header>
-
 <div class="app">
+  <header>
+    <h1>LUMINA</h1>
+    <span class="subtitle">Light Sequencer</span>
+  </header>
 
-  <!-- DROP ZONE -->
-  <div class="drop-zone" id="dropZone">
-    <div class="drop-icon">◈</div>
-    <div class="drop-text">Drop WAV of MP3 hier</div>
-    <div class="drop-sub">of klik om een bestand te kiezen</div>
-    <div class="loading-bar" id="loadingBar"></div>
+  <div class="tabs">
+    <button class="tab active" id="tabSeq" onclick="switchTab('seq')">▤ Sequencer</button>
+    <button class="tab" id="tabStream" onclick="switchTab('stream')">⊙ Livestream</button>
   </div>
-  <input type="file" id="fileInput" accept=".wav,.mp3,audio/wav,audio/mpeg">
 
-  <!-- WAVEFORM + TRANSPORT (hidden until loaded) -->
-  <div id="controlArea" style="display:none">
-    <div class="waveform-section">
-      <div class="waveform-wrap" id="waveformWrap">
-        <canvas id="waveformCanvas"></canvas>
-        <div class="playhead" id="playhead"></div>
-      </div>
-    </div>
-
-    <div class="transport">
-      <button class="btn" id="btnPlay">▶ PLAY</button>
-      <button class="btn" id="btnStop">■ STOP</button>
-      <div class="time-display" id="timeDisplay">0:00.0</div>
-      <div class="sep"></div>
-      <div class="threshold-control">
-        <label>DREMPEL</label>
-        <input type="range" id="thresholdRange" min="0" max="100" value="0">
-        <span class="threshold-val" id="thresholdVal">0%</span>
-      </div>
-      <div class="transport-right">
-        <button class="btn" id="btnTorch">⚡ CAMERA LED</button>
-        <span id="torchStatus">● UIT</span>
-        <button class="btn" id="btnExport">⬇ EXPORT JSON</button>
-        <button class="btn danger" id="btnReset">✕ RESET</button>
-      </div>
-    </div>
-
-    <!-- FREQ BAND CONTROLS -->
-    <div class="freq-controls">
-      <span class="freq-label">FREQUENTIES:</span>
-      <div class="freq-chip active" data-band="sub" id="chipSub">
-        <span class="dot"></span>SUB 20-250Hz
-      </div>
-      <div class="freq-chip active" data-band="mid" id="chipMid">
-        <span class="dot"></span>MID 250-4kHz
-      </div>
-      <div class="freq-chip active" data-band="high" id="chipHigh">
-        <span class="dot"></span>HIGH 4k-20kHz
-      </div>
-      <div class="freq-chip" data-band="all" id="chipAll">
-        <span class="dot"></span>ALLE
-      </div>
-      <div class="sep"></div>
-      <div class="speed-control">
-        <label>LUMENATE MULT.</label>
-        <input type="range" id="speedMult" min="1" max="8" step="0.5" value="2">
-        <span class="speed-val" id="speedVal">×2.0</span>
-      </div>
-    </div>
-
-    <!-- TIMELINE -->
-    <div class="timeline-section" id="timelineSection">
-      <div class="timeline-header" style="grid-template-columns: 44px 52px 90px 1fr 60px 80px 70px 52px 100px">
-        <span>#</span>
-        <span>TIJD</span>
-        <span>ENERGIE</span>
-        <span>PATROON</span>
-        <span>BAND</span>
-        <span>ZONE</span>
-        <span>FLITS Hz</span>
-        <span>LICHT</span>
-        <span>OVERRIDE</span>
-      </div>
-      <div id="timelineRows">
-        <div class="empty-timeline">— LAAD EEN AUDIOBESTAND —</div>
-      </div>
+  <div class="orb-container">
+    <div class="orb" id="orb">
+      <div class="orb-ring"></div><div class="orb-ring2"></div>
     </div>
   </div>
 
-  <!-- BOTTOM BAR -->
-  <div class="bottom-bar">
-    <div class="stats">
-      <span>DUUR: <span id="statDuration">—</span></span>
-      <span>SECONDEN: <span id="statSeconds">—</span></span>
-      <span>LICHT-AAN: <span id="statLight">—</span></span>
-      <span>GEM. FLITS: <span id="statAvgFlash">—</span></span>
+  <div class="hz-badge" id="hzBadge">— Hz</div>
+  <div class="status" id="status">Klaar om te starten</div>
+
+  <div class="scopes">
+    <div class="scope-wrap">
+      <span class="scope-label">Flash</span>
+      <canvas id="scopeFlash" width="210" height="60"></canvas>
+    </div>
+    <div class="scope-wrap">
+      <span class="scope-label">FFT</span>
+      <canvas id="scopeFFT" width="210" height="60"></canvas>
     </div>
   </div>
 
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <!-- SEQUENCER -->
+  <div id="seqPanel">
+    <button class="btn btn-primary" id="startBtn" onclick="toggleSession()">▶ Start Sessie</button>
+
+    <div class="section-label">Presets</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="loadPreset('delta',event)"><span class="preset-hz">2 Hz</span>Delta</button>
+      <button class="preset-btn" onclick="loadPreset('theta',event)"><span class="preset-hz">6 Hz</span>Theta</button>
+      <button class="preset-btn" onclick="loadPreset('alpha',event)"><span class="preset-hz">10 Hz</span>Alpha</button>
+      <button class="preset-btn" onclick="loadPreset('gamma',event)"><span class="preset-hz">40 Hz</span>Gamma</button>
+      <button class="preset-btn" onclick="loadPreset('lumenate',event)"><span class="preset-hz">3→10</span>Lumenate</button>
+      <button class="preset-btn" onclick="loadPreset('descent',event)"><span class="preset-hz">10→4</span>Descent</button>
+      <button class="preset-btn" onclick="loadPreset('pulse',event)"><span class="preset-hz">8↔12</span>Pulse</button>
+      <button class="preset-btn" onclick="loadPreset('wake',event)"><span class="preset-hz">5→18</span>Wake</button>
+    </div>
+
+    <div class="section-label">Parameters</div>
+    <div class="param-row">
+      <div class="param-box">
+        <div class="param-label">Duty Cycle</div>
+        <input type="range" id="dutyCycle" min="5" max="90" value="30" oninput="updateDuty()">
+        <div class="param-val" id="dutyVal">30%</div>
+      </div>
+      <div class="param-box">
+        <div class="param-label">Modus</div>
+        <select class="mode-select" id="modeSelect">
+          <option value="rhythmic">Rhythmisch</option>
+          <option value="arrhythmic">Aritmisch</option>
+          <option value="ramp">Ramp up</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="loop-row">
+      <span class="loop-label">Loop herhalen</span>
+      <button class="toggle" id="loopToggle" onclick="toggleLoop()"></button>
+    </div>
+
+    <div class="section-label">Sequentie</div>
+    <div class="steps-list" id="stepsList"></div>
+    <button class="add-step-btn" onclick="addStep()">+ Stap toevoegen</button>
+
+    <div class="section-label">Opslaan / Laden</div>
+    <div class="json-actions">
+      <button class="btn" onclick="exportJSON()">↓ JSON Export</button>
+      <button class="btn" onclick="document.getElementById('jsonInput').click()">↑ JSON Laden</button>
+    </div>
+    <input type="file" id="jsonInput" accept=".json" style="display:none" onchange="importJSON(event)">
+  </div>
+
+  <!-- STREAM -->
+  <div id="streamPanel">
+    <div class="section-label">Stream URL</div>
+    <div class="stream-url-row">
+      <input type="text" class="stream-url-input" id="streamUrl" placeholder="https://...  (HLS / Icecast / MP3)">
+      <button class="btn" onclick="loadStream()">Laden</button>
+    </div>
+    <div class="stream-presets">
+      <button class="stream-preset" onclick="setStreamUrl('https://icecast.omroep.nl/radio1-bb-mp3')">NPO R1</button>
+      <button class="stream-preset" onclick="setStreamUrl('https://icecast.omroep.nl/radio2-bb-mp3')">NPO R2</button>
+      <button class="stream-preset" onclick="setStreamUrl('https://icecast.omroep.nl/3fm-bb-mp3')">3FM</button>
+      <button class="stream-preset" onclick="setStreamUrl('https://icecast.omroep.nl/radio6-bb-mp3')">R6 Soul</button>
+    </div>
+
+    <audio id="streamAudio" crossorigin="anonymous" controls></audio>
+
+    <div class="section-label">FFT Instellingen</div>
+    <div class="fft-params">
+      <div class="fft-box">
+        <div class="param-label">Flash Hz Min</div>
+        <input type="range" id="fftHzMin" min="0.5" max="10" step="0.5" value="1" oninput="document.getElementById('fftHzMinVal').textContent=this.value+' Hz'">
+        <div class="param-val" id="fftHzMinVal">1 Hz</div>
+      </div>
+      <div class="fft-box">
+        <div class="param-label">Flash Hz Max</div>
+        <input type="range" id="fftHzMax" min="5" max="50" step="1" value="20" oninput="document.getElementById('fftHzMaxVal').textContent=this.value+' Hz'">
+        <div class="param-val" id="fftHzMaxVal">20 Hz</div>
+      </div>
+      <div class="fft-box">
+        <div class="param-label">Beat Sens.</div>
+        <input type="range" id="beatSens" min="1" max="10" step="0.5" value="4" oninput="document.getElementById('beatSensVal').textContent=this.value">
+        <div class="param-val" id="beatSensVal">4</div>
+      </div>
+      <div class="fft-box">
+        <div class="param-label">Smoothing</div>
+        <input type="range" id="smoothing" min="0" max="0.95" step="0.05" value="0.6" oninput="document.getElementById('smoothingVal').textContent=this.value; if(fftAnalyser) fftAnalyser.smoothingTimeConstant=+this.value">
+        <div class="param-val" id="smoothingVal">0.6</div>
+      </div>
+    </div>
+
+    <div class="section-label">Energiebanden</div>
+    <div class="energy-bars">
+      <div class="energy-bar-wrap">
+        <div class="energy-bar-label">Bass</div>
+        <div class="energy-bar-track"><div class="energy-bar-fill" id="bassBar"></div></div>
+        <div class="energy-bar-val" id="bassVal">0</div>
+      </div>
+      <div class="energy-bar-wrap">
+        <div class="energy-bar-label">Mid</div>
+        <div class="energy-bar-track"><div class="energy-bar-fill mid" id="midBar"></div></div>
+        <div class="energy-bar-val" id="midVal">0</div>
+      </div>
+      <div class="energy-bar-wrap">
+        <div class="energy-bar-label">High</div>
+        <div class="energy-bar-track"><div class="energy-bar-fill high" id="highBar"></div></div>
+        <div class="energy-bar-val" id="highVal">0</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="streamStartBtn" onclick="toggleStreamFlash()">▶ Flash Activeren</button>
+    <button class="btn btn-rec" id="recBtn" onclick="toggleRecording()">⏺ Opname Starten</button>
+
+    <div class="section-label">Opname Laden</div>
+    <div class="json-actions">
+      <button class="btn" onclick="document.getElementById('recJsonInput').click()">↑ JSON Laden</button>
+      <button class="btn" onclick="document.getElementById('recAudioInput').click()">↑ Audio Laden</button>
+    </div>
+    <input type="file" id="recJsonInput" accept=".json" style="display:none" onchange="loadRecordingJSON(event)">
+    <input type="file" id="recAudioInput" accept=".webm,.wav,.mp3" style="display:none" onchange="loadRecordingAudio(event)">
+  </div>
+
+  <div class="warning">⚠ Niet gebruiken bij fotosensitieve epilepsie. Ogen gesloten houden. Armlengte afstand.</div>
 </div>
 
 <script>
-// === STATE ===
-let audioCtx = null;
-let audioBuffer = null;
-let sourceNode = null;
-let startTime = 0;
-let pauseOffset = 0;
-let isPlaying = false;
-let animFrame = null;
-let timeline = [];
-let flashAnimTimers = [];
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let steps = [
+  { hz: 3, dur: 30 }, { hz: 6, dur: 30 }, { hz: 10, dur: 60 }, { hz: 8, dur: 30 }
+];
+let running = false, loopOn = false;
+let torchStream = null, torchTrack = null;
+let flashTimeout = null, sessionTimeout = null;
+let currentStep = -1, dutyCycle = 0.30, flashState = false, currentHz = 0;
 
-// Torch
-let torchTrack = null;       // MediaStreamTrack with torch capability
-let torchEnabled = false;    // user toggled torch on
-let torchOn = false;         // current physical state
+// FFT
+let audioCtx = null, fftAnalyser = null, fftData = null, audioSource = null;
+let streamFlashActive = false, fftAnimFrame = null;
+let measuredHz = 0, lastBeatTime = 0;
+let energyHistory = new Array(43).fill(0), histIdx = 0;
 
-// Settings
-let activeBands = { sub: true, mid: true, high: true };
-let speedMult = 2.0;
-let threshold = 0.0;
+// Recording
+let mediaRecorder = null, recChunks = [], isRecording = false;
+let recFlashLog = [], recStartTime = 0;
 
-// === DOM ===
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const controlArea = document.getElementById('controlArea');
-const waveformCanvas = document.getElementById('waveformCanvas');
-const playhead = document.getElementById('playhead');
-const btnPlay = document.getElementById('btnPlay');
-const btnStop = document.getElementById('btnStop');
-const btnReset = document.getElementById('btnReset');
-const btnExport = document.getElementById('btnExport');
-const btnTorch = document.getElementById('btnTorch');
-const torchStatus = document.getElementById('torchStatus');
-const timeDisplay = document.getElementById('timeDisplay');
-const timelineRows = document.getElementById('timelineRows');
-const statusBar = document.getElementById('statusBar');
-const statusText = document.getElementById('statusText');
-const loadingBar = document.getElementById('loadingBar');
-const speedVal = document.getElementById('speedVal');
-const thresholdVal = document.getElementById('thresholdVal');
+// ── SCOPES ────────────────────────────────────────────────────────────────────
+const flashCanvas = document.getElementById('scopeFlash');
+const fctx = flashCanvas.getContext('2d');
+const fftCanvas = document.getElementById('scopeFFT');
+const pctx = fftCanvas.getContext('2d');
+const W = 210, H = 60;
+let flashBuf = new Array(W).fill(0), flashPos = 0;
 
-// === WAKE LOCK ===
-let wakeLock = null;
-
-async function requestWakeLock() {
-  // Methode 1: Screen Wake Lock API (Chrome Android 84+)
-  if ('wakeLock' in navigator) {
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => {
-        // Automatisch opnieuw aanvragen als het vrijgegeven wordt (bijv. tab-wissel)
-        if (isPlaying) requestWakeLock();
-      });
-      return;
-    } catch(e) { /* val door naar fallback */ }
+function pushFlashScope(v) { flashBuf[flashPos++ % W] = v; drawFlashScope(); }
+function drawFlashScope() {
+  fctx.clearRect(0, 0, W, H);
+  fctx.strokeStyle = 'rgba(200,240,255,0.6)'; fctx.lineWidth = 1.5; fctx.beginPath();
+  for (let i = 0; i < W; i++) {
+    const y = flashBuf[(flashPos + i) % W] ? 6 : H - 6;
+    i === 0 ? fctx.moveTo(i, y) : fctx.lineTo(i, y);
   }
-  // Methode 2: Onzichtbare video loop als fallback
-  startNoSleepVideo();
+  fctx.stroke();
+}
+drawFlashScope();
+
+function drawFFTScope(data) {
+  pctx.clearRect(0, 0, W, H);
+  const bw = W / data.length;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i] / 255;
+    pctx.fillStyle = `hsla(${180 + v * 60},80%,70%,0.8)`;
+    pctx.fillRect(i * bw, H - v * H, Math.max(1, bw - 1), v * H);
+  }
 }
 
-function releaseWakeLock() {
-  if (wakeLock) { wakeLock.release(); wakeLock = null; }
-  stopNoSleepVideo();
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tabSeq').classList.toggle('active', tab === 'seq');
+  document.getElementById('tabStream').classList.toggle('active', tab === 'stream');
+  document.getElementById('seqPanel').classList.toggle('hidden', tab !== 'seq');
+  document.getElementById('streamPanel').classList.toggle('visible', tab === 'stream');
 }
 
-// Fallback: tiny canvas → video stream → play() houdt scherm wakker
-let noSleepVideo = null;
-let noSleepStream = null;
-
-function startNoSleepVideo() {
-  if (noSleepVideo) return;
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1; canvas.height = 1;
-    const ctx = canvas.getContext('2d');
-    ctx.fillRect(0, 0, 1, 1);
-    // Teken elke seconde een pixel zodat de stream actief blijft
-    setInterval(() => ctx.fillRect(0, 0, 1, 1), 1000);
-    noSleepStream = canvas.captureStream(1);
-    noSleepVideo = document.createElement('video');
-    noSleepVideo.srcObject = noSleepStream;
-    noSleepVideo.muted = true;
-    noSleepVideo.loop = true;
-    noSleepVideo.play().catch(() => {});
-  } catch(e) {}
-}
-
-function stopNoSleepVideo() {
-  if (noSleepVideo) { noSleepVideo.pause(); noSleepVideo = null; }
-}
-
-// Heractiveer wake lock na tab-wissel terug
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && isPlaying) requestWakeLock();
-});
-
-// === TORCH INIT ===
+// ── TORCH ─────────────────────────────────────────────────────────────────────
 async function initTorch() {
+  if (!window.isSecureContext) return false;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
-    const track = stream.getVideoTracks()[0];
-    const caps = track.getCapabilities();
-    if (!caps.torch) {
-      torchStatus.textContent = '✕ GEEN TORCH';
-      torchStatus.className = 'error';
-      torchTrack = null;
-      return;
+    torchStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1 }, height: { ideal: 1 } } });
+    torchTrack = torchStream.getVideoTracks()[0];
+    await new Promise(r => setTimeout(r, 300));
+    const caps = torchTrack.getCapabilities();
+    if (!caps.torch) { torchTrack = null; return false; }
+    await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+    await new Promise(r => setTimeout(r, 80));
+    await torchTrack.applyConstraints({ advanced: [{ torch: false }] });
+    return true;
+  } catch(e) { torchTrack = null; return false; }
+}
+
+function releaseTorch() {
+  if (torchTrack) {
+    torchTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+    torchStream?.getTracks().forEach(t => t.stop());
+    torchTrack = null; torchStream = null;
+  }
+}
+
+function setFlash(on) {
+  if (flashState === on) return;
+  flashState = on;
+  document.getElementById('orb').classList.toggle('flash-on', on);
+  pushFlashScope(on ? 1 : 0);
+  if (torchTrack) torchTrack.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+  if (isRecording) recFlashLog.push({ t: Date.now() - recStartTime, hz: currentHz, flash: on ? 1 : 0 });
+}
+
+// ── SEQUENCER ─────────────────────────────────────────────────────────────────
+async function toggleSession() {
+  if (running) stopSession(); else await startSession();
+}
+
+async function startSession() {
+  const hasTorch = await initTorch();
+  setStatus(hasTorch ? 'Torch actief ✓' : 'Visuele modus', 'active');
+  running = true;
+  document.getElementById('startBtn').textContent = '■ Stop Sessie';
+  document.getElementById('startBtn').classList.add('running');
+  runSequence(0);
+}
+
+function stopSession() {
+  running = false; currentStep = -1;
+  clearTimeout(sessionTimeout); clearTimeout(flashTimeout);
+  setFlash(false); releaseTorch();
+  document.getElementById('startBtn').textContent = '▶ Start Sessie';
+  document.getElementById('startBtn').classList.remove('running');
+  document.getElementById('progress').style.width = '0%';
+  document.getElementById('hzBadge').textContent = '— Hz';
+  setStatus('Gestopt', '');
+  renderSteps();
+}
+
+function runSequence(idx) {
+  if (!running) return;
+  if (idx >= steps.length) {
+    if (loopOn) { runSequence(0); return; }
+    stopSession(); setStatus('Sessie voltooid', ''); return;
+  }
+  currentStep = idx; renderSteps();
+  const step = steps[idx];
+  const mode = document.getElementById('modeSelect').value;
+  const totalMs = step.dur * 1000;
+  const t0 = Date.now();
+  setStatus(`Stap ${idx + 1}/${steps.length} — ${step.hz} Hz`, 'active');
+
+  const pi = setInterval(() => {
+    if (!running) { clearInterval(pi); return; }
+    const p = (Date.now() - t0) / totalMs;
+    document.getElementById('progress').style.width = ((idx + p) / steps.length * 100) + '%';
+  }, 100);
+
+  function doFlash() {
+    if (!running) return;
+    const elapsed = Date.now() - t0;
+    let hz = step.hz;
+    if (mode === 'ramp' && idx + 1 < steps.length)
+      hz = step.hz + (steps[idx + 1].hz - step.hz) * (elapsed / totalMs);
+    let period = 1000 / hz;
+    if (mode === 'arrhythmic') period *= (0.7 + Math.random() * 0.6);
+    currentHz = hz;
+    document.getElementById('hzBadge').textContent = hz.toFixed(1) + ' Hz';
+    setFlash(true);
+    flashTimeout = setTimeout(() => {
+      if (!running) { setFlash(false); return; }
+      setFlash(false);
+      if (running) flashTimeout = setTimeout(doFlash, period * (1 - dutyCycle));
+    }, period * dutyCycle);
+  }
+  doFlash();
+
+  sessionTimeout = setTimeout(() => {
+    clearInterval(pi); clearTimeout(flashTimeout); setFlash(false);
+    runSequence(idx + 1);
+  }, totalMs);
+}
+
+// ── STREAM + FFT ──────────────────────────────────────────────────────────────
+function setStreamUrl(url) { document.getElementById('streamUrl').value = url; }
+
+async function loadStream() {
+  const url = document.getElementById('streamUrl').value.trim();
+  if (!url) return;
+  const audio = document.getElementById('streamAudio');
+
+  // Release old source
+  if (audioSource) { try { audioSource.disconnect(); } catch(e) {} audioSource = null; }
+
+  audio.src = url; audio.load();
+  setStatus('Stream laden...', 'active');
+
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  audioSource = audioCtx.createMediaElementSource(audio);
+  fftAnalyser = audioCtx.createAnalyser();
+  fftAnalyser.fftSize = 2048;
+  fftAnalyser.smoothingTimeConstant = parseFloat(document.getElementById('smoothing').value);
+  fftData = new Uint8Array(fftAnalyser.frequencyBinCount);
+  audioSource.connect(fftAnalyser);
+  fftAnalyser.connect(audioCtx.destination);
+
+  audio.play().then(() => setStatus('Stream actief', 'active')).catch(() => setStatus('Druk play in de audiospeler', 'error'));
+  startFFTLoop();
+}
+
+function startFFTLoop() {
+  if (fftAnimFrame) cancelAnimationFrame(fftAnimFrame);
+  energyHistory = new Array(43).fill(0); histIdx = 0; lastBeatTime = 0; measuredHz = 0;
+
+  function loop() {
+    fftAnimFrame = requestAnimationFrame(loop);
+    if (!fftAnalyser || !fftData) return;
+    fftAnalyser.getByteFrequencyData(fftData);
+    drawFFTScope(fftData.slice(0, 128));
+
+    const binHz = audioCtx.sampleRate / fftAnalyser.fftSize;
+    const bassEnd = Math.floor(250 / binHz);
+    const midEnd  = Math.floor(2000 / binHz);
+    const highEnd = Math.floor(8000 / binHz);
+
+    let bassE = 0, midE = 0, highE = 0;
+    for (let i = 1; i <= bassEnd; i++) bassE += fftData[i];
+    for (let i = bassEnd+1; i <= midEnd; i++) midE += fftData[i];
+    for (let i = midEnd+1; i <= highEnd; i++) highE += fftData[i];
+    bassE /= (bassEnd * 255); midE /= ((midEnd - bassEnd) * 255); highE /= ((highEnd - midEnd) * 255);
+
+    document.getElementById('bassBar').style.height = (bassE * 100) + '%';
+    document.getElementById('midBar').style.height  = (midE  * 100) + '%';
+    document.getElementById('highBar').style.height = (highE * 100) + '%';
+    document.getElementById('bassVal').textContent = (bassE * 100).toFixed(0);
+    document.getElementById('midVal').textContent  = (midE  * 100).toFixed(0);
+    document.getElementById('highVal').textContent = (highE * 100).toFixed(0);
+
+    if (!streamFlashActive) return;
+
+    // Beat: weighted combo bass 70% + mid 20% + high 10%
+    const instant = bassE * 0.7 + midE * 0.2 + highE * 0.1;
+    energyHistory[histIdx++ % energyHistory.length] = instant;
+    const avg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+    const sens = parseFloat(document.getElementById('beatSens').value);
+    const isBeat = instant > avg * (1 + sens * 0.15);
+
+    const now = performance.now();
+    const hzMin = parseFloat(document.getElementById('fftHzMin').value);
+    const hzMax = parseFloat(document.getElementById('fftHzMax').value);
+
+    if (isBeat && (now - lastBeatTime) > (1000 / hzMax)) {
+      if (lastBeatTime > 0) {
+        const raw = 1000 / (now - lastBeatTime);
+        measuredHz = Math.min(hzMax, Math.max(hzMin, raw));
+      }
+      lastBeatTime = now;
+      currentHz = measuredHz || hzMin;
+      document.getElementById('hzBadge').textContent = currentHz.toFixed(1) + ' Hz';
+      setFlash(true);
+      setTimeout(() => setFlash(false), Math.max(15, (1000 / Math.max(currentHz, 1)) * dutyCycle));
     }
-    torchTrack = track;
-    torchEnabled = true;
-    torchStatus.textContent = '● GEREED';
-    torchStatus.className = '';
-    btnTorch.classList.add('active');
-  } catch(e) {
-    torchStatus.textContent = '✕ GEEN TOEGANG';
-    torchStatus.className = 'error';
-    console.warn('Torch init failed:', e);
   }
+  loop();
 }
 
-async function setTorch(on) {
-  if (!torchTrack || !torchEnabled) return;
-  if (torchOn === on) return;
-  torchOn = on;
-  try {
-    await torchTrack.applyConstraints({ advanced: [{ torch: on }] });
-    torchStatus.textContent = on ? '◉ AAN' : '● UIT';
-    torchStatus.className = on ? 'on' : '';
-  } catch(e) {
-    console.warn('Torch set failed:', e);
-  }
-}
-
-btnTorch.addEventListener('click', async () => {
-  if (!torchTrack) {
-    await initTorch();
+async function toggleStreamFlash() {
+  if (streamFlashActive) {
+    streamFlashActive = false;
+    setFlash(false); releaseTorch();
+    document.getElementById('streamStartBtn').textContent = '▶ Flash Activeren';
+    document.getElementById('streamStartBtn').classList.remove('running');
+    setStatus('Flash gestopt', '');
   } else {
-    torchEnabled = !torchEnabled;
-    if (!torchEnabled) {
-      await setTorch(false);
-      torchStatus.textContent = '● UITGESCHAKELD';
-      torchStatus.className = '';
-      btnTorch.classList.remove('active');
-    } else {
-      torchStatus.textContent = '● GEREED';
-      btnTorch.classList.add('active');
-    }
+    if (!fftAnalyser) { setStatus('Laad eerst een stream', 'error'); return; }
+    const hasTorch = await initTorch();
+    streamFlashActive = true;
+    document.getElementById('streamStartBtn').textContent = '■ Flash Stoppen';
+    document.getElementById('streamStartBtn').classList.add('running');
+    setStatus(hasTorch ? 'Torch + FFT actief ✓' : 'Visuele FFT modus', 'active');
   }
-});
+}
 
-// === DROP ZONE ===
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) loadAudio(file);
-});
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) loadAudio(e.target.files[0]);
-});
+// ── RECORDING ─────────────────────────────────────────────────────────────────
+function nowStamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `GK${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
 
-// === TRANSPORT ===
-btnPlay.addEventListener('click', () => { if (audioBuffer) togglePlay(); });
-btnStop.addEventListener('click', stopAudio);
-btnReset.addEventListener('click', resetAll);
-btnExport.addEventListener('click', exportJSON);
+function downloadFile(name, content, type) {
+  const blob = new Blob([content], { type });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+  a.click(); URL.revokeObjectURL(a.href);
+}
 
-// === SPEED + THRESHOLD ===
-document.getElementById('speedMult').addEventListener('input', e => {
-  speedMult = parseFloat(e.target.value);
-  speedVal.textContent = `×${speedMult.toFixed(1)}`;
-  if (timeline.length) rebuildTimeline();
-});
+async function toggleRecording() {
+  if (isRecording) stopRecording(); else await startRecording();
+}
 
-document.getElementById('thresholdRange').addEventListener('input', e => {
-  threshold = parseInt(e.target.value) / 100;
-  thresholdVal.textContent = `${e.target.value}%`;
-  if (timeline.length) rebuildTimeline();
-});
-
-// === FREQ CHIPS ===
-document.querySelectorAll('.freq-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    const band = chip.dataset.band;
-    if (band === 'all') {
-      const allOn = activeBands.sub && activeBands.mid && activeBands.high;
-      activeBands.sub = activeBands.mid = activeBands.high = !allOn;
-      document.getElementById('chipSub').classList.toggle('active', !allOn);
-      document.getElementById('chipMid').classList.toggle('active', !allOn);
-      document.getElementById('chipHigh').classList.toggle('active', !allOn);
-    } else {
-      activeBands[band] = !activeBands[band];
-      chip.classList.toggle('active', activeBands[band]);
-    }
-    if (timeline.length) rebuildTimeline();
-  });
-});
-
-// === LOAD AUDIO ===
-async function loadAudio(file) {
-  if (!['audio/wav', 'audio/mpeg', 'audio/mp3'].includes(file.type) &&
-      !file.name.match(/\.(wav|mp3)$/i)) {
-    setStatus('FOUT: ALLEEN WAV/MP3', false);
-    return;
-  }
-
-  setStatus('LADEN...', true);
-  loadingBar.style.width = '30%';
-
+async function startRecording() {
+  if (!fftAnalyser) { setStatus('Laad eerst een stream', 'error'); return; }
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    loadingBar.style.width = '60%';
+    const dest = audioCtx.createMediaStreamDestination();
+    fftAnalyser.connect(dest);
+    const mr = new MediaRecorder(dest.stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm' });
+    recChunks = [];
+    mr.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+    mr.onstop = saveRecording;
+    mr.start(100);
+    mediaRecorder = mr;
+  } catch(e) { setStatus('Opname fout: ' + e.message, 'error'); return; }
 
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    loadingBar.style.width = '100%';
-
-    // Update drop zone
-    dropZone.classList.add('loaded');
-    dropZone.innerHTML = `
-      <div class="file-info">
-        <div class="file-name">◈ ${file.name}</div>
-        <div class="file-meta">
-          <span>${audioBuffer.numberOfChannels}ch</span>
-          <span>${audioBuffer.sampleRate}Hz</span>
-          <span>${formatTime(audioBuffer.duration)}</span>
-        </div>
-      </div>
-      <button class="btn" onclick="document.getElementById('fileInput').click()" style="font-size:10px">WIJZIG</button>
-    `;
-
-    controlArea.style.display = 'block';
-    drawWaveform();
-    await analyzeAudio();
-
-    setStatus('KLAAR', true);
-  } catch(err) {
-    setStatus('FOUT BIJ LADEN', false);
-    loadingBar.style.width = '0%';
-    console.error(err);
-  }
+  recFlashLog = []; recStartTime = Date.now(); isRecording = true;
+  document.getElementById('recBtn').textContent = '⏹ Opname Stoppen';
+  document.getElementById('recBtn').classList.add('recording');
+  setStatus('⏺ Opname actief', 'rec');
 }
 
-// === WAVEFORM ===
-function drawWaveform() {
-  const canvas = waveformCanvas;
-  const wrap = document.getElementById('waveformWrap');
-  canvas.width = wrap.clientWidth;
-  canvas.height = wrap.clientHeight;
-  const ctx = canvas.getContext('2d');
-  const data = audioBuffer.getChannelData(0);
-  const step = Math.ceil(data.length / canvas.width);
-  const amp = canvas.height / 2;
-
-  ctx.fillStyle = '#050508';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Draw seconds markers
-  const secWidth = canvas.width / audioBuffer.duration;
-  ctx.strokeStyle = 'rgba(26,26,46,0.8)';
-  ctx.lineWidth = 1;
-  for (let s = 0; s < audioBuffer.duration; s++) {
-    const x = s * secWidth;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
-
-  // Draw waveform with energy color
-  for (let i = 0; i < canvas.width; i++) {
-    let min = 1, max = -1;
-    for (let j = 0; j < step; j++) {
-      const val = data[(i * step) + j] || 0;
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-    const energy = Math.max(Math.abs(min), Math.abs(max));
-    const h = energy > 0.6 ? '#ff3cac' : energy > 0.3 ? '#a855f7' : '#00ffe1';
-    ctx.fillStyle = h;
-    ctx.fillRect(i, amp - max * amp * 0.9, 1, (max - min) * amp * 0.9);
-  }
+function stopRecording() {
+  if (mediaRecorder?.state !== 'inactive') mediaRecorder.stop();
+  isRecording = false;
+  document.getElementById('recBtn').textContent = '⏺ Opname Starten';
+  document.getElementById('recBtn').classList.remove('recording');
 }
 
-// === FFT BAND ENERGY via OfflineAudioContext ===
-// Analyseert één seconde audio en geeft bandenergiëen terug via echte FFT
-async function fftAnalyseSec(chunk, sampleRate) {
-  const fftSize = 4096; // hogere resolutie = nauwkeuriger lage freq
-  const offline = new OfflineAudioContext(1, chunk.length, sampleRate);
+function saveRecording() {
+  const stamp = nowStamp();
+  downloadFile(stamp + '.json', JSON.stringify({ timestamp: stamp, dutyCycle, flashLog: recFlashLog }, null, 2), 'application/json');
+  const blob = new Blob(recChunks, { type: 'audio/webm' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: stamp + '.webm' });
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus('Opgeslagen als ' + stamp, 'active');
+}
 
-  // Zet chunk in een buffer
-  const buf = offline.createBuffer(1, chunk.length, sampleRate);
-  buf.copyToChannel(chunk, 0);
-
-  const src = offline.createBufferSource();
-  src.buffer = buf;
-
-  const analyser = offline.createAnalyser();
-  analyser.fftSize = fftSize;
-  analyser.smoothingTimeConstant = 0; // geen smoothing, we willen ruwe data
-
-  src.connect(analyser);
-  analyser.connect(offline.destination);
-  src.start(0);
-
-  await offline.startRendering();
-
-  // Haal frequentiedata op (dB schaal, -Infinity tot 0)
-  const freqData = new Float32Array(analyser.frequencyBinCount);
-  analyser.getFloatFrequencyData(freqData);
-
-  // Binbreedte in Hz per bin
-  const binHz = sampleRate / fftSize;
-
-  // Bereken gemiddeld vermogen per band (lineair, niet dB)
-  function bandEnergy(loHz, hiHz) {
-    const lo = Math.max(0, Math.floor(loHz / binHz));
-    const hi = Math.min(freqData.length - 1, Math.ceil(hiHz / binHz));
-    let sum = 0, count = 0;
-    for (let i = lo; i <= hi; i++) {
-      // Van dB naar lineair vermogen: 10^(dB/10)
-      const db = freqData[i];
-      if (db > -Infinity) sum += Math.pow(10, db / 10);
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }
-
-  return {
-    sub:  bandEnergy(20, 250),      // bas, kick
-    mid:  bandEnergy(250, 4000),    // stem, melodie
-    high: bandEnergy(4000, 20000),  // hi-hat, lucht
+function loadRecordingJSON(evt) {
+  const file = evt.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      alert(`JSON geladen ✓\nTimestamp: ${data.timestamp}\nFlash events: ${data.flashLog?.length}`);
+    } catch(err) { setStatus('JSON fout: ' + err.message, 'error'); }
   };
+  reader.readAsText(file);
 }
 
-// Hersengolf zones → flits Hz
-// Delta  1–4 Hz   diepe rust
-// Theta  4–8 Hz   dromerig, hypnagogisch
-// Alpha  8–12 Hz  ontspannen, visuele patronen (Lumenate sweet spot)
-// Beta  12–30 Hz  actief, alert
-// Gamma 30–90 Hz  intens, piek (CFF grens ~90 Hz)
-function brainwaveHz(overall, subN, midN, highN) {
-  const vol = Math.min(1, overall * 4);
-  const total = subN + midN + highN + 1e-9;
-  const subRatio  = subN  / total;
-  const midRatio  = midN  / total;
-  const highRatio = highN / total;
-  const spectral = midRatio * 0.5 + highRatio * 1.0;
-  const score = vol * 0.6 + spectral * 0.4;
-
-  if (score < 0.10) return { hz: 1  + score / 0.10 * 3,         zone: 'DELTA', range: '1–4 Hz'   };
-  if (score < 0.25) return { hz: 4  + (score-0.10)/0.15 * 4,    zone: 'THETA', range: '4–8 Hz'   };
-  if (score < 0.45) return { hz: 8  + (score-0.25)/0.20 * 4,    zone: 'ALPHA', range: '8–12 Hz'  };
-  if (score < 0.70) return { hz: 12 + (score-0.45)/0.25 * 18,   zone: 'BETA',  range: '12–30 Hz' };
-  return               { hz: 30 + (score-0.70)/0.30 * 60,   zone: 'GAMMA', range: '30–90 Hz' };
+function loadRecordingAudio(evt) {
+  const file = evt.target.files[0]; if (!file) return;
+  const audio = document.getElementById('streamAudio');
+  audio.src = URL.createObjectURL(file);
+  setStatus('Audio geladen — druk play', 'active');
 }
 
-// === ANALYZE AUDIO ===
-async function analyzeAudio() {
-  setStatus('FFT ANALYSEREN...', true);
-  const sampleRate = audioBuffer.sampleRate;
-  const duration = audioBuffer.duration;
-  const totalSeconds = Math.ceil(duration);
-  const data = audioBuffer.getChannelData(0);
-
-  timeline = [];
-
-  // Eerste pass: verzamel alle energiewaarden voor normalisatie
-  const rawData = [];
-  for (let sec = 0; sec < totalSeconds; sec++) {
-    const startSample = Math.floor(sec * sampleRate);
-    const endSample = Math.min(startSample + sampleRate, data.length);
-    const chunk = data.slice(startSample, endSample);
-
-    // RMS
-    let rmsSum = 0;
-    for (let i = 0; i < chunk.length; i++) rmsSum += chunk[i] * chunk[i];
-    const rms = Math.sqrt(rmsSum / chunk.length);
-
-    // Echte FFT via OfflineAudioContext
-    const bands = await fftAnalyseSec(chunk, sampleRate);
-
-    rawData.push({ rms, ...bands });
-
-    loadingBar.style.width = `${60 + (sec / totalSeconds) * 35}%`;
-    // Yield elke seconde zodat de UI niet bevriest
-    await new Promise(r => setTimeout(r, 0));
-  }
-
-  // Normaliseer bandenergiëen over het hele bestand
-  const maxSub  = Math.max(...rawData.map(r => r.sub))  || 1;
-  const maxMid  = Math.max(...rawData.map(r => r.mid))  || 1;
-  const maxHigh = Math.max(...rawData.map(r => r.high)) || 1;
-
-  // Tweede pass: bereken flits-Hz per seconde
-  for (let sec = 0; sec < totalSeconds; sec++) {
-    const { rms, sub, mid, high } = rawData[sec];
-    const subN  = sub  / maxSub;
-    const midN  = mid  / maxMid;
-    const highN = high / maxHigh;
-
-    const overall = rms;
-    const { hz: flashHz, zone, range } = brainwaveHz(overall, subN, midN, highN);
-
-    // Dominant band voor kleurcodering
-    let dominantBand = 'mid';
-    if (subN > midN && subN > highN) dominantBand = 'sub';
-    else if (highN > midN && highN > subN) dominantBand = 'high';
-
-    const lightOn = overall > threshold;
-
-    timeline.push({
-      sec,
-      time: sec,
-      rms,
-      overall,
-      sub: subN,
-      mid: midN,
-      high: highN,
-      flashHz,
-      zone,     // 'DELTA' | 'THETA' | 'ALPHA' | 'BETA' | 'GAMMA'
-      range,    // '1–4 Hz' etc voor weergave
-      lightOn,
-      dominantBand,
-      userFlashHz: null,
-    });
-
-    loadingBar.style.width = `${95 + (sec / totalSeconds) * 5}%`;
-  }
-
-  loadingBar.style.width = '0%';
-  renderTimeline();
-  updateStats();
-}
-
-// === REBUILD (after settings change) ===
-function rebuildTimeline() {
-  timeline.forEach(row => {
-    const { hz, zone, range } = brainwaveHz(row.overall, row.sub, row.mid, row.high);
-    row.flashHz = hz;
-    row.zone = zone;
-    row.range = range;
-    row.lightOn = row.overall > threshold;
+// ── STEPS ─────────────────────────────────────────────────────────────────────
+function renderSteps() {
+  const list = document.getElementById('stepsList');
+  list.innerHTML = '';
+  steps.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'step' + (i === currentStep ? ' current' : '');
+    div.innerHTML = `
+      <span class="step-num">${i+1}</span>
+      <input type="range" class="step-slider" min="1" max="50" value="${s.hz}"
+        oninput="steps[${i}].hz=+this.value;this.closest('.step').querySelector('.step-hz').textContent=this.value+' Hz'">
+      <span class="step-hz">${s.hz} Hz</span>
+      <div class="step-dur"><input type="number" value="${s.dur}" min="1" max="600"
+        oninput="steps[${i}].dur=+this.value" style="width:48px"> s</div>
+      <button class="step-del" onclick="removeStep(${i})">×</button>`;
+    list.appendChild(div);
   });
-  renderTimeline();
-  updateStats();
+}
+function addStep() { steps.push({ hz: 8, dur: 30 }); renderSteps(); }
+function removeStep(i) { if (steps.length > 1) { steps.splice(i, 1); renderSteps(); } }
+function updateDuty() { dutyCycle = document.getElementById('dutyCycle').value / 100; document.getElementById('dutyVal').textContent = Math.round(dutyCycle*100)+'%'; }
+function toggleLoop() { loopOn = !loopOn; document.getElementById('loopToggle').classList.toggle('on', loopOn); }
+
+const presets = {
+  delta:    [{ hz:2, dur:120 }],
+  theta:    [{ hz:4, dur:60 },{ hz:6, dur:60 },{ hz:7, dur:60 }],
+  alpha:    [{ hz:8, dur:60 },{ hz:10, dur:60 },{ hz:12, dur:60 }],
+  gamma:    [{ hz:40, dur:60 }],
+  lumenate: [{ hz:3, dur:30 },{ hz:6, dur:30 },{ hz:8, dur:60 },{ hz:10, dur:60 },{ hz:12, dur:30 }],
+  descent:  [{ hz:10, dur:40 },{ hz:8, dur:40 },{ hz:6, dur:40 },{ hz:4, dur:60 }],
+  pulse:    [{ hz:8, dur:30 },{ hz:12, dur:30 },{ hz:8, dur:30 },{ hz:12, dur:30 }],
+  wake:     [{ hz:5, dur:30 },{ hz:10, dur:30 },{ hz:15, dur:30 },{ hz:18, dur:30 }],
+};
+function loadPreset(name, evt) {
+  if (running) return;
+  steps = presets[name].map(s => ({...s}));
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  evt.target.closest('.preset-btn').classList.add('active');
+  renderSteps();
 }
 
-// === RENDER TIMELINE ===
-function renderTimeline() {
-  const maxEnergy = Math.max(...timeline.map(r => r.overall)) || 1;
-  const rows = timeline.map((row, i) => {
-    const energyPct = (row.overall / maxEnergy * 100).toFixed(0);
-    const flashHz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
-    const lightOn = row.lightOn;
-
-    // Energy color
-    const energyColor = row.overall > 0.6 ? '#ff3cac' :
-                        row.overall > 0.3 ? '#a855f7' : '#00ffe1';
-
-    // Flash visualization blocks
-    const blockCount = Math.min(40, Math.round(flashHz * 2));
-    const flashBlocks = Array.from({length: blockCount}, (_, bi) => {
-      const col = row.dominantBand === 'sub' ? '#00bfff' :
-                  row.dominantBand === 'high' ? '#ff3cac' : '#a855f7';
-      return `<div class="flash-block" style="width:${Math.max(2,36/blockCount)}px;background:${col};opacity:${0.4 + Math.random()*0.5}"></div>`;
-    }).join('');
-
-    // Freq pills
-    let pills = '';
-    if (row.sub > 0.1) pills += `<span class="pill sub">SUB</span>`;
-    if (row.mid > 0.1) pills += `<span class="pill mid">MID</span>`;
-    if (row.high > 0.1) pills += `<span class="pill high">HI</span>`;
-
-    // Flash options
-    const flashOptions = [0.5,1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,65,75,80,90].map(hz =>
-      `<option value="${hz}" ${Math.abs(flashHz - hz) < 0.5 ? 'selected' : ''}>${hz} Hz</option>`
-    ).join('');
-
-    // Zone kleur
-    const zoneColor = {
-      DELTA: '#4477ff', THETA: '#00bfff', ALPHA: '#00ffe1',
-      BETA:  '#a855f7', GAMMA: '#ff3cac'
-    }[row.zone] || '#00ffe1';
-
-    return `<div class="timeline-row" id="row-${i}" data-sec="${i}" style="grid-template-columns: 44px 52px 90px 1fr 60px 80px 70px 52px 100px">
-      <span class="row-time" style="color:var(--text-dim)">${String(i+1).padStart(3,'0')}</span>
-      <span class="row-time">${formatTime(row.time)}</span>
-      <div class="energy-bar-wrap">
-        <div class="energy-bar-fill" style="width:${energyPct}%;background:${energyColor}"></div>
-      </div>
-      <div class="flash-vis">${flashBlocks}</div>
-      <div class="freq-pills">${pills}</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:${zoneColor};border:1px solid ${zoneColor}44;padding:1px 4px;text-align:center;letter-spacing:1px">
-        ${row.zone || '—'}
-      </div>
-      <div class="flash-badge" style="color:${zoneColor};border:1px solid ${zoneColor}33;padding:2px 6px;font-family:'Share Tech Mono',monospace;font-size:10px">
-        ${flashHz.toFixed(1)} Hz
-      </div>
-      <div class="light-on ${lightOn ? 'on' : ''}">
-        <div class="light-led"></div>
-      </div>
-      <select class="flash-select" data-row="${i}" onchange="setUserFlash(${i}, this.value)">
-        <option value="auto" ${row.userFlashHz === null ? 'selected' : ''}>AUTO</option>
-        ${flashOptions}
-      </select>
-    </div>`;
-  }).join('');
-
-  timelineRows.innerHTML = rows || '<div class="empty-timeline">— GEEN DATA —</div>';
-}
-
-function setUserFlash(rowIdx, val) {
-  if (val === 'auto') {
-    timeline[rowIdx].userFlashHz = null;
-  } else {
-    timeline[rowIdx].userFlashHz = parseFloat(val);
-  }
-}
-
-// === STATS ===
-function updateStats() {
-  const dur = audioBuffer ? audioBuffer.duration : 0;
-  const lightOnCount = timeline.filter(r => r.lightOn).length;
-  const avgFlash = timeline.length ?
-    (timeline.reduce((a,r) => a + r.flashHz, 0) / timeline.length).toFixed(1) : 0;
-
-  document.getElementById('statDuration').textContent = formatTime(dur);
-  document.getElementById('statSeconds').textContent = timeline.length;
-  document.getElementById('statLight').textContent = lightOnCount;
-  document.getElementById('statAvgFlash').textContent = `${avgFlash} Hz`;
-}
-
-// === PLAYBACK ===
-function togglePlay() {
-  if (isPlaying) {
-    // Save current position
-    pauseOffset = audioCtx.currentTime - startTime;
-    sourceNode.stop();
-    isPlaying = false;
-    btnPlay.textContent = '▶ PLAY';
-    cancelAnimationFrame(animFrame);
-    clearFlashTimers();
-    document.getElementById('liveFlash').style.opacity = '0';
-  } else {
-    startPlayback();
-  }
-}
-
-function startPlayback() {
-  if (!audioBuffer) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  sourceNode = audioCtx.createBufferSource();
-  sourceNode.buffer = audioBuffer;
-  sourceNode.connect(audioCtx.destination);
-  sourceNode.start(0, pauseOffset);
-  startTime = audioCtx.currentTime - pauseOffset;
-  isPlaying = true;
-  btnPlay.textContent = '⏸ PAUZE';
-
-  requestWakeLock();
-
-  sourceNode.onended = () => {
-    if (isPlaying) stopAudio();
-  };
-
-  scheduleFlashes();
-  updatePlayhead();
-}
-
-function stopAudio() {
-  if (sourceNode) { try { sourceNode.stop(); } catch(e) {} }
-  isPlaying = false;
-  pauseOffset = 0;
-  startTime = 0;
-  btnPlay.textContent = '▶ PLAY';
-  cancelAnimationFrame(animFrame);
-  clearFlashTimers();
-  setTorch(false);
-  releaseWakeLock();
-  playhead.style.left = '0%';
-  timeDisplay.textContent = '0:00.0';
-  document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
-}
-
-function updatePlayhead() {
-  if (!isPlaying) return;
-  const elapsed = audioCtx.currentTime - startTime;
-  const pct = (elapsed / audioBuffer.duration) * 100;
-  playhead.style.left = `${Math.min(100, pct)}%`;
-  timeDisplay.textContent = formatTime(elapsed);
-
-  // Highlight current row
-  const curSec = Math.floor(elapsed);
-  document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('playing-row'));
-  const curRow = document.getElementById(`row-${curSec}`);
-  if (curRow) {
-    curRow.classList.add('playing-row');
-    curRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
-
-  // === REAL-TIME FLASH via rAF ===
-  tickFlash(elapsed);
-
-  animFrame = requestAnimationFrame(updatePlayhead);
-}
-
-// === FLASH STATE ===
-let flashState = { flashOn: false };
-
-function tickFlash(elapsed) {
-  const curSec = Math.floor(elapsed);
-  const row = timeline[curSec];
-
-  if (!row || !row.lightOn) {
-    if (flashState.flashOn) { flashState.flashOn = false; setTorch(false); }
-    return;
-  }
-
-  const hz = row.userFlashHz !== null ? row.userFlashHz : row.flashHz;
-  const period = 1 / hz;
-  const phase = (elapsed % period) / period;
-  const shouldBeOn = phase < 0.45; // 45% duty cycle
-
-  if (shouldBeOn !== flashState.flashOn) {
-    flashState.flashOn = shouldBeOn;
-    setTorch(shouldBeOn);
-  }
-}
-
-// === FLASH SCHEDULING (kept for cleanup only) ===
-function clearFlashTimers() {
-  flashAnimTimers.forEach(t => clearTimeout(t));
-  flashAnimTimers = [];
-  flashState = { lastFlipTime: -1, flashOn: false };
-}
-
-function scheduleFlashes() {
-  // No-op: flash is now driven by tickFlash() inside updatePlayhead rAF loop
-}
-
-// === WAVEFORM CLICK ===
-document.getElementById('waveformWrap').addEventListener('click', e => {
-  if (!audioBuffer) return;
-  const rect = e.currentTarget.getBoundingClientRect();
-  const pct = (e.clientX - rect.left) / rect.width;
-  pauseOffset = pct * audioBuffer.duration;
-  if (isPlaying) {
-    sourceNode.stop();
-    isPlaying = false;
-    startPlayback();
-  } else {
-    playhead.style.left = `${pct * 100}%`;
-    timeDisplay.textContent = formatTime(pauseOffset);
-  }
-});
-
-// === EXPORT ===
+// ── JSON IMPORT/EXPORT ────────────────────────────────────────────────────────
 function exportJSON() {
-  if (!timeline.length) return;
-  const out = {
-    filename: 'lumenate-export',
-    duration: audioBuffer.duration,
-    sampleRate: audioBuffer.sampleRate,
-    speedMultiplier: speedMult,
-    threshold,
-    activeBands,
-    timeline: timeline.map(r => ({
-      second: r.sec,
-      time: r.time,
-      energy: parseFloat(r.overall.toFixed(4)),
-      sub: parseFloat(r.sub.toFixed(4)),
-      mid: parseFloat(r.mid.toFixed(4)),
-      high: parseFloat(r.high.toFixed(4)),
-      lightOn: r.lightOn,
-      flashHz: parseFloat((r.userFlashHz !== null ? r.userFlashHz : r.flashHz).toFixed(2)),
-      dominantBand: r.dominantBand
-    }))
+  const data = { steps, dutyCycle, mode: document.getElementById('modeSelect').value, loop: loopOn };
+  downloadFile('lumina_' + nowStamp() + '.json', JSON.stringify(data, null, 2), 'application/json');
+}
+function importJSON(evt) {
+  const file = evt.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (d.steps) { steps = d.steps; renderSteps(); }
+      if (d.dutyCycle !== undefined) { dutyCycle = d.dutyCycle; document.getElementById('dutyCycle').value = Math.round(dutyCycle*100); document.getElementById('dutyVal').textContent = Math.round(dutyCycle*100)+'%'; }
+      if (d.mode) document.getElementById('modeSelect').value = d.mode;
+      if (typeof d.loop === 'boolean') { loopOn = d.loop; document.getElementById('loopToggle').classList.toggle('on', loopOn); }
+      setStatus('JSON geladen ✓', 'active');
+    } catch(err) { setStatus('JSON fout: ' + err.message, 'error'); }
   };
-  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'lumenate-timeline.json';
-  a.click();
+  reader.readAsText(file);
 }
 
-// === RESET ===
-function resetAll() {
-  stopAudio();
-  audioBuffer = null;
-  timeline = [];
-  dropZone.classList.remove('loaded');
-  dropZone.innerHTML = `
-    <div class="drop-icon">◈</div>
-    <div class="drop-text">Drop WAV of MP3 hier</div>
-    <div class="drop-sub">of klik om een bestand te kiezen</div>
-    <div class="loading-bar" id="loadingBar"></div>
-  `;
-  controlArea.style.display = 'none';
-  timelineRows.innerHTML = '<div class="empty-timeline">— LAAD EEN AUDIOBESTAND —</div>';
-  setStatus('WACHT OP AUDIO', false);
-  document.getElementById('statDuration').textContent = '—';
-  document.getElementById('statSeconds').textContent = '—';
-  document.getElementById('statLight').textContent = '—';
-  document.getElementById('statAvgFlash').textContent = '—';
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg; el.className = 'status ' + (cls||'');
 }
 
-// === HELPERS ===
-function formatTime(s) {
-  const m = Math.floor(s / 60);
-  const sec = (s % 60).toFixed(1);
-  return `${m}:${String(Math.floor(s % 60)).padStart(2,'0')}.${(s % 1).toFixed(1).slice(2)}`;
-}
-
-function setStatus(txt, active) {
-  statusText.textContent = txt;
-  statusBar.classList.toggle('active', active);
-}
-
-// Window resize → redraw waveform
-window.addEventListener('resize', () => {
-  if (audioBuffer) drawWaveform();
-});
+renderSteps();
 </script>
 </body>
 </html>
