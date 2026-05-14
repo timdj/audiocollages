@@ -249,7 +249,7 @@ select:focus{border-color:var(--ac)}
     <div class="eprog"><div class="ebar" id="expBar"></div></div>
     <div class="estat" id="expStat">Klaar om te renderen</div>
     <div class="sep" style="margin:7px 0"></div>
-    <div class="srow"><span class="slabel">Sample rate</span><select id="expRate" style="margin:0;flex:1;font-size:9px"><option value="44100" selected>44100 Hz (CD)</option><option value="48000">48000 Hz (Pro)</option><option value="22050">22050 Hz (Lo-Fi)</option></select></div>
+    <div style="font-size:8px;color:var(--dm);line-height:1.6;margin-bottom:6px">Neemt de live audio op &#x2014; identiek aan wat je hoort.</div>
     <div class="srow"><span class="slabel">Bit depth</span><select id="expBits" style="margin:0;flex:1;font-size:9px"><option value="16" selected>16-bit PCM</option><option value="24">24-bit PCM</option><option value="32">32-bit Float</option></select></div>
   </div>
 
@@ -342,106 +342,30 @@ async function ensureAudio(){
 }
 
 function buildFX(){
-  if(!ctx) return;
   try{mg.disconnect();}catch(e){}
   let chain=[mg];
-  chain=applyFXChain(ctx,chain,fx);
-  for(let i=0;i<chain.length-1;i++) try{chain[i].connect(chain[i+1]);}catch(e){}
+  if(fx.comp){const c=ctx.createDynamicsCompressor();c.threshold.value=+g('cmpThr').value;c.ratio.value=+g('cmpRat').value;chain.push(c);}
+  if(fx.dist){const ws=ctx.createWaveShaper();ws.curve=dCurve(+g('dstDrv').value*400);ws.oversample='4x';const df=ctx.createBiquadFilter();df.type='lowpass';df.frequency.value=+g('dstTone').value;chain.push(ws,df);}
+  if(fx.bit){const bits=+g('bitDpth').value,rate=+g('bitRate').value,bp=ctx.createScriptProcessor(4096,1,1);let ph=0,last=0;bp.onaudioprocess=e=>{const i=e.inputBuffer.getChannelData(0),o=e.outputBuffer.getChannelData(0),st=Math.pow(2,bits),ps=rate/ctx.sampleRate;for(let j=0;j<i.length;j++){ph+=ps;if(ph>=1){ph-=1;last=Math.round(i[j]*st)/st;}o[j]=last;}};chain.push(bp);}
+  if(fx.ring){const ro=ctx.createOscillator(),rg=ctx.createGain();ro.frequency.value=+g('rngFreq').value;ro.connect(rg.gain);ro.start();chain.push(rg);}
+  if(fx.filter){const f=ctx.createBiquadFilter();f.type=g('filterType').value;f.frequency.value=+g('fltFreq').value;f.Q.value=+g('fltQ').value;chain.push(f);}
+  if(fx.chorus){const cd=ctx.createDelay(.05);cd.delayTime.value=.02;const co=ctx.createOscillator(),cg=ctx.createGain();co.frequency.value=+g('chrRate').value;cg.gain.value=+g('chrDpth').value;co.connect(cg);cg.connect(cd.delayTime);co.start();chain.push(cd);}
+  if(fx.flanger){const fd=ctx.createDelay(.02);fd.delayTime.value=.005;const fo=ctx.createOscillator(),fg=ctx.createGain();fo.frequency.value=+g('flgRate').value;fg.gain.value=+g('flgDpth').value;fo.connect(fg);fg.connect(fd.delayTime);fo.start();const ffb=ctx.createGain();ffb.gain.value=.5;fd.connect(ffb);ffb.connect(fd);chain.push(fd);}
+  if(fx.trem){const to=ctx.createOscillator(),tg=ctx.createGain();to.frequency.value=+g('trmRate').value;tg.gain.value=+g('trmDpth').value;to.connect(tg.gain);to.start();chain.push(tg);}
+  if(fx.delay){const dn=ctx.createDelay(5),dfb=ctx.createGain(),dw=ctx.createGain();dn.delayTime.value=+g('dlyTime').value;dfb.gain.value=+g('dlyFB').value;dw.gain.value=+g('dlyWet').value;dn.connect(dfb);dfb.connect(dn);dn.connect(dw);chain.push(dn);}
+  if(fx.reverb){const rv=makeRev(),rw=ctx.createGain();rw.gain.value=+g('rvbWet').value;rv.connect(rw);rw.connect(ctx.destination);chain.push(rv);}
+  for(let i=0;i<chain.length-1;i++)try{chain[i].connect(chain[i+1]);}catch(e){}
   try{chain[chain.length-1].connect(analyser);}catch(e){}
   try{analyser.connect(ctx.destination);}catch(e){}
 }
 
-// ── FIX 3: Shared FX chain builder used by BOTH live + export ──
-// Returns the chain array; caller connects last node to destination
-function applyFXChain(c, chain, fxMap){
-  if(fxMap.comp){
-    const n=c.createDynamicsCompressor();
-    n.threshold.value=+g('cmpThr').value; n.ratio.value=+g('cmpRat').value;
-    n.knee.value=3; n.attack.value=0.003; n.release.value=0.1;
-    chain.push(n);
-  }
-  if(fxMap.dist){
-    const ws=c.createWaveShaper(); ws.curve=dCurve(+g('dstDrv').value*400); ws.oversample='4x';
-    const df=c.createBiquadFilter(); df.type='lowpass'; df.frequency.value=+g('dstTone').value;
-    chain.push(ws,df);
-  }
-  if(fxMap.filter){
-    const f=c.createBiquadFilter(); f.type=g('filterType').value;
-    f.frequency.value=+g('fltFreq').value; f.Q.value=+g('fltQ').value;
-    chain.push(f);
-  }
-  if(fxMap.chorus){
-    const cd=c.createDelay(.05); cd.delayTime.value=.02;
-    const co=c.createOscillator(), cg=c.createGain();
-    co.frequency.value=+g('chrRate').value; cg.gain.value=+g('chrDpth').value;
-    co.connect(cg); cg.connect(cd.delayTime); co.start();
-    chain.push(cd);
-  }
-  if(fxMap.flanger){
-    const fd=c.createDelay(.02); fd.delayTime.value=.005;
-    const fo=c.createOscillator(), fg=c.createGain();
-    fo.frequency.value=+g('flgRate').value; fg.gain.value=+g('flgDpth').value;
-    fo.connect(fg); fg.connect(fd.delayTime); fo.start();
-    const ffb=c.createGain(); ffb.gain.value=.45;
-    fd.connect(ffb); ffb.connect(fd);
-    chain.push(fd);
-  }
-  if(fxMap.trem){
-    const to=c.createOscillator(), tg=c.createGain();
-    to.frequency.value=+g('trmRate').value; tg.gain.value=+g('trmDpth').value;
-    to.connect(tg.gain); to.start();
-    chain.push(tg);
-  }
-  if(fxMap.ring){
-    const ro=c.createOscillator(), rg=c.createGain();
-    ro.frequency.value=+g('rngFreq').value; ro.connect(rg.gain); ro.start();
-    chain.push(rg);
-  }
-  if(fxMap.delay){
-    const dn=c.createDelay(5), dfb=c.createGain(), dw=c.createGain();
-    dn.delayTime.value=+g('dlyTime').value;
-    dfb.gain.value=+g('dlyFB').value; dw.gain.value=+g('dlyWet').value;
-    dn.connect(dfb); dfb.connect(dn); dn.connect(dw);
-    chain.push(dn);
-  }
-  // Reverb: parallel wet signal → goes straight to destination, dry continues chain
-  if(fxMap.reverb){
-    const rv=makeConvolver(c,+g('rvbDec').value);
-    const rw=c.createGain(); rw.gain.value=+g('rvbWet').value;
-    // Connect the last chain node to reverb in parallel
-    const lastSoFar=chain[chain.length-1];
-    try{lastSoFar.connect(rv);}catch(e){}
-    rv.connect(rw);
-    // rw will be connected to destination by caller separately
-    // Store ref so export can wire it
-    chain._reverbWet=rw;
-  }
-  // Bitcrusher via ScriptProcessor (live only — not usable offline)
-  if(fxMap.bit && c===ctx){
-    const bits=+g('bitDpth').value, rate=+g('bitRate').value;
-    const bp=c.createScriptProcessor(4096,1,1); let ph=0,last=0;
-    bp.onaudioprocess=e=>{
-      const i=e.inputBuffer.getChannelData(0),o=e.outputBuffer.getChannelData(0);
-      const st=Math.pow(2,bits),ps=rate/c.sampleRate;
-      for(let j=0;j<i.length;j++){ph+=ps;if(ph>=1){ph-=1;last=Math.round(i[j]*st)/st;}o[j]=last;}
-    };
-    chain.push(bp);
-  }
-  return chain;
+function makeRev(){
+  const cv=ctx.createConvolver(),len=ctx.sampleRate*+g('rvbDec').value;
+  const buf=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);}
+  cv.buffer=buf;return cv;
 }
-
-function makeConvolver(c,decSec){
-  const cv=c.createConvolver(), len=Math.ceil(c.sampleRate*decSec);
-  const buf=c.createBuffer(2,len,c.sampleRate);
-  for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);}
-  cv.buffer=buf; return cv;
-}
-function dCurve(a){
-  const n=256,c=new Float32Array(n),d=Math.PI/180;
-  for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=(3+a)*x*20*d/(Math.PI+a*Math.abs(x));}
-  return c;
-}
-
+function dCurve(a){const n=256,c=new Float32Array(n),d=Math.PI/180;for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=(3+a)*x*20*d/(Math.PI+a*Math.abs(x));}return c;}
 function makeSrc(c,freq){
   if(wave==='noise'){
     const nb=c.createBuffer(1,c.sampleRate,c.sampleRate);
@@ -536,17 +460,51 @@ async function playNow(ch){
 }
 
 // CHAR MAP
+function makeTile(ch,map){
+  const t=document.createElement('div');t.className='ctile';t.dataset.ch=ch;
+  t.innerHTML='<span>'+ch+'</span><span class="nl">'+freqName(charToFreq(ch))+'</span>';
+  t.onclick=()=>playNow(ch);map.appendChild(t);
+}
+
 function buildMap(){
   const layout=LAYOUTS[g('kbLayout').value]||LAYOUTS.qwerty,map=g('charMap');
-  map.innerHTML='';const seen=new Set();
+  map.innerHTML='';
+  const seen=new Set();
+
+  // 1. All chars from the selected keyboard layout
   for(const ch of layout){
-    if(seen.has(ch)||ch===' ')continue;seen.add(ch);
-    const t=document.createElement('div');t.className='ctile';t.dataset.ch=ch;
-    t.innerHTML=`<span>${ch}</span><span class="nl">${freqName(charToFreq(ch))}</span>`;
-    t.onclick=()=>playNow(ch);map.appendChild(t);
+    if(seen.has(ch)||ch===' ')continue;
+    seen.add(ch);makeTile(ch,map);
+  }
+
+  // 2. Any extra chars typed in the textarea
+  const txt=g('inputText').value;
+  if(txt){
+    let firstExtra=true;
+    for(const ch of txt){
+      if(seen.has(ch))continue;
+      const code=ch.codePointAt(0)||0;
+      if(code===32||code===10||code===13||code===9)continue;
+      seen.add(ch);
+      if(firstExtra){
+        firstExtra=false;
+        const sep=document.createElement('div');
+        sep.style.cssText='width:100%;height:1px;background:var(--bd);margin:6px 0 4px;flex-basis:100%';
+        const lbl=document.createElement('div');
+        lbl.style.cssText='font-size:7px;color:var(--dm);letter-spacing:.12em;flex-basis:100%;margin-bottom:3px';
+        lbl.textContent='UIT DE TEKST';
+        map.appendChild(sep);map.appendChild(lbl);
+      }
+      makeTile(ch,map);
+    }
   }
 }
-function updCount(){g('charCount').textContent=g('inputText').value.length+' tekens';}
+function updCount(){
+  const txt=g('inputText').value;
+  const unique=new Set([...txt].filter(c=>c.codePointAt(0)>32));
+  g('charCount').textContent=txt.length+' tekens, '+unique.size+' uniek';
+  buildMap();
+}
 
 // VISUALIZER
 const vis=g('vis'),vc=vis.getContext('2d');
@@ -564,86 +522,88 @@ const vis=g('vis'),vc=vis.getContext('2d');
   vc.stroke();vc.shadowBlur=0;
 })();
 
-// ── FIX 3: WAV EXPORT with all effects ────────────────────
+// ── EXPORT: MediaRecorder tapped from live analyser node ──
+// Exactly what you hear = what gets recorded.
+let recorder=null, recChunks=[], recDest=null;
+
 async function exportWAV(){
   const txt=g('inputText').value;
   if(!txt){g('expStat').textContent='Geen tekst!';return;}
-  g('expBtn').disabled=true;g('expBar').style.width='0%';
-  g('expStat').textContent='Renderen...';
+  if(playing){g('expStat').textContent='Stop eerst het afspelen.';return;}
 
-  const sr=+g('expRate').value,bits=+g('expBits').value,noteDur=getDur();
-  const chars=[...txt].filter(c=>c!==' '&&c!=='\n'&&c!=='\r');
-  if(!chars.length){g('expStat').textContent='Geen afspeelbare tekens.';g('expBtn').disabled=false;return;}
+  await ensureAudio();
 
-  const tail=fx.reverb?+g('rvbDec').value+0.5:0.5;
-  const totalDur=chars.length*noteDur+tail;
-  const oc=new OfflineAudioContext(2,Math.ceil(totalDur*sr),sr);
+  // Check MediaRecorder support
+  if(!window.MediaRecorder){g('expStat').textContent='MediaRecorder niet ondersteund in deze browser.';return;}
 
-  // Master gain
-  const oMg=oc.createGain();oMg.gain.value=+g('volSl').value;
+  g('expBtn').disabled=true;g('expBar').style.width='5%';
+  g('expStat').textContent='Opname gestart — speelt af...';
 
-  // Build full FX chain offline (without ScriptProcessor/bitcrusher — not supported offline)
-  let chain=[oMg];
-  // Compressor
-  if(fx.comp){const n=oc.createDynamicsCompressor();n.threshold.value=+g('cmpThr').value;n.ratio.value=+g('cmpRat').value;n.knee.value=3;n.attack.value=0.003;n.release.value=0.1;chain.push(n);}
-  // Distortion
-  if(fx.dist){const ws=oc.createWaveShaper();ws.curve=dCurve(+g('dstDrv').value*400);ws.oversample='4x';const df=oc.createBiquadFilter();df.type='lowpass';df.frequency.value=+g('dstTone').value;chain.push(ws,df);}
-  // Filter
-  if(fx.filter){const f=oc.createBiquadFilter();f.type=g('filterType').value;f.frequency.value=+g('fltFreq').value;f.Q.value=+g('fltQ').value;chain.push(f);}
-  // Chorus
-  if(fx.chorus){const cd=oc.createDelay(.05);cd.delayTime.value=.02;const co=oc.createOscillator(),cg=oc.createGain();co.frequency.value=+g('chrRate').value;cg.gain.value=+g('chrDpth').value;co.connect(cg);cg.connect(cd.delayTime);co.start();chain.push(cd);}
-  // Flanger
-  if(fx.flanger){const fd=oc.createDelay(.02);fd.delayTime.value=.005;const fo=oc.createOscillator(),fg=oc.createGain();fo.frequency.value=+g('flgRate').value;fg.gain.value=+g('flgDpth').value;fo.connect(fg);fg.connect(fd.delayTime);fo.start();const ffb=oc.createGain();ffb.gain.value=.45;fd.connect(ffb);ffb.connect(fd);chain.push(fd);}
-  // Tremolo
-  if(fx.trem){const to=oc.createOscillator(),tg=oc.createGain();to.frequency.value=+g('trmRate').value;tg.gain.value=+g('trmDpth').value;to.connect(tg.gain);to.start();chain.push(tg);}
-  // Ring Mod
-  if(fx.ring){const ro=oc.createOscillator(),rg=oc.createGain();ro.frequency.value=+g('rngFreq').value;ro.connect(rg.gain);ro.start();chain.push(rg);}
-  // Delay (parallel wet)
-  if(fx.delay){
-    const dn=oc.createDelay(5),dfb=oc.createGain(),dw=oc.createGain(),dd=oc.createGain();
-    dn.delayTime.value=+g('dlyTime').value;dfb.gain.value=+g('dlyFB').value;
-    dw.gain.value=+g('dlyWet').value;dd.gain.value=1-+g('dlyWet').value;
-    chain[chain.length-1].connect(dn);dn.connect(dfb);dfb.connect(dn);dn.connect(dw);
-    dw.connect(oc.destination);chain.push(dd);
-  }
-  // Connect chain
-  for(let i=0;i<chain.length-1;i++) try{chain[i].connect(chain[i+1]);}catch(e){}
-  // Reverb parallel
-  if(fx.reverb){
-    const rv=makeConvolver(oc,+g('rvbDec').value),rw=oc.createGain();
-    rw.gain.value=+g('rvbWet').value;
-    chain[chain.length-1].connect(rv);rv.connect(rw);rw.connect(oc.destination);
-  }
-  // Dry to destination
-  chain[chain.length-1].connect(oc.destination);
+  // Tap audio after the full FX chain (analyser sits at end of chain)
+  recDest=ctx.createMediaStreamDestination();
+  analyser.connect(recDest);
 
-  // Schedule notes
-  const atk=+g('atkSl').value,dec=+g('decSl').value,sus=+g('susSl').value,rel=+g('relSl').value;
-  chars.forEach((ch,i)=>{
-    const t=i*noteDur,freq=charToFreq(ch);
-    const src=makeSrc(oc,freq),env=oc.createGain();
-    env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(1,t+atk);
-    env.gain.linearRampToValueAtTime(sus,t+atk+dec);
-    env.gain.setValueAtTime(sus,Math.max(t+noteDur-rel,t+atk+dec+.001));
-    env.gain.linearRampToValueAtTime(0,t+noteDur);
-    src.connect(env);env.connect(oMg);src.start(t);src.stop(t+noteDur+.05);
+  // Pick best supported format
+  const mimeType=['audio/webm;codecs=pcm','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+  recChunks=[];
+  recorder=new MediaRecorder(recDest.stream,mimeType?{mimeType}:{});
+  recorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
+
+  recorder.onstop=async()=>{
+    analyser.disconnect(recDest);
+    g('expBar').style.width='80%';
+    g('expStat').textContent='Verwerken...';
+
+    const webmBlob=new Blob(recChunks,{type:recorder.mimeType||'audio/webm'});
+
+    // Decode the recorded audio and re-encode as WAV
+    const arrayBuf=await webmBlob.arrayBuffer();
+    const decCtx=new AudioContext();
+    let decoded;
+    try{decoded=await decCtx.decodeAudioData(arrayBuf);}
+    catch(e){
+      // Fallback: offer the webm directly
+      g('expBar').style.width='100%';
+      g('expStat').textContent='WAV encode mislukt — downloadt als WebM';
+      dlBlob(webmBlob,'tekst-toon-'+Date.now()+'.webm');
+      g('expBtn').disabled=false;return;
+    }
+    await decCtx.close();
+
+    const bits=+g('expBits').value;
+    const wavBlob=bufToWAV(decoded,bits);
+    g('expBar').style.width='100%';
+    g('expStat').textContent='✓ '+(wavBlob.size/1024/1024).toFixed(2)+' MB — '+decoded.duration.toFixed(1)+'s';
+    dlBlob(wavBlob,'tekst-toon-'+Date.now()+'.wav');
+    g('expBtn').disabled=false;
+    setTimeout(()=>g('expBar').style.width='0%',3000);
+  };
+
+  recorder.start(100); // collect in 100ms chunks
+
+  // Play from beginning, stop recorder when done
+  rewind();
+  await togglePlay();
+
+  // Poll until playback finishes
+  await new Promise(resolve=>{
+    const check=setInterval(()=>{
+      if(!playing){clearInterval(check);resolve();}
+    },200);
   });
 
-  g('expBar').style.width='40%';
-  let rendered;
-  try{rendered=await oc.startRendering();}
-  catch(e){g('expStat').textContent='Render fout: '+e.message;g('expBtn').disabled=false;return;}
-  g('expBar').style.width='78%';g('expStat').textContent='Encoderen naar WAV...';
+  // Extra tail for reverb decay
+  const tail=fx.reverb?Math.min(+g('rvbDec').value,3):0.3;
+  g('expStat').textContent='Wachten op staart ('+tail.toFixed(1)+'s)...';
+  await new Promise(r=>setTimeout(r,tail*1000));
 
-  const blob=bufToWAV(rendered,bits);
+  recorder.stop();
+}
+
+function dlBlob(blob,name){
   const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='tekst-toon-'+Date.now()+'.wav';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),8000);
-  g('expBar').style.width='100%';
-  g('expStat').textContent='✓ '+(blob.size/1024/1024).toFixed(2)+' MB — '+rendered.duration.toFixed(1)+'s';
-  g('expBtn').disabled=false;
-  setTimeout(()=>{g('expBar').style.width='0%';},3000);
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),8000);
 }
 
 function bufToWAV(buf,bits){
@@ -741,6 +701,15 @@ function loadSample(k){g('inputText').value=SAMPLES[k];updCount();}
 
 if(!navigator.requestMIDIAccess)g('midiStat').textContent='⚠ Web MIDI niet beschikbaar. Gebruik Chrome/Edge.';
 buildMap();
+
+// Expose onclick functions to global scope explicitly
+window.togglePlay  = togglePlay;
+window.stopPlay    = stopPlay;
+window.rewind      = rewind;
+window.exportWAV   = exportWAV;
+window.initMIDI    = initMIDI;
+window.toggleMidiThru = toggleMidiThru;
+window.loadSample  = loadSample;
 </script>
 </body>
 </html>
