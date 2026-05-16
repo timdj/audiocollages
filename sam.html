@@ -115,8 +115,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 .presets{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .preset-btn{background:none;border:1px solid #002d10;color:#006622;font-family:'Share Tech Mono',monospace;font-size:10px;padding:7px 4px;cursor:pointer;letter-spacing:.06em;transition:all .1s;text-align:center}
 .preset-btn:hover{border-color:var(--green-dim);color:var(--green);background:var(--green-dark)}
-.phoneme-help{font-size:10px;color:#005520;line-height:1.8;margin-top:7px}
-.phoneme-help code{color:var(--green)}
 /* Rec time */
 #recTime{font-family:'VT323',monospace;font-size:20px;color:#ff0040;min-width:60px;text-align:right}
 .footer{text-align:center;margin-top:14px;font-size:10px;color:#002008;letter-spacing:.18em}
@@ -436,6 +434,53 @@ function loadPreset(name){
 // ═══════════════════════════════════════════════════════════════════
 // SAM RENDERING
 // ═══════════════════════════════════════════════════════════════════
+// Vertaaltabel: symbool → uitgesproken tekst voor SAM
+// Volgorde is belangrijk: langere combinaties eerst
+// Vertaaltabel: symbool → uitgesproken tekst voor SAM
+// Simpele string-vervanging, geen regex — vermijdt escape-problemen
+const SYMBOL_MAP = [
+  // Combinaties eerst (langste match eerst)
+  [':)', 'smiley'], [':(', 'droef gezicht'], [':D', 'blij gezicht'],
+  [';)', 'knipoog'], [':P', 'tong'], ['<3', 'hartje'],
+  ['...', 'puntpuntpunt'], ['!!', 'uitroep uitroep'], ['??', 'vraag vraag'],
+  // Geldeenheden
+  ['€', 'euro'], ['£', 'pond'], ['$', 'dollar'], ['¢', 'cent'], ['¥', 'yen'],
+  // Wiskundig
+  ['+', 'plus'], ['*', 'maal'], ['/', 'gedeeld door'],
+  ['=', 'is'], ['%', 'procent'], ['^', 'macht'],
+  ['√', 'wortel'], ['π', 'pi'], ['÷', 'gedeeld door'], ['×', 'maal'],
+  ['∆', 'delta'],
+  // Leestekens
+  ['!', 'uitroep'], ['?', 'vraag'], ['.', 'punt'],
+  [',', 'komma'], [':', 'dubbele punt'], [';', 'puntkomma'],
+  ['-', 'streepje'],
+  // Aanhalingstekens en haakjes
+  ['"', 'aanhalingsteken'], ["'", 'apostrof'],
+  ['(', 'haakje open'], [')', 'haakje dicht'],
+  ['[', 'blokhaakje open'], [']', 'blokhaakje dicht'],
+  ['{', 'accolade open'], ['}', 'accolade dicht'],
+  // Overige symbolen
+  ['@', 'at'], ['#', 'hekje'], ['&', 'en'], ['_', 'onderstreep'],
+  ['|', 'streep'], ['\\', 'backslash'], ['`', 'accent'],
+  ['~', 'tilde'], ['·', 'punt'], ['¶', 'alinea'], ['°', 'graden'],
+  ['©', 'copyright'], ['®', 'geregistreerd'], ['™', 'handelsmerk'],
+  ['✓', 'vinkje'], ['<', 'kleiner dan'], ['>', 'groter dan'],
+  // Cijfers
+  ['0', 'nul'], ['1', 'een'], ['2', 'twee'], ['3', 'drie'],
+  ['4', 'vier'], ['5', 'vijf'], ['6', 'zes'], ['7', 'zeven'],
+  ['8', 'acht'], ['9', 'negen'],
+];
+
+function expandSymbols(text){
+  // Vervang teken voor teken via simpele string split/join — geen regex
+  let out = text;
+  for(const [sym, spoken] of SYMBOL_MAP){
+    out = out.split(sym).join(' ' + spoken + ' ');
+  }
+  // Opruimen: meerdere spaties → één, geen leading/trailing
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 function splitChunks(text){
   const parts=text.match(/[^.!?,\n]+[.!?,\n]?/g)||[text];
   const chunks=[]; let cur='';
@@ -470,7 +515,9 @@ function applyLoopCrossfade(f32){
 }
 
 function renderAll(text,opts){
-  const chunks=splitChunks(text);
+  // Eerst splitsen op normale leestekens, daarna pas symbolen uitbreiden
+  // Zo blijft splitChunks werkend op .!?, en loopt het niet vast
+  const chunks = splitChunks(text).map(expandSymbols);
   const f32parts=[]; const u8parts=[];
   for(const ch of chunks){
     try{
