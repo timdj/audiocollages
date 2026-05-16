@@ -181,6 +181,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
     <div class="knob-row"><div class="knob-row-label">TOONHOOGTE</div><div class="knob-value" id="pitchVal">64</div><input type="range" id="pitch" min="0" max="255" value="64" oninput="updateSlider(this,'pitchVal');liveRender()"></div>
     <div class="knob-row"><div class="knob-row-label">KEELKLANK</div><div class="knob-value" id="throatVal">128</div><input type="range" id="throat" min="0" max="255" value="128" oninput="updateSlider(this,'throatVal');liveRender()"></div>
     <div class="knob-row"><div class="knob-row-label">MONDSTAND</div><div class="knob-value" id="mouthVal">128</div><input type="range" id="mouth" min="0" max="255" value="128" oninput="updateSlider(this,'mouthVal');liveRender()"></div>
+    <div class="knob-row" style="padding-top:8px;border-top:1px solid var(--border)">
+      <div class="knob-row-label">MENSELIJK</div>
+      <div class="knob-value" id="humanVal">0%</div>
+      <input type="range" id="humanize" min="0" max="100" value="0" oninput="updateSlider(this,'humanVal','%');liveRender()">
+    </div>
   </div>
 </div>
 
@@ -376,10 +381,10 @@ setInterval(updateClock,1000); updateClock();
 // ═══════════════════════════════════════════════════════════════════
 // SLIDERS
 // ═══════════════════════════════════════════════════════════════════
-function updateSlider(el,valId){
+function updateSlider(el,valId,suffix){
   const pct=((el.value-el.min)/(el.max-el.min))*100;
   el.style.setProperty('--val',pct+'%');
-  document.getElementById(valId).textContent=parseFloat(el.value);
+  document.getElementById(valId).textContent=parseFloat(el.value)+(suffix||'');
 }
 document.querySelectorAll('input[type=range]').forEach(el=>{
   const pct=((el.value-el.min)/(el.max-el.min))*100;
@@ -511,17 +516,63 @@ function applyLoopCrossfade(f32){
   return out;
 }
 
+function humanizeOpts(opts, chunkIndex, totalChunks){
+  const h = parseInt(document.getElementById('humanize').value) / 100;
+  if(h <= 0) return opts;
+
+  // Willekeurige variatie schaalt met h (0=niks, 1=maximaal)
+  const jitter = (range) => (Math.random() * 2 - 1) * range * h;
+
+  // Toonhoogte: lichte stijging begin zin, daling einde (intonatie)
+  const intonation = Math.sin((chunkIndex / Math.max(totalChunks-1,1)) * Math.PI);
+  const pitchShift  = Math.round(jitter(18) + intonation * 8 * h);
+  const speedShift  = Math.round(jitter(14));
+  const mouthShift  = Math.round(jitter(20));
+  const throatShift = Math.round(jitter(16));
+
+  return {
+    ...opts,
+    pitch:  Math.max(0, Math.min(255, opts.pitch  + pitchShift)),
+    speed:  Math.max(5, Math.min(255, opts.speed  + speedShift)),
+    mouth:  Math.max(0, Math.min(255, opts.mouth  + mouthShift)),
+    throat: Math.max(0, Math.min(255, opts.throat + throatShift)),
+  };
+}
+
+// Stilte buffer (ademhaling) in samples @ 22050Hz
+function makePause(ms){
+  return new Float32Array(Math.floor(22050 * ms / 1000));
+}
+
 function renderAll(text,opts){
-  const chunks=splitChunks(text).map(expandSymbols);
+  const rawChunks = splitChunks(text);
+  const chunks = rawChunks.map(expandSymbols);
+  const h = parseInt(document.getElementById('humanize').value) / 100;
   const f32parts=[]; const u8parts=[];
-  for(const ch of chunks){
+
+  for(let ci=0; ci<chunks.length; ci++){
+    const ch = chunks[ci];
     try{
-      const sam=new SamJs(opts);
-      const b8=sam.buf8(ch);
+      const chOpts = humanizeOpts(opts, ci, chunks.length);
+      const sam = new SamJs(chOpts);
+      const b8  = sam.buf8(ch);
       if(b8&&b8.length>0){
         const f=new Float32Array(b8.length);
         for(let i=0;i<b8.length;i++) f[i]=(b8[i]-128)/128;
-        f32parts.push(f); u8parts.push(b8);
+
+        // Pauze vóór chunk (behalve eerste): ademhaling simuleren
+        if(ci > 0 && h > 0){
+          // Korte pauze tussen zinnen (20-120ms afhankelijk van h en interpunctie)
+          const raw = rawChunks[ci-1];
+          const isSentenceEnd = /[.!?]$/.test(raw.trim());
+          const baseMs = isSentenceEnd ? 80 : 30;
+          const pauseMs = baseMs + Math.random() * 80 * h;
+          f32parts.push(makePause(pauseMs));
+          u8parts.push(new Uint8Array(Math.floor(22050 * pauseMs / 1000)));
+        }
+
+        f32parts.push(f);
+        u8parts.push(b8);
       }
     }catch(e){console.warn('chunk fail',ch,e);}
   }
@@ -535,7 +586,6 @@ function renderAll(text,opts){
     u8.set(u8parts[k],off);
     off+=f32parts[k].length;
   }
-  // Naadloze loop: crossfade inbakken als loop aan staat
   if(isLooping) f32=applyLoopCrossfade(f32);
   return{f32,u8};
 }
