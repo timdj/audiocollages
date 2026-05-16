@@ -67,6 +67,11 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .toggle-btn.active{background:var(--green-dark);border-color:var(--green);color:var(--green);box-shadow:0 0 7px rgba(0,255,65,.3)}
 /* Knob grids */
 .kg4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.knob-stack{display:flex;flex-direction:column;gap:10px}
+.knob-row{display:grid;grid-template-columns:100px 52px 1fr;align-items:center;gap:10px}
+.knob-row-label{font-size:10px;letter-spacing:.2em;color:var(--green-dim);text-transform:uppercase}
+.knob-row input[type=range]{height:20px}
+.knob-row input[type=range]::-webkit-slider-thumb{width:28px;height:28px}
 .kg3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .kg2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .knob-group{display:flex;flex-direction:column;gap:5px}
@@ -169,16 +174,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 
 <!-- SAM params -->
 <div class="panel" data-label="STEM PARAMETERS (LIVE)">
-  <div class="kg4">
-    <div class="knob-group"><div class="knob-label">SNELHEID</div><div class="knob-value" id="speedVal">72</div><input type="range" id="speed" min="0" max="255" value="72" oninput="updateSlider(this,'speedVal');liveRender()"></div>
-    <div class="knob-group"><div class="knob-label">TOONHOOGTE</div><div class="knob-value" id="pitchVal">64</div><input type="range" id="pitch" min="0" max="255" value="64" oninput="updateSlider(this,'pitchVal');liveRender()"></div>
-    <div class="knob-group"><div class="knob-label">KEELKLANK</div><div class="knob-value" id="throatVal">128</div><input type="range" id="throat" min="0" max="255" value="128" oninput="updateSlider(this,'throatVal');liveRender()"></div>
-    <div class="knob-group"><div class="knob-label">MONDSTAND</div><div class="knob-value" id="mouthVal">128</div><input type="range" id="mouth" min="0" max="255" value="128" oninput="updateSlider(this,'mouthVal');liveRender()"></div>
+  <div class="knob-stack">
+    <div class="knob-row"><div class="knob-row-label">SNELHEID</div><div class="knob-value" id="speedVal">72</div><input type="range" id="speed" min="0" max="255" value="72" oninput="updateSlider(this,'speedVal');liveRender()"></div>
+    <div class="knob-row"><div class="knob-row-label">TOONHOOGTE</div><div class="knob-value" id="pitchVal">64</div><input type="range" id="pitch" min="0" max="255" value="64" oninput="updateSlider(this,'pitchVal');liveRender()"></div>
+    <div class="knob-row"><div class="knob-row-label">KEELKLANK</div><div class="knob-value" id="throatVal">128</div><input type="range" id="throat" min="0" max="255" value="128" oninput="updateSlider(this,'throatVal');liveRender()"></div>
+    <div class="knob-row"><div class="knob-row-label">MONDSTAND</div><div class="knob-value" id="mouthVal">128</div><input type="range" id="mouth" min="0" max="255" value="128" oninput="updateSlider(this,'mouthVal');liveRender()"></div>
   </div>
 </div>
 
 <!-- FX -->
 <div class="panel" data-label="AUDIO EFFECTEN (LIVE)">
+  <div class="knob-row" style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+    <div class="knob-row-label">CROSSFADE</div>
+    <div class="knob-value" id="xfadeVal">2.0s</div>
+    <input type="range" id="xfadeSlider" min="0" max="4" value="2" step="0.1" oninput="updateXfade(this)">
+  </div>
   <div class="fx-grid">
     <button class="fx-btn" id="fx-distortion" onclick="toggleFx('distortion')">DISTORTION</button>
     <button class="fx-btn" id="fx-filter" onclick="toggleFx('filter')">FILTER</button>
@@ -367,6 +377,12 @@ document.querySelectorAll('input[type=range]').forEach(el=>{
 });
 const FILTER_TYPES=['lowpass','highpass','bandpass','notch'];
 const FILTER_LABELS=['LP','HP','BP','NT'];
+function updateXfade(el){
+  const pct=((el.value-el.min)/(el.max-el.min))*100;
+  el.style.setProperty('--val',pct+'%');
+  XFADE_SEC=parseFloat(el.value);
+  document.getElementById('xfadeVal').textContent=XFADE_SEC.toFixed(1)+'s';
+}
 function updateFilterType(el){
   updateSlider(el,'filtTypeVal');
   document.getElementById('filtTypeVal').textContent=FILTER_LABELS[+el.value]||'LP';
@@ -592,7 +608,7 @@ let _chainIn=null,_chainOut=null;
 let _slots=[null,null];
 let _activeSlot=0;
 let _xfadeTimer=null;
-const XFADE_SEC=0.08;
+let XFADE_SEC=2.0;
 
 function _buildSlot(){
   const stages=[]; const oscList=[]; const spList=[];
