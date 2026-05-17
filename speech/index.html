@@ -1524,7 +1524,7 @@ function esPlay(){
 
       try{
         _esCtx = new (window.AudioContext||window.webkitAudioContext)();
-        const buf = _esCtx.createBuffer(1, total, 22050);
+        const buf = _esCtx.createBuffer(1, total, 44100);
         buf.copyToChannel(f32, 0);
         _esSrc = _esCtx.createBufferSource();
         _esSrc.buffer = buf;
