@@ -1476,7 +1476,18 @@ function _initEspeak(){
 }
 
 // ── eSpeak-NG spreken (output → SAM FX chain) ────────────
+let _esCtx = null;
+let _esSrc = null;
+
+function esStop(){
+  if(_esSrc){ try{_esSrc.stop();}catch(e){} _esSrc=null; }
+  if(_esCtx){ try{_esCtx.close();}catch(e){} _esCtx=null; }
+  document.getElementById('btnPlay').classList.remove('active');
+  setStatus('','GESTOPT');
+}
+
 function esPlay(){
+  esStop(); // stop vorige
   if(!_espeakReady){ setStatus('err','eSpeak niet geladen'); return; }
   const text = document.getElementById('textInput').value.trim();
   if(!text) return;
@@ -1493,53 +1504,66 @@ function esPlay(){
   try{ _espeakTts.set_pitch(pitch); }catch(e){}
   _espeakTts.set_voice(voice);
 
-  const chunks = [];
+  // Verzamel bytes direct als Uint8Array (voor ArrayBuffer consumption)
+  const byteChunks = [];
 
   _espeakTts.synthesize(text, function(arg1, arg2){
-    if(arg1 instanceof ArrayBuffer && arg1.byteLength > 0){
-      chunks.push(new Int16Array(arg1.slice(0))); // slice voor veilige kopie
-    } else if(arg1 instanceof ArrayBuffer && arg1.byteLength === 0){
-      // Einde
-      const total = chunks.reduce((s,c)=>s+c.length, 0);
-      document.getElementById('esStatus').textContent = total > 0 ? '✓ '+total+' samples' : '⚠ Geen audio';
+    if(!(arg1 instanceof ArrayBuffer)) return;
 
-      if(total === 0){
+    if(arg1.byteLength > 0){
+      // Kopieer bytes direct — ArrayBuffer kan maar één keer gelezen worden
+      const copy = new Uint8Array(arg1.byteLength);
+      copy.set(new Uint8Array(arg1));
+      byteChunks.push(copy);
+    } else {
+      // byteLength === 0 = einde
+      const totalBytes = byteChunks.reduce((s,c)=>s+c.length, 0);
+      const totalSamples = totalBytes / 2; // Int16 = 2 bytes per sample
+
+      document.getElementById('esStatus').textContent = totalSamples > 0
+        ? '✓ '+totalSamples+' samples' : '⚠ Geen audio';
+
+      if(totalSamples === 0){
         setStatus('','GEREED');
         document.getElementById('btnPlay').classList.remove('active');
         return;
       }
 
-      // Combineer
-      const all = new Int16Array(total);
+      // Combineer alle bytes
+      const allBytes = new Uint8Array(totalBytes);
       let off = 0;
-      for(const c of chunks){ all.set(c, off); off += c.length; }
-      const f32 = new Float32Array(total);
-      for(let i=0;i<total;i++) f32[i] = all[i] / 32768.0;
+      for(const c of byteChunks){ allBytes.set(c, off); off += c.length; }
 
-      // Simpele directe afspeel via eigen AudioContext
+      // Uint8Array → Int16Array → Float32Array
+      const int16 = new Int16Array(allBytes.buffer);
+      const f32 = new Float32Array(totalSamples);
+      for(let i=0;i<totalSamples;i++) f32[i] = int16[i] / 32768.0;
+
+      // Afspelen
       try{
-        const ctx = new (window.AudioContext||window.webkitAudioContext)();
-        const buf = ctx.createBuffer(1, total, 22050);
+        _esCtx = new (window.AudioContext||window.webkitAudioContext)();
+        const buf = _esCtx.createBuffer(1, totalSamples, 22050);
         buf.copyToChannel(f32, 0);
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        src.connect(ctx.destination);
-        src.start();
-        src.onended = () => {
+        _esSrc = _esCtx.createBufferSource();
+        _esSrc.buffer = buf;
+        _esSrc.connect(_esCtx.destination);
+        _esSrc.start();
+        _esSrc.onended = ()=>{
+          _esSrc = null;
           document.getElementById('btnPlay').classList.remove('active');
           setStatus('','GEREED');
-          ctx.close();
-          if(isLooping) esPlay(); // loop
+          if(isLooping) esPlay();
         };
         setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
 
-        // Sla ook op voor SAM FX / download
+        // Opslaan voor download
         combinedF32 = f32;
-        lastRaw8 = new Uint8Array(total);
-        for(let i=0;i<total;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
+        lastRaw8 = new Uint8Array(totalSamples);
+        for(let i=0;i<totalSamples;i++)
+          lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
         document.getElementById('dlBtn').disabled = false;
 
-      } catch(e){
+      }catch(e){
         setStatus('err','Audio fout: '+e.message);
         document.getElementById('btnPlay').classList.remove('active');
       }
@@ -1634,8 +1658,7 @@ function wsRun(text){
 document.getElementById('btnPlay').addEventListener('click',e=>{
   if(_eMode==='ws'){e.stopImmediatePropagation();wsPlay();}
   else if(_eMode==='es'){e.stopImmediatePropagation();esPlay();}
-},{capture:true});
-document.getElementById('btnPause').addEventListener('click',e=>{
+},{capture:true});document.getElementById('btnPause').addEventListener('click',e=>{
   if(_eMode==='ws'){
     e.stopImmediatePropagation();
     _wsPaused=!_wsPaused;
@@ -1651,6 +1674,11 @@ document.getElementById('btnStop').addEventListener('click',e=>{
     document.getElementById('btnPlay').classList.remove('active');
     document.getElementById('btnPause').classList.remove('active');
     setStatus('','GESTOPT');
+  } else if(_eMode==='es'){
+    e.stopImmediatePropagation();
+    isLooping=false;
+    document.getElementById('btnLoop').classList.remove('active');
+    esStop();
   }
 },{capture:true});
 document.getElementById('btnLoop').addEventListener('click',e=>{
