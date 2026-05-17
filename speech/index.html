@@ -1487,7 +1487,7 @@ function esStop(){
 }
 
 function esPlay(){
-  esStop(); // stop vorige
+  esStop();
   if(!_espeakReady){ setStatus('err','eSpeak niet geladen'); return; }
   const text = document.getElementById('textInput').value.trim();
   if(!text) return;
@@ -1504,45 +1504,27 @@ function esPlay(){
   try{ _espeakTts.set_pitch(pitch); }catch(e){}
   _espeakTts.set_voice(voice);
 
-  // Verzamel bytes direct als Uint8Array (voor ArrayBuffer consumption)
-  const byteChunks = [];
+  // Data is Float32 — gebruik slice() voor veilige kopie van de ArrayBuffer
+  const chunks = [];
 
   _espeakTts.synthesize(text, function(arg1, arg2){
-    if(!(arg1 instanceof ArrayBuffer)) return;
-
     if(arg1.byteLength > 0){
-      // Kopieer bytes direct — ArrayBuffer kan maar één keer gelezen worden
-      const copy = new Uint8Array(arg1.byteLength);
-      copy.set(new Uint8Array(arg1));
-      byteChunks.push(copy);
+      chunks.push(new Float32Array(arg1.slice(0)));
     } else {
-      // byteLength === 0 = einde
-      const totalBytes = byteChunks.reduce((s,c)=>s+c.length, 0);
-      const totalSamples = totalBytes / 2; // Int16 = 2 bytes per sample
-
-      document.getElementById('esStatus').textContent = totalSamples > 0
-        ? '✓ '+totalSamples+' samples' : '⚠ Geen audio';
-
-      if(totalSamples === 0){
+      const total = chunks.reduce((s,c)=>s+c.length, 0);
+      document.getElementById('esStatus').textContent = total > 0 ? '✓ '+total+' samples' : '⚠ Geen audio';
+      if(total === 0){
         setStatus('','GEREED');
         document.getElementById('btnPlay').classList.remove('active');
         return;
       }
-
-      // Combineer alle bytes
-      const allBytes = new Uint8Array(totalBytes);
+      const f32 = new Float32Array(total);
       let off = 0;
-      for(const c of byteChunks){ allBytes.set(c, off); off += c.length; }
+      for(const c of chunks){ f32.set(c, off); off += c.length; }
 
-      // Uint8Array → Int16Array → Float32Array
-      const int16 = new Int16Array(allBytes.buffer);
-      const f32 = new Float32Array(totalSamples);
-      for(let i=0;i<totalSamples;i++) f32[i] = int16[i] / 32768.0;
-
-      // Afspelen
       try{
         _esCtx = new (window.AudioContext||window.webkitAudioContext)();
-        const buf = _esCtx.createBuffer(1, totalSamples, 22050);
+        const buf = _esCtx.createBuffer(1, total, 22050);
         buf.copyToChannel(f32, 0);
         _esSrc = _esCtx.createBufferSource();
         _esSrc.buffer = buf;
@@ -1555,14 +1537,10 @@ function esPlay(){
           if(isLooping) esPlay();
         };
         setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
-
-        // Opslaan voor download
         combinedF32 = f32;
-        lastRaw8 = new Uint8Array(totalSamples);
-        for(let i=0;i<totalSamples;i++)
-          lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
+        lastRaw8 = new Uint8Array(total);
+        for(let i=0;i<total;i++) lastRaw8[i]=Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
         document.getElementById('dlBtn').disabled = false;
-
       }catch(e){
         setStatus('err','Audio fout: '+e.message);
         document.getElementById('btnPlay').classList.remove('active');
@@ -1571,7 +1549,7 @@ function esPlay(){
   });
 }
 
-// Laad stemmen
+
 function wsLoadV(){
   const sel=document.getElementById('wsVoice');
   const vv=speechSynthesis.getVoices();
