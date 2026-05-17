@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak test 3</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px}</style>
+</head>
+<body>
+<h2>eSpeak test 3</h2>
+<button onclick="test()">Test</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+
+// Sla het object op bij aanmaken
+const tts = new eSpeakNG('espeakng.worker.js', function(){
+  L('Klaar!');
+  L('tts.synthesize type: '+typeof tts.synthesize);
+  tts.set_voice('gmw/en');
+});
+
+function test(){
+  L('Test start...');
+  let sampleRate = 22050;
+  const chunks = [];
+  
+  tts.synthesize('hello world', function(arg1, arg2){
+    // Lees samplerate uit events
+    if(Array.isArray(arg2) && arg2.length > 0){
+      const sr = arg2.find(e=>e&&e.type==='samplerate');
+      if(sr){
+        sampleRate = sr.samplerate || sr.sample_rate || sr.rate || 22050;
+        L('Samplerate: '+sampleRate+' (event: '+JSON.stringify(sr)+')');
+      }
+    }
+    
+    if(arg1 instanceof ArrayBuffer){
+      if(arg1.byteLength > 0){
+        const i16 = new Int16Array(arg1);
+        L('Chunk: '+i16.length+' samples, min='+Math.min(...i16).toFixed(0)+' max='+Math.max(...i16).toFixed(0));
+        chunks.push(i16);
+      } else {
+        // Einde
+        const total = chunks.reduce((s,c)=>s+c.length, 0);
+        L('Einde. Total='+total+' @ '+sampleRate+'Hz');
+        if(total === 0){ L('Geen audio!'); return; }
+        
+        const all = new Int16Array(total);
+        let off=0;
+        for(const c of chunks){ all.set(c,off); off+=c.length; }
+        const f32 = new Float32Array(total);
+        for(let i=0;i<total;i++) f32[i]=all[i]/32768.0;
+        
+        const ctx = new AudioContext();
+        const buf = ctx.createBuffer(1, total, sampleRate);
+        buf.copyToChannel(f32, 0);
+        const src = ctx.createBufferSource();
+        src.buffer=buf; src.connect(ctx.destination); src.start();
+        src.onended=()=>L('Klaar!');
+        L('Speelt!');
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
