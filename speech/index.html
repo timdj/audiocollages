@@ -299,13 +299,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
         <div class="krow"><div class="krow-lbl">STEM</div><div class="knob-value" id="esVoiceV">nl</div>
           <select id="esVoice" style="background:#000;color:var(--green);border:1px solid var(--green-dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:4px;width:100%">
             <option value="nl">NL - Nederlands</option>
-            <option value="nl-mbrola-1">NL MBROLA 1</option>
+            <option value="en">EN - English</option>
+            <option value="en-us">EN-US - English US</option>
             <option value="de">DE - Deutsch</option>
             <option value="fr">FR - Français</option>
-            <option value="en">EN - English</option>
-            <option value="en-us">EN-US</option>
             <option value="es">ES - Español</option>
             <option value="it">IT - Italiano</option>
+            <option value="pt">PT - Português</option>
+            <option value="ru">RU - Русский</option>
+            <option value="zh">ZH - 中文</option>
+            <option value="ja">JA - 日本語</option>
+            <option value="ko">KO - 한국어</option>
+            <option value="ar">AR - العربية</option>
+            <option value="hi">HI - हिन्दी</option>
           </select>
         </div>
         <div class="krow"><div class="krow-lbl">SNELHEID</div><div class="knob-value" id="esSpeedV">175</div><input type="range" id="esSpeed" min="80" max="450" value="175" oninput="wsS(this,'esSpeedV')"></div>
@@ -1440,6 +1446,11 @@ function _initEspeak(){
       _espeakReady = true;
       document.getElementById('esStatus').textContent = '✓ eSpeak-NG klaar — alle SAM FX werken!';
 
+      // Stel standaard stem in direct na laden
+      try{ _espeakTts.set_voice('nl'); }catch(e){
+        try{ _espeakTts.set_voice('en'); }catch(e2){}
+      }
+
       // Haal beschikbare stemmen op en vul de select
       _espeakTts.list_voices(function(voices){
         if(!voices || !voices.length) return;
@@ -1482,21 +1493,43 @@ function esPlay(){
 
   setStatus('play','eSpeak SYNTHESEREN...');
   document.getElementById('btnPlay').classList.add('active');
+  document.getElementById('esStatus').textContent = 'Syntheseren: "'+text.slice(0,30)+'"...';
 
-  // Juiste pettarin API: set_voice accepteert string direct
-  try{ _espeakTts.set_voice(voice); }catch(e){}
-  try{ _espeakTts.set_rate(speed); }catch(e){}
-  try{ _espeakTts.set_pitch(pitch); }catch(e){}
-  try{ _espeakTts.set_volume(amp/100); }catch(e){}
+  // Stel parameters in dan synthesize in één vloeiende flow
+  try{ _espeakTts.set_rate(speed); }catch(e){ console.warn('set_rate',e); }
+  try{ _espeakTts.set_pitch(pitch); }catch(e){ console.warn('set_pitch',e); }
+
+  // set_voice en synthesize: stem VOOR de tekst zetten
+  _espeakTts.set_voice(voice);
+
+  // eSpeak roept de callback meerdere keren aan (per chunk)
+  // Verzamel alle samples en verwerk ze als de laatste call null geeft
+  const _esChunks = [];
 
   _espeakTts.synthesize(text, function(samples, events){
-    // samples = Int16Array @ 22050Hz, kan null zijn als leeg
-    if(!samples || samples.length === 0){
-      // Probeer via WAV blob
-      setStatus('err','Geen audio van eSpeak — controleer stem');
+    console.log('eSpeak callback:', samples ? samples.length : 'null', 'samples,', events ? events.length : 0, 'events');
+
+    if(samples && samples.length > 0){
+      // Voeg chunk toe aan buffer
+      _esChunks.push(new Int16Array(samples));
+      return; // wacht op volgende chunk of afsluiting
+    }
+
+    // samples is null of leeg = einde van synthesize
+    if(_esChunks.length === 0){
+      document.getElementById('esStatus').textContent = '⚠ Geen audio — probeer stem "en"';
+      setStatus('','KLAAR');
       document.getElementById('btnPlay').classList.remove('active');
       return;
     }
+
+    // Combineer alle chunks
+    const totalLen = _esChunks.reduce((s,c)=>s+c.length, 0);
+    const combined = new Int16Array(totalLen);
+    let off = 0;
+    for(const chunk of _esChunks){ combined.set(chunk, off); off += chunk.length; }
+
+    document.getElementById('esStatus').textContent = '✓ '+totalLen+' samples @ 22050Hz';
 
     // Int16Array → Float32Array
     const f32 = new Float32Array(samples.length);
@@ -1509,20 +1542,19 @@ function esPlay(){
     if(audioCtx.state === 'suspended') audioCtx.resume();
 
     combinedF32 = f32;
-    // u8 voor WAV download
     lastRaw8 = new Uint8Array(f32.length);
-    for(let i=0;i<f32.length;i++) lastRaw8[i] = Math.round((f32[i]+1)*127.5);
+    for(let i=0;i<f32.length;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
     document.getElementById('dlBtn').disabled = false;
 
     playPos = 0; _phase = 0;
 
-    // Reset audio keten
+    // Reset audio keten volledig
     clearTimeout(_xfadeTimer);
+    if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
+    if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
     _destroySlot(_slots[0]); _slots[0]=null;
     _destroySlot(_slots[1]); _slots[1]=null;
     _activeSlot = 0;
-    if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-    if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
 
     createPlayer();
     buildFxChain();
