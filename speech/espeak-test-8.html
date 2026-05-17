@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak samplerate detect</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc}</style>
+</head>
+<body>
+<h2>Samplerate detect</h2>
+<button onclick="t(16000)">16000</button>
+<button onclick="t(22050)">22050</button>
+<button onclick="t(32000)">32000</button>
+<button onclick="t(44100)">44100</button>
+<button onclick="t(48000)">48000</button>
+<button onclick="auto()">AUTO detect</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+const tts=new eSpeakNG('espeakng.worker.js',function(){ L('Klaar!'); tts.set_voice('gmw/en'); });
+
+function t(sr){
+  L('\nTest samplerate='+sr+'...');
+  const chunks=[];
+  tts.synthesize('hello',function(arg1,arg2){
+    if(arg1.byteLength>0) chunks.push(new Float32Array(arg1.slice(0)));
+    else {
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      const f32=new Float32Array(total);
+      let off=0; for(const c of chunks){f32.set(c,off);off+=c.length;}
+      const ctx=new AudioContext();
+      const buf=ctx.createBuffer(1,total,sr);
+      buf.copyToChannel(f32,0);
+      const src=ctx.createBufferSource();
+      src.buffer=buf; src.connect(ctx.destination); src.start();
+      src.onended=()=>L(sr+': klaar');
+      L(sr+': speelt ('+total+' samples)');
+    }
+  });
+}
+
+function auto(){
+  L('\nAuto detect: lees samplerate uit events...');
+  let sr=22050;
+  const chunks=[];
+  tts.synthesize('hello',function(arg1,arg2){
+    // Log ALLE event velden
+    if(arg2&&arg2.length>0){
+      arg2.forEach(e=>L('Event: '+JSON.stringify(e)));
+    }
+    if(arg1.byteLength>0) chunks.push(new Float32Array(arg1.slice(0)));
+    else {
+      L('Gevonden samplerate='+sr);
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      L('Total samples='+total+' duration='+(total/sr).toFixed(2)+'s');
+    }
+  });
+}
+</script>
+</body>
+</html>
