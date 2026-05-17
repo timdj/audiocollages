@@ -286,11 +286,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
       <div class="krow"><div class="krow-lbl">TOONHOOGTE</div><div class="knob-value" id="wsPv">1.0</div><input type="range" id="wsP" min="0" max="2" value="1" step="0.05" oninput="wsS(this,'wsPv')"></div>
       <div class="krow"><div class="krow-lbl">VOLUME</div><div class="knob-value" id="wsVv">1.0</div><input type="range" id="wsV" min="0" max="1" value="1" step="0.05" oninput="wsS(this,'wsVv')"></div>
       <div class="krow"><div class="krow-lbl">MENSELIJK</div><div class="knob-value" id="wsHv">0%</div><input type="range" id="wsH" min="0" max="100" value="0" step="1" oninput="wsS(this,'wsHv','%')"></div>
+      <div class="krow"><div class="krow-lbl">SNELH. JIT.</div><div class="knob-value" id="wsRJv">0%</div><input type="range" id="wsRJ" min="0" max="80" value="0" step="1" oninput="wsS(this,'wsRJv','%')"></div>
+      <div class="krow"><div class="krow-lbl">TOON JIT.</div><div class="knob-value" id="wsPJv">0%</div><input type="range" id="wsPJ" min="0" max="80" value="0" step="1" oninput="wsS(this,'wsPJv','%')"></div>
+      <div class="krow"><div class="krow-lbl">ZIN PAUZE</div><div class="knob-value" id="wsBrv">0ms</div><input type="range" id="wsBr" min="0" max="500" value="0" step="10" oninput="wsS(this,'wsBrv','ms')"></div>
     </div>
   <div id="esNote" style="display:none">
     <div class="panel" data-label="eSPEAK-NG (MET FX)">
       <div style="font-size:10px;color:var(--green-dim);letter-spacing:.1em;margin-bottom:10px;line-height:1.8">
-        <span id="esStatus" style="color:var(--amber)">Laden... upload espeakng.worker.js + espeakng.worker.data naar je server</span>
+        <span id="esStatus" style="color:var(--amber)">Klik eSPEAK om te laden...</span>
       </div>
       <div class="kstack">
         <div class="krow"><div class="krow-lbl">STEM</div><div class="knob-value" id="esVoiceV">nl</div>
@@ -522,10 +525,54 @@ function applyLoopCrossfade(f32){
   return out;
 }
 
+// Maak tekst SAM-veilig: vervang niet-ASCII door uitgesproken equivalent
+function samSafeText(text){
+  // Veelgebruikte niet-ASCII tekens translitereren
+  const map = {
+    'à':'a','á':'a','â':'a','ã':'a','ä':'ae','å':'a','æ':'ae',
+    'ç':'s','è':'e','é':'e','ê':'e','ë':'e',
+    'ì':'i','í':'i','î':'i','ï':'i',
+    'ñ':'n','ò':'o','ó':'o','ô':'o','õ':'o','ö':'oe','ø':'o',
+    'ù':'u','ú':'u','û':'u','ü':'ue',
+    'ý':'y','ÿ':'y','ß':'ss',
+    'À':'A','Á':'A','Â':'A','Ã':'A','Ä':'AE','Å':'A','Æ':'AE',
+    'Ç':'S','È':'E','É':'E','Ê':'E','Ë':'E',
+    'Ì':'I','Í':'I','Î':'I','Ï':'I',
+    'Ñ':'N','Ò':'O','Ó':'O','Ô':'O','Õ':'O','Ö':'OE','Ø':'O',
+    'Ù':'U','Ú':'U','Û':'U','Ü':'UE',
+    'Ý':'Y','ß':'SS',
+    // Grieks
+    'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
+    'π':'pi','σ':'sigma','ω':'omega','μ':'mu','λ':'lambda',
+    // Pijlen en symbolen
+    '→':' naar ','←':' terug ','↑':' omhoog ','↓':' omlaag ',
+    '≈':' ongeveer ','≠':' niet gelijk ','≤':' kleiner of gelijk ',
+    '≥':' groter of gelijk ','∞':' oneindig ',
+    '°':' graden ','±':' plus min ',
+  };
+  let out = '';
+  for(const ch of text){
+    const code = ch.codePointAt(0);
+    if(map[ch]){
+      out += map[ch];
+    } else if(code > 127){
+      // Onbekend niet-ASCII: probeer te skippen maar voeg spatie toe
+      // zodat SAM niet vastloopt op lege chunks
+      out += ' ';
+    } else {
+      out += ch;
+    }
+  }
+  // Meerdere spaties samenvoegen
+  return out.replace(/\s+/g,' ').trim();
+}
+
 function renderAll(text,opts){
-  const chunks=splitChunks(text);
+  const safeText = samSafeText(text);
+  const chunks=splitChunks(safeText);
   const f32parts=[]; const u8parts=[];
   for(const ch of chunks){
+    if(!ch.trim()) continue;
     try{
       const sam=new SamJs(opts);
       const b8=sam.buf8(ch);
@@ -534,7 +581,7 @@ function renderAll(text,opts){
         for(let i=0;i<b8.length;i++) f[i]=(b8[i]-128)/128;
         f32parts.push(f); u8parts.push(b8);
       }
-    }catch(e){console.warn('chunk fail',ch,e);}
+    }catch(e){console.warn('chunk skip',ch,e);}
   }
   if(!f32parts.length) return null;
   const totalLen=f32parts.reduce((s,b)=>s+b.length,0);
@@ -1383,15 +1430,42 @@ function setEng(m){
 
 // ── eSpeak-NG initialisatie ───────────────────────────────
 function _initEspeak(){
-  // Laad de worker (moet op dezelfde server staan)
+  if(typeof eSpeakNG === 'undefined'){
+    document.getElementById('esStatus').textContent = '⚠ espeakng.min.js niet gevonden — zet het in dezelfde map als de HTML';
+    return;
+  }
+  document.getElementById('esStatus').textContent = 'Worker laden...';
   try{
-    _espeakTts = new eSpeakNG('espeakng.worker.js', ()=>{
+    _espeakTts = new eSpeakNG('espeakng.worker.js', function(){
       _espeakReady = true;
-      _espeakTts.set_voice('nl');
-      document.getElementById('esStatus').textContent = 'eSpeak-NG klaar ✓';
+      document.getElementById('esStatus').textContent = '✓ eSpeak-NG klaar — alle SAM FX werken!';
+
+      // Haal beschikbare stemmen op en vul de select
+      _espeakTts.list_voices(function(voices){
+        if(!voices || !voices.length) return;
+        const sel = document.getElementById('esVoice');
+        sel.innerHTML = '';
+        // Sorteer: nl eerst
+        voices.sort((a,b)=>{
+          const an=a.languages&&a.languages[0]&&a.languages[0].includes('nl');
+          const bn=b.languages&&b.languages[0]&&b.languages[0].includes('nl');
+          if(an&&!bn)return -1; if(!an&&bn)return 1;
+          return (a.name||'').localeCompare(b.name||'');
+        });
+        let firstNl=true;
+        voices.forEach(v=>{
+          const opt=document.createElement('option');
+          const lang=(v.languages&&v.languages[0])||v.identifier||'?';
+          opt.value=v.identifier||lang;
+          opt.textContent=v.name+' ('+lang+')';
+          if(lang.includes('nl')&&firstNl){opt.selected=true;firstNl=false;}
+          sel.appendChild(opt);
+        });
+      });
     });
   }catch(e){
-    document.getElementById('esStatus').textContent = 'Worker niet gevonden. Upload espeakng.worker.js en espeakng.worker.data naar dezelfde map.';
+    document.getElementById('esStatus').textContent = '⚠ espeakng.worker.js of .data niet gevonden — zet beide in dezelfde map';
+    console.error('eSpeak init error:', e);
   }
 }
 
@@ -1409,41 +1483,52 @@ function esPlay(){
   setStatus('play','eSpeak SYNTHESEREN...');
   document.getElementById('btnPlay').classList.add('active');
 
-  _espeakTts.set_voice(voice);
-  _espeakTts.set_rate(speed);
-  _espeakTts.set_pitch(pitch);
-  _espeakTts.set_volume(amp/100);
+  // Juiste pettarin API: set_voice accepteert string direct
+  try{ _espeakTts.set_voice(voice); }catch(e){}
+  try{ _espeakTts.set_rate(speed); }catch(e){}
+  try{ _espeakTts.set_pitch(pitch); }catch(e){}
+  try{ _espeakTts.set_volume(amp/100); }catch(e){}
 
-  _espeakTts.synthesize(text, (samples, events)=>{
+  _espeakTts.synthesize(text, function(samples, events){
+    // samples = Int16Array @ 22050Hz, kan null zijn als leeg
     if(!samples || samples.length === 0){
-      setStatus('err','Geen audio van eSpeak');
+      // Probeer via WAV blob
+      setStatus('err','Geen audio van eSpeak — controleer stem');
       document.getElementById('btnPlay').classList.remove('active');
       return;
     }
 
-    // samples is Int16Array @ 22050Hz — omzetten naar Float32
-    ensureCtx();
+    // Int16Array → Float32Array
     const f32 = new Float32Array(samples.length);
-    for(let i=0;i<samples.length;i++) f32[i] = samples[i] / 32768.0;
+    for(let i = 0; i < samples.length; i++){
+      f32[i] = samples[i] / 32768.0;
+    }
 
-    // Zet in combinedF32 en speel af via de bestaande SAM FX chain
+    // Speel af via de SAM FX chain
+    ensureCtx();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+
     combinedF32 = f32;
-    lastRaw8 = new Uint8Array(samples.length);
-    for(let i=0;i<samples.length;i++) lastRaw8[i] = Math.round(f32[i]*128+128);
+    // u8 voor WAV download
+    lastRaw8 = new Uint8Array(f32.length);
+    for(let i=0;i<f32.length;i++) lastRaw8[i] = Math.round((f32[i]+1)*127.5);
     document.getElementById('dlBtn').disabled = false;
 
     playPos = 0; _phase = 0;
+
+    // Reset audio keten
     clearTimeout(_xfadeTimer);
     _destroySlot(_slots[0]); _slots[0]=null;
     _destroySlot(_slots[1]); _slots[1]=null;
-    _activeSlot=0;
+    _activeSlot = 0;
     if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
+    if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
 
     createPlayer();
     buildFxChain();
     isPlaying = true;
     startViz();
-    setStatus('play','eSpeak UITZENDEN');
+    setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
   });
 }
 
@@ -1496,16 +1581,19 @@ function wsPlay(){
 function wsRun(text){
   if(!_wsOn||_wsPaused)return;
   const v=wsGetV();
-  const rate=parseFloat(document.getElementById('wsR').value);
-  const pitch=parseFloat(document.getElementById('wsP').value);
-  const vol=parseFloat(document.getElementById('wsV').value);
-  const h=parseInt(document.getElementById('wsH').value)/100;
-  const sents=text.match(/[^.!?\n]+[.!?\n]?/g)||[text];
+  const rate  = parseFloat(document.getElementById('wsR').value);
+  const pitch = parseFloat(document.getElementById('wsP').value);
+  const vol   = parseFloat(document.getElementById('wsV').value);
+  const h     = parseInt(document.getElementById('wsH').value)/100;
+  const rJit  = parseFloat(document.getElementById('wsRJ').value)/100;
+  const pJit  = parseFloat(document.getElementById('wsPJ').value)/100;
+  const brk   = parseInt(document.getElementById('wsBr').value);
+  const sents = text.match(/[^.!?\n]+[.!?\n]?/g)||[text];
   let i=0;
   function next(){
     if(!_wsOn||_wsPaused)return;
     if(i>=sents.length){
-      if(_wsLoopOn&&_wsOn){_wsTimer=setTimeout(()=>wsRun(document.getElementById('textInput').value.trim()),80);}
+      if(_wsLoopOn&&_wsOn){ wsRun(document.getElementById('textInput').value.trim()); }
       else{_wsOn=false;document.getElementById('btnPlay').classList.remove('active');setStatus('','GEREED');}
       return;
     }
@@ -1513,11 +1601,14 @@ function wsRun(text){
     const u=new SpeechSynthesisUtterance(s);
     if(v)u.voice=v;
     u.lang=v?v.lang:(navigator.language||'nl-NL');
-    const j=r=>(Math.random()*2-1)*r*h;
-    u.rate=Math.max(0.1,Math.min(3,rate+j(0.2)));
-    u.pitch=Math.max(0,Math.min(2,pitch+j(0.3)));
-    u.volume=Math.max(0,Math.min(1,vol));
-    u.onend=()=>setTimeout(next,h>0?Math.random()*100*h:0);
+    // Jitter: onafhankelijke variatie per zin bovenop menselijkheid
+    const jH = r=>(Math.random()*2-1)*r*h;
+    const jR = r=>(Math.random()*2-1)*r*rJit;
+    const jP = r=>(Math.random()*2-1)*r*pJit;
+    u.rate   = Math.max(0.1,Math.min(3,   rate  + jH(0.15) + jR(rate)));
+    u.pitch  = Math.max(0,  Math.min(2,   pitch + jH(0.2)  + jP(pitch)));
+    u.volume = Math.max(0,  Math.min(1,   vol));
+    u.onend=()=>setTimeout(next, brk + (h>0?Math.random()*80*h:0));
     u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')console.warn('WS:',e.error);next();};
     speechSynthesis.speak(u);
   }
