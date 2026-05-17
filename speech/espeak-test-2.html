@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak raw worker test</title>
+<style>
+body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px;max-height:500px;overflow:auto}
+</style>
+</head>
+<body>
+<h2>eSpeak Raw Worker Test</h2>
+<button onclick="test1()">Test 1: wrapper</button>
+<button onclick="test2()">Test 2: raw worker</button>
+<button onclick="test3()">Test 3: interceptor</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;console.log(msg);};
+
+let tts=null,ready=false;
+
+function test1(){
+  if(typeof eSpeakNG==='undefined'){L('FOUT: eSpeakNG niet geladen');return;}
+  L('Wrapper laden...');
+  tts=new eSpeakNG('espeakng.worker.js',function(){
+    ready=true;
+    const props=[];
+    for(const k in tts)props.push(k+'('+typeof tts[k]+')');
+    L('Klaar. Props: '+props.join(', '));
+    L('Synthesize test...');
+    let n=0;
+    tts.synthesize('hello',function(s,e){
+      n++;
+      L('CB#'+n+': s='+(s?s.length+' '+s.constructor.name:'null')+' ev='+(e?JSON.stringify(e).slice(0,60):'null'));
+      if(s&&s.length>0)playRaw(s);
+    });
+  });
+}
+
+function test2(){
+  L('\nRaw worker...');
+  const w=new Worker('espeakng.worker.js');
+  w.onmessage=function(e){
+    L('MSG: '+JSON.stringify(e.data).slice(0,200));
+    if(e.data&&(e.data.audio||e.data.samples)){
+      const a=e.data.audio||e.data.samples;
+      L('Audio! len='+a.length);
+      playRaw(a);
+    }
+    if(e.data&&(e.data.type==='ready'||e.data.cmd==='ready'||e.data==='ready')){
+      L('Ready! Stuur synth...');
+      ['synth','synthesize','speak'].forEach(cmd=>{
+        w.postMessage({cmd,text:'hello',voice:'en'});
+      });
+    }
+  };
+  w.onerror=e=>L('ERR: '+e.message);
+  setTimeout(()=>{
+    ['init','ready'].forEach(cmd=>{
+      w.postMessage({cmd});
+      w.postMessage(cmd);
+    });
+  },300);
+}
+
+function test3(){
+  L('\nInterceptor...');
+  const OrigW=window.Worker;
+  window.Worker=function(url){
+    L('New Worker: '+url);
+    const w=new OrigW(url);
+    const op=w.postMessage.bind(w);
+    w.postMessage=msg=>{L('POST: '+JSON.stringify(msg).slice(0,120));op(msg);};
+    w.addEventListener('message',e=>L('RECV: '+JSON.stringify(e.data).slice(0,120)));
+    return w;
+  };
+  window.Worker.prototype=OrigW.prototype;
+  if(typeof eSpeakNG!=='undefined'){
+    const t2=new eSpeakNG('espeakng.worker.js',function(){
+      L('Klaar, synth...');
+      t2.synthesize('test',function(s){L('CB: '+(s?s.length:'null'));});
+    });
+  }
+}
+
+function playRaw(samples){
+  try{
+    const ctx=new AudioContext();
+    const d=samples instanceof Int16Array?samples:new Int16Array(samples.buffer||samples);
+    const f=new Float32Array(d.length);
+    for(let i=0;i<d.length;i++)f[i]=d[i]/32768;
+    const b=ctx.createBuffer(1,f.length,22050);
+    b.copyToChannel(f,0);
+    const s=ctx.createBufferSource();
+    s.buffer=b;s.connect(ctx.destination);s.start();
+    L('SPEELT: '+f.length+' samples');
+  }catch(e){L('PLAY ERR: '+e.message);}
+}
+</script>
+</body>
+</html>
