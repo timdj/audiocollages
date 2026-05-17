@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak test</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-family:monospace;font-size:14px}
+#log{margin-top:20px;white-space:pre;color:#aaa;font-size:12px;border-top:1px solid #333;padding-top:10px}
+</style>
+</head>
+<body>
+<h2>eSpeak-NG Debug Test</h2>
+<p>Upload deze pagina samen met de 3 eSpeak bestanden naar je server.</p>
+
+<button onclick="testLoad()">1. Test laden</button>
+<button onclick="testVoices()">2. Toon stemmen</button>
+<button onclick="testSynth()">3. Test audio</button>
+<button onclick="testEn()">4. Test Engels</button>
+
+<div id="log">Log verschijnt hier...</div>
+
+<script src="espeakng.min.js"></script>
+<script>
+let tts = null;
+let ready = false;
+
+function log(msg){
+  const el = document.getElementById('log');
+  el.textContent += '\n' + new Date().toLocaleTimeString() + ' — ' + msg;
+}
+
+function testLoad(){
+  log('Laden... (espeakng.min.js geladen: ' + (typeof eSpeakNG) + ')');
+  if(typeof eSpeakNG === 'undefined'){
+    log('FOUT: eSpeakNG niet gevonden — is espeakng.min.js geüpload?');
+    return;
+  }
+  try{
+    tts = new eSpeakNG('espeakng.worker.js', function(){
+      ready = true;
+      log('Worker KLAAR!');
+      // Toon beschikbare methoden
+      const methods = [];
+      for(const k in tts){ if(typeof tts[k]==='function') methods.push(k); }
+      log('Methoden: ' + methods.join(', '));
+    });
+    log('Worker aangemaakt, wachten op ready...');
+  }catch(e){
+    log('FOUT bij aanmaken worker: ' + e.message);
+  }
+}
+
+function testVoices(){
+  if(!ready){ log('Eerst laden!'); return; }
+  tts.list_voices(function(voices){
+    log('Stemmen (' + (voices ? voices.length : 0) + '):');
+    if(voices) voices.slice(0,20).forEach(v=>log('  ' + JSON.stringify(v)));
+  });
+}
+
+function testSynth(){
+  if(!ready){ log('Eerst laden!'); return; }
+  log('Synthesize met set_voice nl dan synthesize...');
+  
+  // Probeer aanpak 1: set_voice dan synthesize  
+  tts.set_voice('nl');
+  setTimeout(function(){
+    const chunks = [];
+    tts.synthesize('hallo wereld', function(samples, events){
+      log('Aanpak 1: samples=' + (samples ? samples.length : 'null') + ' type=' + (samples ? samples.constructor.name : 'null'));
+      if(samples && samples.length > 0){
+        chunks.push(new Int16Array(samples));
+      } else {
+        const total = chunks.reduce((s,c)=>s+c.length,0);
+        log('Totaal aanpak 1: ' + total + ' samples');
+        if(total > 0) playAudio(chunks, total);
+        else {
+          // Aanpak 2: synthesize met voice argument
+          log('Probeer aanpak 2: stem als argument...');
+          const chunks2 = [];
+          tts.synthesize('hallo wereld', function(s2, e2){
+            log('Aanpak 2: samples=' + (s2 ? s2.length : 'null'));
+            if(s2 && s2.length > 0) chunks2.push(new Int16Array(s2));
+            else {
+              const t2 = chunks2.reduce((s,c)=>s+c.length,0);
+              log('Totaal aanpak 2: ' + t2);
+              if(t2 > 0) playAudio(chunks2, t2);
+              else testRawSpeech();
+            }
+          }, 'nl');
+        }
+      }
+    });
+  }, 500);
+}
+
+function testRawSpeech(){
+  // Aanpak 3: gebruik de ingebouwde audio output van eSpeak
+  log('Aanpak 3: speakText...');
+  try{
+    if(typeof tts.speakText === 'function'){
+      tts.speakText('hallo', function(audio){
+        log('speakText callback: ' + (audio ? audio.length : 'null'));
+      });
+    } else {
+      log('speakText niet beschikbaar');
+      // Toon alle beschikbare methoden
+      const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(tts)).filter(m=>typeof tts[m]==='function');
+      log('Beschikbare methoden: ' + methods.join(', '));
+    }
+  }catch(e){ log('Fout: '+e.message); }
+}
+
+function testEn(){
+  if(!ready){ log('Eerst laden!'); return; }
+  log('Synthesize "hello world" met stem en...');
+  tts.set_voice('en');
+  const chunks = [];
+  tts.synthesize('hello world', function(samples, events){
+    log('Callback EN: samples=' + (samples ? samples.length : 'null'));
+    if(samples && samples.length > 0){
+      chunks.push(new Int16Array(samples));
+    } else {
+      const total = chunks.reduce((s,c)=>s+c.length,0);
+      log('Totaal EN: ' + total + ' samples');
+      if(total > 0) playAudio(chunks, total);
+    }
+  });
+}
+
+function playAudio(chunks, total){
+  log('Audio afspelen...');
+  const ctx = new AudioContext();
+  const combined = new Int16Array(total);
+  let off = 0;
+  for(const c of chunks){ combined.set(c, off); off += c.length; }
+  const f32 = new Float32Array(total);
+  for(let i=0;i<total;i++) f32[i] = combined[i]/32768.0;
+  const buf = ctx.createBuffer(1, total, 22050);
+  buf.copyToChannel(f32, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  src.onended = ()=>log('Klaar!');
+  log('Speelt af!');
+}
+</script>
+</body>
+</html>
