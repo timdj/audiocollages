@@ -1546,9 +1546,18 @@ function _esPlayBuf(f32){
         if(next){
           _esPlayBuf(next); // naadloos — buffer was al klaar
         } else {
-          // Buffer nog niet klaar — wacht kort en herrender
+          // Buffer nog niet klaar of tekst was leeg — probeer nu
           const t = document.getElementById('textInput').value.trim();
-          _esSynth(t, f=>_esPlayBuf(f));
+          if(t){
+            _esSynth(t, f => { if(f && _esPlaying) _esPlayBuf(f); else if(_esPlaying) setTimeout(()=>{ const t2=document.getElementById('textInput').value.trim(); if(t2) _esSynth(t2,f2=>{if(f2&&_esPlaying)_esPlayBuf(f2);}); },200); });
+          } else {
+            // Leeg — wacht tot er tekst is
+            const wait = setInterval(()=>{
+              if(!_esPlaying||!isLooping){ clearInterval(wait); return; }
+              const t2 = document.getElementById('textInput').value.trim();
+              if(t2){ clearInterval(wait); _esSynth(t2, f=>{ if(f&&_esPlaying) _esPlayBuf(f); }); }
+            }, 200);
+          }
         }
       } else {
         _esPlaying = false;
@@ -1577,28 +1586,30 @@ function _esPlayBuf(f32){
 function esPlay(){
   esStop();
   if(!_espeakReady){ setStatus('err','eSpeak niet geladen'); return; }
-  const text = document.getElementById('textInput').value.trim();
-  if(!text){
-    // Leeg tekstvak — wacht op invoer
-    setStatus('play','Typ tekst om af te spelen...');
-    document.getElementById('btnPlay').classList.add('active');
-    _esPlaying = true;
-    const wait = setInterval(()=>{
-      if(!_esPlaying){ clearInterval(wait); return; }
-      const t = document.getElementById('textInput').value.trim();
-      if(t){ clearInterval(wait); _esSynth(t, f=>_esPlayBuf(f)); }
-    }, 300);
-    return;
-  }
 
   _esPlaying = true;
   document.getElementById('btnPlay').classList.add('active');
-  setStatus('play','eSPEAK SYNTHESEREN...');
-  document.getElementById('esStatus').textContent = 'Syntheseren...';
-  _esSynth(text, f=>{
-    if(!f){ setStatus('err','Geen audio'); document.getElementById('btnPlay').classList.remove('active'); _esPlaying=false; return; }
-    _esPlayBuf(f);
-  });
+  setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK');
+  document.getElementById('esStatus').textContent = 'Gereed...';
+
+  function renderAndPlay(){
+    if(!_esPlaying) return;
+    const text = document.getElementById('textInput').value.trim();
+    if(!text){
+      // Leeg — wacht 200ms en probeer opnieuw, loop loopt gewoon door
+      setTimeout(renderAndPlay, 200);
+      return;
+    }
+    _esSynth(text, f=>{
+      if(!f || !_esPlaying){
+        if(_esPlaying) setTimeout(renderAndPlay, 200);
+        return;
+      }
+      _esPlayBuf(f);
+    });
+  }
+
+  renderAndPlay();
 }
 
 
