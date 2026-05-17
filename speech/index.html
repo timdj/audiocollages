@@ -120,16 +120,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 /* Rec time */
 #recTime{font-family:'VT323',monospace;font-size:20px;color:#ff0040;min-width:60px;text-align:right}
 .footer{text-align:center;margin-top:14px;font-size:10px;color:#002008;letter-spacing:.18em}
-.kstack{display:flex;flex-direction:column;gap:10px}
-.krow{display:grid;grid-template-columns:110px 54px 1fr;align-items:center;gap:10px}
-.krow-lbl{font-size:10px;letter-spacing:.2em;color:var(--green-dim);text-transform:uppercase}
-.krow input[type=range]{height:20px}
-.krow input[type=range]::-webkit-slider-thumb{width:28px;height:28px}
 @keyframes flicker{0%,95%,100%{opacity:1}96%{opacity:.85}97%{opacity:1}98%{opacity:.7}99%{opacity:1}}
 @keyframes pulse-led{from{opacity:.65}to{opacity:1}}
 @keyframes rec-pulse{from{box-shadow:0 0 5px #ff0040}to{box-shadow:0 0 20px #ff0040,0 0 40px #ff004066}}
 </style>
-<script src="espeakng.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -272,58 +266,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 <div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div><div class="viz-bar" style="height:2px"></div>
 </div>
 
-<!-- Engine -->
-<div style="display:flex;gap:8px;margin-bottom:8px">
-  <button class="tbtn" id="eBtnSam" onclick="setEng('sam')" style="flex:1;font-size:13px;padding:9px;border-color:var(--green);color:var(--green);background:rgba(0,255,65,.12)">S&#183;A&#183;M</button>
-  <button class="tbtn" id="eBtnWs"  onclick="setEng('ws')"  style="flex:1;font-size:13px;padding:9px;border-color:#44aaff;color:#44aaff">WEB SPEECH</button>
-  <button class="tbtn" id="eBtnEs"  onclick="setEng('es')"  style="flex:1;font-size:13px;padding:9px;border-color:#ffaa00;color:#ffaa00">eSPEAK-NG</button>
-</div>
-<div id="wsPanel" style="display:none">
-  <div class="panel" data-label="STEM">
-    <select id="wsVoice" style="width:100%;background:#000;color:var(--green);border:1px solid var(--green-dim);font-family:'Share Tech Mono',monospace;font-size:13px;padding:8px;outline:none;margin-bottom:10px"><option>laden...</option></select>
-    <div class="kstack">
-      <div class="krow"><div class="krow-lbl">SNELHEID</div><div class="knob-value" id="wsRv">1.0</div><input type="range" id="wsR" min="0.1" max="3" value="1" step="0.05" oninput="wsS(this,'wsRv')"></div>
-      <div class="krow"><div class="krow-lbl">TOONHOOGTE</div><div class="knob-value" id="wsPv">1.0</div><input type="range" id="wsP" min="0" max="2" value="1" step="0.05" oninput="wsS(this,'wsPv')"></div>
-      <div class="krow"><div class="krow-lbl">VOLUME</div><div class="knob-value" id="wsVv">1.0</div><input type="range" id="wsV" min="0" max="1" value="1" step="0.05" oninput="wsS(this,'wsVv')"></div>
-      <div class="krow"><div class="krow-lbl">MENSELIJK</div><div class="knob-value" id="wsHv">0%</div><input type="range" id="wsH" min="0" max="100" value="0" step="1" oninput="wsS(this,'wsHv','%')"></div>
-      <div class="krow"><div class="krow-lbl">SNELH. JIT.</div><div class="knob-value" id="wsRJv">0%</div><input type="range" id="wsRJ" min="0" max="80" value="0" step="1" oninput="wsS(this,'wsRJv','%')"></div>
-      <div class="krow"><div class="krow-lbl">TOON JIT.</div><div class="knob-value" id="wsPJv">0%</div><input type="range" id="wsPJ" min="0" max="80" value="0" step="1" oninput="wsS(this,'wsPJv','%')"></div>
-      <div class="krow"><div class="krow-lbl">ZIN PAUZE</div><div class="knob-value" id="wsBrv">0ms</div><input type="range" id="wsBr" min="0" max="500" value="0" step="10" oninput="wsS(this,'wsBrv','ms')"></div>
-    </div>
-  <div id="esNote" style="display:none">
-    <div class="panel" data-label="eSPEAK-NG (MET FX)">
-      <div style="font-size:10px;color:var(--green-dim);letter-spacing:.1em;margin-bottom:10px;line-height:1.8">
-        <span id="esStatus" style="color:var(--amber)">Klik eSPEAK om te laden...</span>
-      </div>
-      <div class="kstack">
-        <div class="krow"><div class="krow-lbl">STEM</div><div class="knob-value" id="esVoiceV">nl</div>
-          <select id="esVoice" style="background:#000;color:var(--green);border:1px solid var(--green-dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:4px;width:100%">
-            <option value="gmw/nl">NL - Nederlands</option>
-            <option value="gmw/en">EN - English</option>
-            <option value="gmw/de">DE - Deutsch</option>
-            <option value="roa/fr">FR - Français</option>
-            <option value="roa/es">ES - Español</option>
-            <option value="roa/it">IT - Italiano</option>
-            <option value="zls/ru">RU - Русский</option>
-            <option value="sit/zh">ZH - 中文</option>
-            <option value="jpx/ja">JA - 日本語</option>
-            <option value="ko">KO - 한국어</option>
-          </select>
-        </div>
-        <div class="krow"><div class="krow-lbl">SNELHEID</div><div class="knob-value" id="esSpeedV">175</div><input type="range" id="esSpeed" min="80" max="450" value="175" oninput="wsS(this,'esSpeedV')"></div>
-        <div class="krow"><div class="krow-lbl">TOONHOOGTE</div><div class="knob-value" id="esPitchV">50</div><input type="range" id="esPitch" min="0" max="99" value="50" oninput="wsS(this,'esPitchV')"></div>
-        <div class="krow"><div class="krow-lbl">VOLUME</div><div class="knob-value" id="esAmpV">100</div><input type="range" id="esAmp" min="0" max="200" value="100" oninput="wsS(this,'esAmpV')"></div>
-      </div>
-      <div style="margin-top:10px;font-size:10px;color:var(--green-dim);line-height:1.8;letter-spacing:.08em">
-        ★ eSpeak audio gaat door de SAM FX chain — alle effecten werken!<br>
-        Upload naar server: <code style="color:var(--green)">espeakng.worker.js</code> + <code style="color:var(--green)">espeakng.worker.data</code><br>
-        Download: <a href="https://cdn.jsdelivr.net/espeakng.js/1.49.0/espeakng.min.js" style="color:var(--green)">jsdelivr CDN</a>
-        + voeg <code style="color:var(--green)">&lt;script src="espeakng.min.js"&gt;</code> toe
-      </div>
-    </div>
-  </div>
-  </div>
-</div>
 <!-- Transport -->
 <div class="transport">
   <button class="tbtn tbtn-play" id="btnPlay" onclick="speak()">&#9654; AFSPELEN</button>
@@ -343,9 +285,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
     <span id="statusText">GEREED</span>
   </div>
   <div class="row-btns">
-    <span id="liveRecTime" style="font-family:VT323,monospace;font-size:20px;color:#ff0040;min-width:50px"></span>
-    <button class="sm-btn" id="btnLiveRec" onclick="toggleLiveRec()" style="border-color:#ff0040;color:#ff0040">&#9679; REC</button>
-    <button class="sm-btn" id="dlLiveBtn" onclick="downloadLiveRec()" disabled>&#11015; OPNAME</button>
+    <span id="recTime"></span>
+    <span id="lrTime" style="font-family:VT323,monospace;font-size:18px;color:#ff0040;min-width:44px"></span>
+    <button class="sm-btn" id="btnLR" onclick="toggleLiveRec()" style="border-color:#ff0040;color:#ff0040">&#9679; REC</button>
+    <button class="sm-btn" id="dlLiveBtn" onclick="_lrDownload()" disabled>&#11015; OPNAME</button>
     <button class="sm-btn" id="dlBtn" onclick="downloadWav()" disabled>&#11015; WAV</button>
     <span id="clockDisplay" style="font-family:VT323,monospace;font-size:18px">00:00:00</span>
   </div>
@@ -495,6 +438,46 @@ function loadPreset(name){
 // ═══════════════════════════════════════════════════════════════════
 // SAM RENDERING
 // ═══════════════════════════════════════════════════════════════════
+
+// Alle Android ?123 en =\< symbolen → uitgesproken tekst
+function samSafeText(t){
+  const s=[
+    [':)','smiley'],[':D','blij'],[':(',  'droef'],[';)','knipoog'],[':P','tong'],
+    ['<3','hartje'],['->','pijl rechts'],['<-','pijl links'],
+    ['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],['&','en'],
+    ['+','plus'],['*','maal'],['/','gedeeld'],['=','is'],['%','procent'],
+    ['"','aanhalingsteken'],["'",'apostrof'],[':','dubbele punt'],[';','puntkomma'],
+    ['!','uitroep'],['?','vraag'],['(','haakje open'],[')','haakje dicht'],
+    ['-','min'],['~','tilde'],['`','accent'],['|','streep'],['\\','backslash'],
+    ['^','macht'],['[','blok open'],[']','blok dicht'],
+    ['{','accolade open'],['}','accolade dicht'],
+    ['<','kleiner'],['>', 'groter'],['€','euro'],['£','pond'],
+    ['¢','cent'],['¥','yen'],['°','graden'],['©','copyright'],
+    ['®','registered'],['™','trademark'],['✓','vinkje'],
+    ['√','wortel'],['π','pi'],['÷','gedeeld'],['×','maal'],
+    ['∆','delta'],['·','punt'],['¶','alinea'],
+    ['0','nul'],['1','een'],['2','twee'],['3','drie'],['4','vier'],
+    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen'],
+  ];
+  let o=t;
+  for(const [sym,w] of s) o=o.split(sym).join(' '+w+' ');
+  // Niet-ASCII transliteratie
+  const m={'à':'a','á':'a','â':'a','ä':'ae','å':'a','æ':'ae','ç':'s',
+    'è':'e','é':'e','ê':'e','ë':'e','ì':'i','í':'i','î':'i','ï':'i',
+    'ñ':'n','ò':'o','ó':'o','ô':'o','ö':'oe','ø':'o','ù':'u','ú':'u',
+    'û':'u','ü':'ue','ý':'y','ß':'ss',
+    'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
+    'π':'pi','σ':'sigma','ω':'omega','μ':'mu','λ':'lambda'};
+  let r='';
+  for(const c of o){
+    const lc=c.toLowerCase();
+    if(m[lc]) r+=' '+m[lc]+' ';
+    else if(c.codePointAt(0)>127) r+=' ';
+    else r+=c;
+  }
+  return r.replace(/\s+/g,' ').trim();
+}
+
 function splitChunks(text){
   const parts=text.match(/[^.!?,\n]+[.!?,\n]?/g)||[text];
   const chunks=[]; let cur='';
@@ -528,81 +511,10 @@ function applyLoopCrossfade(f32){
   return out;
 }
 
-// Maak tekst SAM-veilig: vervang niet-ASCII door uitgesproken equivalent
-function samSafeText(text){
-  // Android ?123 toetsenbord: alle symbolen → uitgesproken tekst
-  const symMap = [
-    // Combinaties eerst (langste match)
-    [':)','smiley'],[':D','blij gezicht'],[':(','droef'],
-    [';)','knipoog'],[':P','tong'],['<3','hartje'],
-    ['...','puntpuntpunt'],['->','pijl rechts'],['<-','pijl links'],
-    // ?123 pagina
-    ['@',' at '],['#',' hekje '],['$',' dollar '],
-    ['_',' onderstreep '],['&',' en '],
-    ['-',' min '],['+',' plus '],['/','gedeeld door'],
-    ['*',' maal '],
-    ['"',' aanhalingsteken '],[''',' apostrof '],
-    [':',' dubbele punt '],[';',' puntkomma '],
-    ['!',' uitroep '],['?',' vraag '],
-    ['(',' haakje open '],[')',' haakje dicht '],
-    // =\< pagina
-    ['~',' tilde '],['`',' backtick '],['|',' streep '],
-    ['·',' punt '],['√',' wortel '],['π',' pi '],
-    ['÷',' gedeeld '],['×',' maal '],['¶',' alinea '],['∆',' delta '],
-    ['£',' pond '],['¢',' cent '],['€',' euro '],['¥',' yen '],
-    ['^',' macht '],['°',' graden '],['=',' is '],
-    ['{',' accolade open '],['}',' accolade dicht '],
-    ['\',' backslash '],['\',' backslash '],
-    ['%',' procent '],['©',' copyright '],['®',' registered '],
-    ['™',' trademark '],['✓',' vinkje '],
-    ['[',' blokhaakje open'],[']',' blokhaakje dicht '],
-    ['<',' kleiner dan '],['>',' groter dan '],
-    // Cijfers uitspreken
-    ['0',' nul '],['1',' een '],['2',' twee '],['3',' drie '],
-    ['4',' vier '],['5',' vijf '],['6',' zes '],['7',' zeven '],
-    ['8',' acht '],['9',' negen '],
-  ];
-
-  // ASCII niet-alfanumeriek: vervang via symMap
-  let out = text;
-  for(const [sym,word] of symMap){
-    out = out.split(sym).join(' '+word+' ');
-  }
-
-  // Niet-ASCII: translitereer of skip
-  const charMap = {
-    'à':'a','á':'a','â':'a','ã':'a','ä':'ae','å':'a','æ':'ae',
-    'ç':'s','è':'e','é':'e','ê':'e','ë':'e',
-    'ì':'i','í':'i','î':'i','ï':'i',
-    'ñ':'n','ò':'o','ó':'o','ô':'o','õ':'o','ö':'oe','ø':'o',
-    'ù':'u','ú':'u','û':'u','ü':'ue','ý':'y','ÿ':'y','ß':'ss',
-    'À':'A','Á':'A','Â':'A','Ã':'A','Ä':'AE','Å':'A','Æ':'AE',
-    'Ç':'S','È':'E','É':'E','Ê':'E','Ë':'E',
-    'Ì':'I','Í':'I','Î':'I','Ï':'I',
-    'Ñ':'N','Ò':'O','Ó':'O','Ô':'O','Õ':'O','Ö':'OE','Ø':'O',
-    'Ù':'U','Ú':'U','Û':'U','Ü':'UE','Ý':'Y',
-    'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
-    'π':'pi','σ':'sigma','ω':'omega','μ':'mu','λ':'lambda',
-    '→':'naar','←':'terug','↑':'omhoog','↓':'omlaag',
-    '≈':'ongeveer','≠':'niet gelijk','≤':'kleiner of gelijk',
-    '≥':'groter of gelijk','∞':'oneindig','±':'plus min',
-  };
-  let result = '';
-  for(const ch of out){
-    const code = ch.codePointAt(0);
-    if(charMap[ch])  result += ' '+charMap[ch]+' ';
-    else if(code>127) result += ' ';
-    else result += ch;
-  }
-  return result.replace(/\s+/g,' ').trim();
-}
-
 function renderAll(text,opts){
-  const safeText = samSafeText(text);
-  const chunks=splitChunks(safeText);
+  const chunks=splitChunks(samSafeText(text));
   const f32parts=[]; const u8parts=[];
   for(const ch of chunks){
-    if(!ch.trim()) continue;
     try{
       const sam=new SamJs(opts);
       const b8=sam.buf8(ch);
@@ -611,7 +523,7 @@ function renderAll(text,opts){
         for(let i=0;i<b8.length;i++) f[i]=(b8[i]-128)/128;
         f32parts.push(f); u8parts.push(b8);
       }
-    }catch(e){console.warn('chunk skip',ch,e);}
+    }catch(e){console.warn('chunk fail',ch,e);}
   }
   if(!f32parts.length) return null;
   const totalLen=f32parts.reduce((s,b)=>s+b.length,0);
@@ -673,10 +585,9 @@ let _chainIn=null,_chainOut=null;
 // FX CHAIN MET CROSSFADE WISSEL
 // ═══════════════════════════════════════════════════════════════════
 let _slots=[null,null];
-let _splitGain=null;
 let _activeSlot=0;
 let _xfadeTimer=null;
-let XFADE_SEC=1.0;
+const XFADE_SEC=0.08;
 
 function _buildSlot(){
   const stages=[]; const oscList=[]; const spList=[];
@@ -793,7 +704,6 @@ function _buildSlot(){
 
 function _destroySlot(slot){
   if(!slot)return;
-  if(_splitGain){try{_splitGain.disconnect(slot.chainIn);}catch(e){}}
   try{slot.gainNode.disconnect();}catch(e){}
   slot.oscList.forEach(o=>{try{o.stop();}catch(e){}});
   slot.spList.forEach(s=>{try{s.disconnect();}catch(e){}});
@@ -802,40 +712,28 @@ function _destroySlot(slot){
 function buildFxChain(){
   if(!audioCtx)return;
   clearTimeout(_xfadeTimer);
-
-  if(!_splitGain){
-    _splitGain=audioCtx.createGain();
-    _splitGain.gain.value=1;
-    if(playerSP) playerSP.connect(_splitGain);
-  }
-
   const now=audioCtx.currentTime;
-  const isFirst=(_slots[0]===null&&_slots[1]===null);
   const next=(_activeSlot+1)%2;
 
-  _destroySlot(_slots[next]); _slots[next]=null;
+  _destroySlot(_slots[next]);
   _slots[next]=_buildSlot();
-  _splitGain.connect(_slots[next].chainIn);
 
-  const ng=_slots[next].gainNode.gain;
-  if(isFirst||XFADE_SEC<0.05){
-    ng.setValueAtTime(1,now);
-    if(_slots[_activeSlot]) _slots[_activeSlot].gainNode.gain.setValueAtTime(0,now);
-    _activeSlot=next;
-    _chainIn=_slots[next].chainIn;
-    _chainOut=_slots[next].gainNode;
-    const oi=(_activeSlot+1)%2;
-    _destroySlot(_slots[oi]); _slots[oi]=null;
-    reconnectRecDest();
-    return;
+  // Verbind playerSP aan beide slots tijdens crossfade
+  if(playerSP){
+    try{playerSP.disconnect();}catch(e){}
+    playerSP.connect(_slots[next].chainIn);
+    if(_slots[_activeSlot]) try{playerSP.connect(_slots[_activeSlot].chainIn);}catch(e){}
   }
 
+  // Crossfade gains
+  const ng=_slots[next].gainNode.gain;
   ng.cancelScheduledValues(now);
   ng.setValueAtTime(0,now);
   ng.linearRampToValueAtTime(1,now+XFADE_SEC);
 
-  if(_slots[_activeSlot]){
-    const og=_slots[_activeSlot].gainNode.gain;
+  const old=_slots[_activeSlot];
+  if(old){
+    const og=old.gainNode.gain;
     og.cancelScheduledValues(now);
     og.setValueAtTime(og.value,now);
     og.linearRampToValueAtTime(0,now+XFADE_SEC);
@@ -847,12 +745,18 @@ function buildFxChain(){
 
   _xfadeTimer=setTimeout(()=>{
     const oldIdx=(_activeSlot+1)%2;
-    _destroySlot(_slots[oldIdx]); _slots[oldIdx]=null;
-    _chainIn=_slots[_activeSlot].chainIn;
-    _chainOut=_slots[_activeSlot].gainNode;
+    _destroySlot(_slots[oldIdx]);
+    _slots[oldIdx]=null;
+    if(playerSP){
+      try{playerSP.disconnect();}catch(e){}
+      if(_slots[_activeSlot]) playerSP.connect(_slots[_activeSlot].chainIn);
+    }
+    _chainIn=_slots[_activeSlot]?_slots[_activeSlot].chainIn:masterGain;
+    _chainOut=_slots[_activeSlot]?_slots[_activeSlot].gainNode:masterGain;
     reconnectRecDest();
-  }, XFADE_SEC*1000+50);
+  },XFADE_SEC*1000+30);
 }
+
 function liveFx(){
   if(!audioCtx)return;
   if(_filtNode&&fxEnabled.filter){
@@ -942,11 +846,7 @@ function createPlayer(){
     }
     playPos=Math.floor(_phase)%bufLen;
   };
-  if(!_splitGain){
-    _splitGain=audioCtx.createGain();
-    _splitGain.gain.value=1;
-  }
-  playerSP.connect(_splitGain);
+  playerSP.connect(_chainIn||masterGain);
 
   // Tap _chainOut → dedicated recGain → _recDest for recording with FX
   _rewireRecGain();
@@ -1094,13 +994,8 @@ async function speak(){
   document.getElementById('dlBtn').disabled=false;
   playPos=0; _phase=0;
 
-  clearTimeout(_xfadeTimer);
-  _destroySlot(_slots[0]); _slots[0]=null;
-  _destroySlot(_slots[1]); _slots[1]=null;
-  _activeSlot=0;
-  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-  createPlayer();
   buildFxChain();
+  createPlayer();
   isPlaying=true;
   startViz();
   setStatus('play','LIVE UITZENDEN');
@@ -1119,12 +1014,7 @@ function togglePause(){
 
 function stopAll(){
   isPaused=false; isPlaying=false;
-  clearTimeout(_xfadeTimer);
   if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
-  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-  _destroySlot(_slots[0]); _slots[0]=null;
-  _destroySlot(_slots[1]); _slots[1]=null;
-  _activeSlot=0;
   playPos=0; _phase=0;
   stopViz();
   document.getElementById('btnPlay').classList.remove('active');
@@ -1457,335 +1347,54 @@ document.getElementById('textInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();speak();}
 });
 
+// ── Live opname (tapt van masterGain = alles wat je hoort) ───────
+let _lrDest=null, _lrRec=null, _lrChunks=[], _lrBlob=null, _lrOn=false, _lrTimer=null;
 
-// ══════════════════════════════════════════════════════════
-// WEB SPEECH ENGINE (via browser speechSynthesis)
-// + eSPEAK-NG ENGINE (via worker, geeft PCM → FX chain)
-// ══════════════════════════════════════════════════════════
-let _eMode = 'sam';
-let _espeakReady = false;
-let _espeakTts = null;
-
-function setEng(m){
-  _eMode = m;
-  const ws = m === 'ws';
-  const es = m === 'es';
-  document.getElementById('eBtnSam').style.background = m==='sam' ? 'rgba(0,255,65,.12)' : 'none';
-  document.getElementById('eBtnWs').style.background  = ws ? 'rgba(68,170,255,.15)' : 'none';
-  document.getElementById('eBtnEs').style.background  = es ? 'rgba(255,170,0,.15)'  : 'none';
-  document.getElementById('wsPanel').style.display = (ws||es) ? 'block' : 'none';
-  document.getElementById('esNote').style.display  = es ? 'block' : 'none';
-  if(m==='sam'){ try{speechSynthesis.cancel();}catch(e){} }
-  else { stopAll(); }
-  if(es && !_espeakReady) _initEspeak();
+function toggleLiveRec(){
+  _lrOn ? _lrStop() : _lrStart();
 }
-
-// ── eSpeak-NG initialisatie ───────────────────────────────
-function _initEspeak(){
-  if(typeof eSpeakNG === 'undefined'){
-    document.getElementById('esStatus').textContent = '⚠ espeakng.min.js niet gevonden — zet het in dezelfde map als de HTML';
-    return;
-  }
-  document.getElementById('esStatus').textContent = 'Worker laden...';
-  try{
-    _espeakTts = new eSpeakNG('espeakng.worker.js', function(){
-      _espeakReady = true;
-      document.getElementById('esStatus').textContent = '✓ eSpeak-NG klaar — alle SAM FX werken!';
-
-      try{ _espeakTts.set_voice('gmw/nl'); }catch(e){
-        try{ _espeakTts.set_voice('gmw/en'); }catch(e2){}
-      }
-
-      // Haal beschikbare stemmen op en vul de select
-      _espeakTts.list_voices(function(voices){
-        if(!voices || !voices.length) return;
-        const sel = document.getElementById('esVoice');
-        sel.innerHTML = '';
-        voices.sort((a,b)=>{
-          const an=(a.languages&&a.languages[0]&&a.languages[0].name&&a.languages[0].name.startsWith('nl'))||false;
-          const bn=(b.languages&&b.languages[0]&&b.languages[0].name&&b.languages[0].name.startsWith('nl'))||false;
-          if(an&&!bn)return -1; if(!an&&bn)return 1;
-          return (a.name||'').localeCompare(b.name||'');
-        });
-        let firstNl=true;
-        voices.forEach(v=>{
-          const opt=document.createElement('option');
-          const id=v.identifier||v.name||'en';
-          const lang=(v.languages&&v.languages[0]&&v.languages[0].name)||'?';
-          opt.value=id;
-          opt.textContent=v.name+' ('+lang+')';
-          if(lang.startsWith('nl')&&firstNl){opt.selected=true;firstNl=false;}
-          sel.appendChild(opt);
-        });
-      });
-    });
-  }catch(e){
-    document.getElementById('esStatus').textContent = '⚠ espeakng.worker.js of .data niet gevonden — zet beide in dezelfde map';
-    console.error('eSpeak init error:', e);
-  }
+function _lrStart(){
+  ensureCtx();
+  if(!_lrDest){ _lrDest=audioCtx.createMediaStreamDestination(); masterGain.connect(_lrDest); }
+  _lrChunks=[]; _lrBlob=null;
+  document.getElementById('dlLiveBtn').disabled=true;
+  const mimes=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg',''];
+  let mime=''; for(const m of mimes){try{if(!m||MediaRecorder.isTypeSupported(m)){mime=m;break;}}catch(e){}}
+  try{ _lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream); }
+  catch(e){ setStatus('err','Opname niet beschikbaar'); return; }
+  _lrRec.ondataavailable=e=>{if(e.data&&e.data.size>0)_lrChunks.push(e.data);};
+  _lrRec.onstop=()=>{
+    _lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'});
+    document.getElementById('dlLiveBtn').disabled=false;
+    setStatus('','OPNAME KLAAR');
+  };
+  _lrRec.start(50); _lrOn=true;
+  const t0=Date.now();
+  document.getElementById('btnLR').classList.add('active');
+  document.getElementById('btnLR').style.boxShadow='0 0 14px rgba(255,0,64,.5)';
+  _lrTimer=setInterval(()=>{
+    const s=Math.floor((Date.now()-t0)/1000);
+    document.getElementById('lrTime').textContent=
+      String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  },500);
+  setStatus('rec','● OPNAME');
 }
-
-// ── eSpeak-NG spreken (output → SAM FX chain) ────────────
-let _esCtx = null;
-let _esSrc = null;
-let _esPlaying = false;
-let _esNextBuf = null;   // pre-rendered volgende loop buffer
-let _esRendering = false;
-
-function esStop(){
-  _esPlaying = false;
-  if(_esSrc){ try{_esSrc.stop();}catch(e){} _esSrc=null; }
-  if(_esCtx){ try{_esCtx.close();}catch(e){} _esCtx=null; }
-  _esNextBuf = null; _esRendering = false;
-  document.getElementById('btnPlay').classList.remove('active');
-  setStatus('','GESTOPT');
+function _lrStop(){
+  _lrOn=false; clearInterval(_lrTimer);
+  document.getElementById('lrTime').textContent='';
+  document.getElementById('btnLR').classList.remove('active');
+  document.getElementById('btnLR').style.boxShadow='none';
+  try{_lrRec.stop();}catch(e){} _lrRec=null;
 }
-
-// Synthesize tekst → Float32Array, roept cb(f32) aan als klaar
-function _esSynth(text, cb){
-  if(!text || !_espeakReady){ cb(null); return; }
-  const voice = document.getElementById('esVoice').value || 'gmw/en';
-  const speed = parseInt(document.getElementById('esSpeed').value);
-  const pitch = parseInt(document.getElementById('esPitch').value);
-  try{ _espeakTts.set_rate(speed); }catch(e){}
-  try{ _espeakTts.set_pitch(pitch); }catch(e){}
-  _espeakTts.set_voice(voice);
-  const chunks = [];
-  _espeakTts.synthesize(text, function(arg1, arg2){
-    if(arg1.byteLength > 0){
-      chunks.push(new Float32Array(arg1.slice(0)));
-    } else {
-      const total = chunks.reduce((s,c)=>s+c.length, 0);
-      if(total === 0){ cb(null); return; }
-      const f32 = new Float32Array(total);
-      let off=0; for(const c of chunks){ f32.set(c,off); off+=c.length; }
-      cb(f32);
-    }
-  });
+function _lrDownload(){
+  if(!_lrBlob)return;
+  const t=_lrBlob.type, ext=t.includes('ogg')?'ogg':t.includes('mp4')?'mp4':'webm';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(_lrBlob);
+  const n=new Date(), pad=v=>String(v).padStart(2,'0');
+  a.download='opname-'+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate())+'-'+pad(n.getHours())+pad(n.getMinutes())+pad(n.getSeconds())+'.'+ext;
+  a.click();
 }
-
-// Speel een f32 buffer af, pre-render volgende buffer tegelijk
-function _esPlayBuf(f32){
-  if(!_esPlaying || !f32) return;
-  try{
-    if(!_esCtx || _esCtx.state === 'closed'){
-      _esCtx = new (window.AudioContext||window.webkitAudioContext)();
-    }
-    const buf = _esCtx.createBuffer(1, f32.length, 44100);
-    buf.copyToChannel(f32, 0);
-    _esSrc = _esCtx.createBufferSource();
-    _esSrc.buffer = buf;
-    _esSrc.connect(_esCtx.destination);
-
-    // Pre-render de volgende buffer terwijl deze speelt
-    if(isLooping && !_esRendering){
-      _esRendering = true;
-      const nextText = document.getElementById('textInput').value.trim();
-      _esSynth(nextText, function(nextF32){
-        _esRendering = false;
-        _esNextBuf = nextF32;
-      });
-    }
-
-    _esSrc.onended = ()=>{
-      _esSrc = null;
-      if(!_esPlaying) return;
-      if(isLooping){
-        const next = _esNextBuf;
-        _esNextBuf = null;
-        if(next){
-          _esPlayBuf(next); // naadloos — buffer was al klaar
-        } else {
-          // Buffer nog niet klaar of tekst was leeg — probeer nu
-          const t = document.getElementById('textInput').value.trim();
-          if(t){
-            _esSynth(t, f => { if(f && _esPlaying) _esPlayBuf(f); else if(_esPlaying) setTimeout(()=>{ const t2=document.getElementById('textInput').value.trim(); if(t2) _esSynth(t2,f2=>{if(f2&&_esPlaying)_esPlayBuf(f2);}); },200); });
-          } else {
-            // Leeg — wacht tot er tekst is
-            const wait = setInterval(()=>{
-              if(!_esPlaying||!isLooping){ clearInterval(wait); return; }
-              const t2 = document.getElementById('textInput').value.trim();
-              if(t2){ clearInterval(wait); _esSynth(t2, f=>{ if(f&&_esPlaying) _esPlayBuf(f); }); }
-            }, 200);
-          }
-        }
-      } else {
-        _esPlaying = false;
-        document.getElementById('btnPlay').classList.remove('active');
-        setStatus('','GEREED');
-      }
-    };
-
-    _esSrc.start();
-    setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
-
-    // Opslaan voor download
-    combinedF32 = f32;
-    lastRaw8 = new Uint8Array(f32.length);
-    for(let i=0;i<f32.length;i++) lastRaw8[i]=Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
-    document.getElementById('dlBtn').disabled = false;
-    document.getElementById('esStatus').textContent = '✓ '+f32.length+' samples @ 44100Hz';
-
-  }catch(e){
-    setStatus('err','Audio fout: '+e.message);
-    document.getElementById('btnPlay').classList.remove('active');
-    _esPlaying = false;
-  }
-}
-
-function esPlay(){
-  esStop();
-  if(!_espeakReady){ setStatus('err','eSpeak niet geladen'); return; }
-
-  _esPlaying = true;
-  document.getElementById('btnPlay').classList.add('active');
-  setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK');
-  document.getElementById('esStatus').textContent = 'Gereed...';
-
-  function renderAndPlay(){
-    if(!_esPlaying) return;
-    const text = document.getElementById('textInput').value.trim();
-    if(!text){
-      // Leeg — wacht 200ms en probeer opnieuw, loop loopt gewoon door
-      setTimeout(renderAndPlay, 200);
-      return;
-    }
-    _esSynth(text, f=>{
-      if(!f || !_esPlaying){
-        if(_esPlaying) setTimeout(renderAndPlay, 200);
-        return;
-      }
-      _esPlayBuf(f);
-    });
-  }
-
-  renderAndPlay();
-}
-
-
-function wsLoadV(){
-  const sel=document.getElementById('wsVoice');
-  const vv=speechSynthesis.getVoices();
-  if(!vv.length)return;
-  sel.innerHTML='';
-  const sorted=[...vv].sort((a,b)=>{
-    if(a.lang.startsWith('nl')&&!b.lang.startsWith('nl'))return -1;
-    if(!a.lang.startsWith('nl')&&b.lang.startsWith('nl'))return 1;
-    return a.lang.localeCompare(b.lang)||a.name.localeCompare(b.name);
-  });
-  let last='',firstNl=true;
-  sorted.forEach((v,i)=>{
-    const lg=v.lang.slice(0,5).toUpperCase();
-    if(lg!==last){sel.appendChild(Object.assign(document.createElement('optgroup'),{label:lg}));last=lg;}
-    const o=document.createElement('option');
-    o.value=i; o.textContent=v.name+(v.localService?' ★':'');
-    if(v.lang.startsWith('nl')&&firstNl){o.selected=true;firstNl=false;}
-    sel.lastElementChild.appendChild(o);
-  });
-  sel._v=sorted;
-}
-function wsGetV(){
-  const sel=document.getElementById('wsVoice');
-  return(sel&&sel._v)?sel._v[parseInt(sel.value)]||null:null;
-}
-
-function wsS(el,id,sfx){
-  const p=((el.value-el.min)/(el.max-el.min))*100;
-  el.style.setProperty('--val',p+'%');
-  document.getElementById(id).textContent=parseFloat(el.value)+(sfx||'');
-}
-
-let _wsOn=false,_wsPaused=false,_wsLoopOn=false,_wsTimer=null;
-
-function wsPlay(){
-  if(!('speechSynthesis' in window)){setStatus('err','Web Speech niet beschikbaar');return;}
-  const text=document.getElementById('textInput').value.trim();
-  if(!text)return;
-  speechSynthesis.cancel();
-  _wsPaused=false; _wsLoopOn=isLooping; _wsOn=true;
-  document.getElementById('btnPlay').classList.add('active');
-  setStatus('play',_wsLoopOn?'WEB SPEECH [LOOP]':'WEB SPEECH');
-  wsRun(text);
-}
-
-function wsRun(text){
-  if(!_wsOn||_wsPaused)return;
-  const v=wsGetV();
-  const rate  = parseFloat(document.getElementById('wsR').value);
-  const pitch = parseFloat(document.getElementById('wsP').value);
-  const vol   = parseFloat(document.getElementById('wsV').value);
-  const h     = parseInt(document.getElementById('wsH').value)/100;
-  const rJit  = parseFloat(document.getElementById('wsRJ').value)/100;
-  const pJit  = parseFloat(document.getElementById('wsPJ').value)/100;
-  const brk   = parseInt(document.getElementById('wsBr').value);
-  const sents = text.match(/[^.!?\n]+[.!?\n]?/g)||[text];
-  let i=0;
-  function next(){
-    if(!_wsOn||_wsPaused)return;
-    if(i>=sents.length){
-      if(_wsLoopOn&&_wsOn){ wsRun(document.getElementById('textInput').value.trim()); }
-      else{_wsOn=false;document.getElementById('btnPlay').classList.remove('active');setStatus('','GEREED');}
-      return;
-    }
-    const s=sents[i++].trim(); if(!s){next();return;}
-    const u=new SpeechSynthesisUtterance(s);
-    if(v)u.voice=v;
-    u.lang=v?v.lang:(navigator.language||'nl-NL');
-    // Jitter: onafhankelijke variatie per zin bovenop menselijkheid
-    const jH = r=>(Math.random()*2-1)*r*h;
-    const jR = r=>(Math.random()*2-1)*r*rJit;
-    const jP = r=>(Math.random()*2-1)*r*pJit;
-    u.rate   = Math.max(0.1,Math.min(3,   rate  + jH(0.15) + jR(rate)));
-    u.pitch  = Math.max(0,  Math.min(2,   pitch + jH(0.2)  + jP(pitch)));
-    u.volume = Math.max(0,  Math.min(1,   vol));
-    u.onend=()=>setTimeout(next, brk + (h>0?Math.random()*80*h:0));
-    u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')console.warn('WS:',e.error);next();};
-    speechSynthesis.speak(u);
-  }
-  next();
-}
-
-// Intercept knoppen
-document.getElementById('btnPlay').addEventListener('click',e=>{
-  if(_eMode==='ws'){e.stopImmediatePropagation();wsPlay();}
-  else if(_eMode==='es'){e.stopImmediatePropagation();esPlay();}
-},{capture:true});document.getElementById('btnPause').addEventListener('click',e=>{
-  if(_eMode==='ws'){
-    e.stopImmediatePropagation();
-    _wsPaused=!_wsPaused;
-    if(_wsPaused){speechSynthesis.pause();clearTimeout(_wsTimer);document.getElementById('btnPause').classList.add('active');setStatus('pause','GEPAUZEERD');}
-    else{speechSynthesis.resume();document.getElementById('btnPause').classList.remove('active');setStatus('play',_wsLoopOn?'WEB SPEECH [LOOP]':'WEB SPEECH');}
-  }
-},{capture:true});
-document.getElementById('btnStop').addEventListener('click',e=>{
-  if(_eMode==='ws'){
-    e.stopImmediatePropagation();
-    _wsOn=false;_wsPaused=false;_wsLoopOn=false;
-    clearTimeout(_wsTimer);speechSynthesis.cancel();
-    document.getElementById('btnPlay').classList.remove('active');
-    document.getElementById('btnPause').classList.remove('active');
-    setStatus('','GESTOPT');
-  } else if(_eMode==='es'){
-    e.stopImmediatePropagation();
-    isLooping=false;
-    document.getElementById('btnLoop').classList.remove('active');
-    esStop();
-  }
-},{capture:true});
-document.getElementById('btnLoop').addEventListener('click',e=>{
-  if(_eMode==='ws'){e.stopImmediatePropagation();toggleLoop();_wsLoopOn=isLooping;}
-},{capture:true});
-
-let _wsLT=null;
-document.getElementById('textInput').addEventListener('input',()=>{
-  if(_eMode==='ws'&&_wsOn&&!_wsPaused){clearTimeout(_wsLT);_wsLT=setTimeout(()=>{speechSynthesis.cancel();wsRun(document.getElementById('textInput').value.trim());},600);}
-});
-
-if('speechSynthesis' in window){
-  speechSynthesis.onvoiceschanged=wsLoadV;
-  wsLoadV();setTimeout(wsLoadV,200);setTimeout(wsLoadV,1000);
-}
-
 </script>
 </body>
 </html>
