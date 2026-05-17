@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak fix test</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px}</style>
+</head>
+<body>
+<h2>eSpeak Fix Test</h2>
+<button onclick="test()">Test</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+
+let tts=null;
+const tts2=new eSpeakNG('espeakng.worker.js',function(){
+  L('Klaar. Synthesize...');
+  tts=tts2;
+  tts.set_voice('gmw/en');
+});
+
+function test(){
+  if(!tts){L('Nog niet klaar');return;}
+  tts.set_voice('gmw/en');
+  const chunks=[];
+  tts.synthesize('hello world',function(arg1,arg2){
+    // Log beide argumenten
+    L('arg1: type='+typeof arg1+' constructor='+(arg1?arg1.constructor.name:'null')+' value='+JSON.stringify(arg1).slice(0,80));
+    L('arg2: type='+typeof arg2+' constructor='+(arg2?arg2.constructor.name:'null'));
+    
+    // Probeer arg2 als samples
+    if(arg2 instanceof ArrayBuffer){
+      L('arg2 is ArrayBuffer! byteLength='+arg2.byteLength);
+      if(arg2.byteLength>0){
+        const samples=new Int16Array(arg2);
+        chunks.push(samples);
+        return;
+      }
+    }
+    if(arg2===null){
+      // Einde — speel af
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      L('Einde. Total='+total);
+      if(total>0) play(chunks,total);
+    }
+  });
+}
+
+function play(chunks,total){
+  const ctx=new AudioContext();
+  const all=new Int16Array(total);
+  let off=0;
+  for(const c of chunks){all.set(c,off);off+=c.length;}
+  const f=new Float32Array(total);
+  for(let i=0;i<total;i++)f[i]=all[i]/32768;
+  const b=ctx.createBuffer(1,total,22050);
+  b.copyToChannel(f,0);
+  const s=ctx.createBufferSource();
+  s.buffer=b;s.connect(ctx.destination);s.start();
+  L('SPEELT! '+total+' samples');
+}
+</script>
+</body>
+</html>
