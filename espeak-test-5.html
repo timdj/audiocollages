@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak samplerate test</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px}</style>
+</head>
+<body>
+<h2>eSpeak Samplerate Test</h2>
+<button onclick="test()">Test</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+
+let tts=null;
+new eSpeakNG('espeakng.worker.js',function(){
+  tts=this||arguments[0];
+  // Probeer this en argument
+  L('this type: '+typeof this);
+  L('arg0 type: '+typeof arguments[0]);
+  tts=this.synthesize?this:(arguments[0]&&arguments[0].synthesize?arguments[0]:null);
+  if(!tts){L('FOUT: geen tts object'); return;}
+  L('Klaar!');
+  tts.set_voice('gmw/en');
+});
+
+function test(){
+  if(!tts){L('Niet klaar');return;}
+  let sampleRate=22050;
+  const chunks=[];
+  tts.synthesize('hello world',function(arg1,arg2){
+    // Lees samplerate uit events
+    if(arg2&&arg2.length>0){
+      const srEvent=arg2.find(e=>e.type==='samplerate');
+      if(srEvent){
+        sampleRate=srEvent.samplerate||srEvent.sample_rate||srEvent.rate||22050;
+        L('Samplerate event: '+JSON.stringify(srEvent));
+      }
+      // Log alle event types
+      arg2.forEach(e=>{ if(e.type!=='word') L('Event: '+JSON.stringify(e)); });
+    }
+    if(arg1.byteLength>0){
+      L('Chunk: '+arg1.byteLength+' bytes = '+(arg1.byteLength/2)+' samples');
+      chunks.push(new Int16Array(arg1));
+    } else {
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      L('Einde. Total='+total+' sampleRate='+sampleRate);
+      const all=new Int16Array(total);
+      let off=0;
+      for(const c of chunks){all.set(c,off);off+=c.length;}
+      
+      // Log min/max om te zien of data klopt
+      let min=0,max=0;
+      for(let i=0;i<all.length;i++){if(all[i]<min)min=all[i];if(all[i]>max)max=all[i];}
+      L('Min='+min+' Max='+max);
+      
+      const f32=new Float32Array(total);
+      for(let i=0;i<total;i++)f32[i]=all[i]/32768.0;
+      
+      const ctx=new AudioContext();
+      L('AudioContext sampleRate='+ctx.sampleRate);
+      
+      // Probeer met gevonden samplerate
+      const buf=ctx.createBuffer(1,total,sampleRate);
+      buf.copyToChannel(f32,0);
+      const src=ctx.createBufferSource();
+      src.buffer=buf;
+      src.connect(ctx.destination);
+      src.start();
+      src.onended=()=>L('Klaar!');
+      L('Speelt met sampleRate='+sampleRate);
+    }
+  });
+}
+</script>
+</body>
+</html>
