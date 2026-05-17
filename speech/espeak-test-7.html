@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak copy test</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px}</style>
+</head>
+<body>
+<h2>eSpeak copy test</h2>
+<button onclick="t1()">1: slice Int16</button>
+<button onclick="t2()">2: Blob</button>
+<button onclick="t3()">3: structuredClone</button>
+<button onclick="t4()">4: Float32 direct</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+const tts=new eSpeakNG('espeakng.worker.js',function(){ L('Klaar!'); tts.set_voice('gmw/en'); });
+
+function synth(copyFn, label){
+  L('\n'+label+'...');
+  const chunks=[];
+  tts.synthesize('hello world',function(arg1,arg2){
+    if(arg1.byteLength>0){
+      try{ chunks.push(copyFn(arg1)); }
+      catch(e){ L('Copy fout: '+e.message); }
+    } else {
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      if(!total){ L('Geen samples'); return; }
+      const all=new Float32Array(total);
+      let off=0; for(const c of chunks){all.set(c,off);off+=c.length;}
+      const mn=all.reduce((a,b)=>Math.min(a,b));
+      const mx=all.reduce((a,b)=>Math.max(a,b));
+      L('min='+mn.toFixed(3)+' max='+mx.toFixed(3)+' total='+total);
+      play(all,label);
+    }
+  });
+}
+
+// 4 verschillende copy methoden
+function t1(){ synth(ab=>{ const c=ab.slice(0); const i=new Int16Array(c); const f=new Float32Array(i.length); for(let k=0;k<i.length;k++)f[k]=i[k]/32768; return f; },'1:slice+Int16'); }
+function t2(){
+  L('\n2: Blob...');
+  const blobs=[];
+  tts.synthesize('hello world',function(arg1,arg2){
+    if(arg1.byteLength>0){ blobs.push(new Blob([new Uint8Array(arg1)])); }
+    else {
+      new Blob(blobs).arrayBuffer().then(ab=>{
+        const i=new Int16Array(ab);
+        const f=new Float32Array(i.length);
+        for(let k=0;k<i.length;k++)f[k]=i[k]/32768;
+        L('Blob: min='+Math.min(...f).toFixed(3)+' max='+Math.max(...f).toFixed(3));
+        play(f,'2:Blob');
+      });
+    }
+  });
+}
+function t3(){ synth(ab=>{ const c=structuredClone(ab); const i=new Int16Array(c); const f=new Float32Array(i.length); for(let k=0;k<i.length;k++)f[k]=i[k]/32768; return f; },'3:clone'); }
+function t4(){ synth(ab=>{ const c=ab.slice(0); return new Float32Array(c); },'4:Float32direct'); }
+
+function play(f32,label){
+  const ctx=new AudioContext();
+  const buf=ctx.createBuffer(1,f32.length,22050);
+  buf.copyToChannel(f32,0);
+  const src=ctx.createBufferSource();
+  src.buffer=buf; src.connect(ctx.destination); src.start();
+  src.onended=()=>L(label+': klaar!');
+  L(label+': speelt ('+f32.length+' samples)!');
+}
+</script>
+</body>
+</html>
