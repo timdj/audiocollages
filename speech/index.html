@@ -298,20 +298,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
       <div class="kstack">
         <div class="krow"><div class="krow-lbl">STEM</div><div class="knob-value" id="esVoiceV">nl</div>
           <select id="esVoice" style="background:#000;color:var(--green);border:1px solid var(--green-dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:4px;width:100%">
-            <option value="nl">NL - Nederlands</option>
-            <option value="en">EN - English</option>
-            <option value="en-us">EN-US - English US</option>
-            <option value="de">DE - Deutsch</option>
-            <option value="fr">FR - Français</option>
-            <option value="es">ES - Español</option>
-            <option value="it">IT - Italiano</option>
-            <option value="pt">PT - Português</option>
-            <option value="ru">RU - Русский</option>
-            <option value="zh">ZH - 中文</option>
-            <option value="ja">JA - 日本語</option>
+            <option value="gmw/nl">NL - Nederlands</option>
+            <option value="gmw/en">EN - English</option>
+            <option value="gmw/de">DE - Deutsch</option>
+            <option value="roa/fr">FR - Français</option>
+            <option value="roa/es">ES - Español</option>
+            <option value="roa/it">IT - Italiano</option>
+            <option value="zls/ru">RU - Русский</option>
+            <option value="sit/zh">ZH - 中文</option>
+            <option value="jpx/ja">JA - 日本語</option>
             <option value="ko">KO - 한국어</option>
-            <option value="ar">AR - العربية</option>
-            <option value="hi">HI - हिन्दी</option>
           </select>
         </div>
         <div class="krow"><div class="krow-lbl">SNELHEID</div><div class="knob-value" id="esSpeedV">175</div><input type="range" id="esSpeed" min="80" max="450" value="175" oninput="wsS(this,'esSpeedV')"></div>
@@ -1446,9 +1442,8 @@ function _initEspeak(){
       _espeakReady = true;
       document.getElementById('esStatus').textContent = '✓ eSpeak-NG klaar — alle SAM FX werken!';
 
-      // Stel standaard stem in direct na laden
-      try{ _espeakTts.set_voice('nl'); }catch(e){
-        try{ _espeakTts.set_voice('en'); }catch(e2){}
+      try{ _espeakTts.set_voice('gmw/nl'); }catch(e){
+        try{ _espeakTts.set_voice('gmw/en'); }catch(e2){}
       }
 
       // Haal beschikbare stemmen op en vul de select
@@ -1456,20 +1451,20 @@ function _initEspeak(){
         if(!voices || !voices.length) return;
         const sel = document.getElementById('esVoice');
         sel.innerHTML = '';
-        // Sorteer: nl eerst
         voices.sort((a,b)=>{
-          const an=a.languages&&a.languages[0]&&a.languages[0].includes('nl');
-          const bn=b.languages&&b.languages[0]&&b.languages[0].includes('nl');
+          const an=(a.languages&&a.languages[0]&&a.languages[0].name&&a.languages[0].name.startsWith('nl'))||false;
+          const bn=(b.languages&&b.languages[0]&&b.languages[0].name&&b.languages[0].name.startsWith('nl'))||false;
           if(an&&!bn)return -1; if(!an&&bn)return 1;
           return (a.name||'').localeCompare(b.name||'');
         });
         let firstNl=true;
         voices.forEach(v=>{
           const opt=document.createElement('option');
-          const lang=(v.languages&&v.languages[0])||v.identifier||'?';
-          opt.value=v.identifier||lang;
+          const id=v.identifier||v.name||'en';
+          const lang=(v.languages&&v.languages[0]&&v.languages[0].name)||'?';
+          opt.value=id;
           opt.textContent=v.name+' ('+lang+')';
-          if(lang.includes('nl')&&firstNl){opt.selected=true;firstNl=false;}
+          if(lang.startsWith('nl')&&firstNl){opt.selected=true;firstNl=false;}
           sel.appendChild(opt);
         });
       });
@@ -1486,81 +1481,82 @@ function esPlay(){
   const text = document.getElementById('textInput').value.trim();
   if(!text) return;
 
-  const voice = document.getElementById('esVoice').value || 'nl';
+  const voice = document.getElementById('esVoice').value || 'gmw/en';
   const speed = parseInt(document.getElementById('esSpeed').value);
   const pitch = parseInt(document.getElementById('esPitch').value);
-  const amp   = parseInt(document.getElementById('esAmp').value);
 
   setStatus('play','eSpeak SYNTHESEREN...');
   document.getElementById('btnPlay').classList.add('active');
-  document.getElementById('esStatus').textContent = 'Syntheseren: "'+text.slice(0,30)+'"...';
+  document.getElementById('esStatus').textContent = 'Syntheseren...';
 
-  // Stel parameters in dan synthesize in één vloeiende flow
-  try{ _espeakTts.set_rate(speed); }catch(e){ console.warn('set_rate',e); }
-  try{ _espeakTts.set_pitch(pitch); }catch(e){ console.warn('set_pitch',e); }
-
-  // set_voice en synthesize: stem VOOR de tekst zetten
+  try{ _espeakTts.set_rate(speed); }catch(e){}
+  try{ _espeakTts.set_pitch(pitch); }catch(e){}
   _espeakTts.set_voice(voice);
 
-  // eSpeak roept de callback meerdere keren aan (per chunk)
-  // Verzamel alle samples en verwerk ze als de laatste call null geeft
-  const _esChunks = [];
+  // API: cb(arg1=ArrayBuffer, arg2=Array events)
+  // arg1.byteLength > 0 = audio chunk, byteLength = 0 = einde
+  const chunks = [];
 
-  _espeakTts.synthesize(text, function(samples, events){
-    console.log('eSpeak callback:', samples ? samples.length : 'null', 'samples,', events ? events.length : 0, 'events');
+  _espeakTts.synthesize(text, function(arg1, arg2){
+    if(arg1 instanceof ArrayBuffer && arg1.byteLength > 0){
+      chunks.push(new Int16Array(arg1));
+    } else {
+      // Einde van synthesize
+      const total = chunks.reduce((s,c)=>s+c.length, 0);
+      if(total === 0){
+        document.getElementById('esStatus').textContent = '⚠ Geen audio — probeer andere stem';
+        setStatus('','');
+        document.getElementById('btnPlay').classList.remove('active');
+        return;
+      }
 
-    if(samples && samples.length > 0){
-      // Voeg chunk toe aan buffer
-      _esChunks.push(new Int16Array(samples));
-      return; // wacht op volgende chunk of afsluiting
+      document.getElementById('esStatus').textContent = '✓ '+total+' samples';
+
+      // Combineer alle chunks naar Float32
+      const all = new Int16Array(total);
+      let off = 0;
+      for(const c of chunks){ all.set(c, off); off += c.length; }
+      const f32 = new Float32Array(total);
+      for(let i=0;i<total;i++) f32[i] = all[i] / 32768.0;
+
+      // Speel af via SAM FX chain
+      ensureCtx();
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+
+      combinedF32 = f32;
+      lastRaw8 = new Uint8Array(total);
+      for(let i=0;i<total;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
+      document.getElementById('dlBtn').disabled = false;
+
+      playPos = 0; _phase = 0;
+      clearTimeout(_xfadeTimer);
+      if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
+      if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
+      _destroySlot(_slots[0]); _slots[0]=null;
+      _destroySlot(_slots[1]); _slots[1]=null;
+      _activeSlot = 0;
+
+      createPlayer();
+      buildFxChain();
+      isPlaying = true;
+      startViz();
+      setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
+
+      // Loop: herstart na afloop
+      if(isLooping){
+        const origOnPlayEnd = onPlayEnd;
+        playerSP._esLoop = true;
+        // Overschrijf onPlayEnd tijdelijk voor loop
+        const loopCheck = setInterval(()=>{
+          if(!isPlaying || !isLooping){
+            clearInterval(loopCheck);
+          } else if(!playerSP){
+            clearInterval(loopCheck);
+            if(isLooping) esPlay();
+          }
+        }, 200);
+      }
     }
-
-    // samples is null of leeg = einde van synthesize
-    if(_esChunks.length === 0){
-      document.getElementById('esStatus').textContent = '⚠ Geen audio — probeer stem "en"';
-      setStatus('','KLAAR');
-      document.getElementById('btnPlay').classList.remove('active');
-      return;
-    }
-
-    // Combineer alle chunks
-    const totalLen = _esChunks.reduce((s,c)=>s+c.length, 0);
-    const combined = new Int16Array(totalLen);
-    let off = 0;
-    for(const chunk of _esChunks){ combined.set(chunk, off); off += chunk.length; }
-
-    document.getElementById('esStatus').textContent = '✓ '+totalLen+' samples @ 22050Hz';
-
-    // Int16Array → Float32Array
-    const f32 = new Float32Array(samples.length);
-    for(let i = 0; i < samples.length; i++){
-      f32[i] = samples[i] / 32768.0;
-    }
-
-    // Speel af via de SAM FX chain
-    ensureCtx();
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-
-    combinedF32 = f32;
-    lastRaw8 = new Uint8Array(f32.length);
-    for(let i=0;i<f32.length;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
-    document.getElementById('dlBtn').disabled = false;
-
-    playPos = 0; _phase = 0;
-
-    // Reset audio keten volledig
-    clearTimeout(_xfadeTimer);
-    if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
-    if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-    _destroySlot(_slots[0]); _slots[0]=null;
-    _destroySlot(_slots[1]); _slots[1]=null;
-    _activeSlot = 0;
-
-    createPlayer();
-    buildFxChain();
-    isPlaying = true;
-    startViz();
-    setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
   });
 }
 
