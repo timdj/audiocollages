@@ -1485,7 +1485,7 @@ function esPlay(){
   const speed = parseInt(document.getElementById('esSpeed').value);
   const pitch = parseInt(document.getElementById('esPitch').value);
 
-  setStatus('play','eSpeak SYNTHESEREN...');
+  setStatus('play','eSPEAK SYNTHESEREN...');
   document.getElementById('btnPlay').classList.add('active');
   document.getElementById('esStatus').textContent = 'Syntheseren...';
 
@@ -1493,68 +1493,55 @@ function esPlay(){
   try{ _espeakTts.set_pitch(pitch); }catch(e){}
   _espeakTts.set_voice(voice);
 
-  // API: cb(arg1=ArrayBuffer, arg2=Array events)
-  // arg1.byteLength > 0 = audio chunk, byteLength = 0 = einde
   const chunks = [];
 
   _espeakTts.synthesize(text, function(arg1, arg2){
     if(arg1 instanceof ArrayBuffer && arg1.byteLength > 0){
-      chunks.push(new Int16Array(arg1));
-    } else {
-      // Einde van synthesize
+      chunks.push(new Int16Array(arg1.slice(0))); // slice voor veilige kopie
+    } else if(arg1 instanceof ArrayBuffer && arg1.byteLength === 0){
+      // Einde
       const total = chunks.reduce((s,c)=>s+c.length, 0);
+      document.getElementById('esStatus').textContent = total > 0 ? '✓ '+total+' samples' : '⚠ Geen audio';
+
       if(total === 0){
-        document.getElementById('esStatus').textContent = '⚠ Geen audio — probeer andere stem';
-        setStatus('','');
+        setStatus('','GEREED');
         document.getElementById('btnPlay').classList.remove('active');
         return;
       }
 
-      document.getElementById('esStatus').textContent = '✓ '+total+' samples';
-
-      // Combineer alle chunks naar Float32
+      // Combineer
       const all = new Int16Array(total);
       let off = 0;
       for(const c of chunks){ all.set(c, off); off += c.length; }
       const f32 = new Float32Array(total);
       for(let i=0;i<total;i++) f32[i] = all[i] / 32768.0;
 
-      // Speel af via SAM FX chain
-      ensureCtx();
-      if(audioCtx.state === 'suspended') audioCtx.resume();
+      // Simpele directe afspeel via eigen AudioContext
+      try{
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const buf = ctx.createBuffer(1, total, 22050);
+        buf.copyToChannel(f32, 0);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start();
+        src.onended = () => {
+          document.getElementById('btnPlay').classList.remove('active');
+          setStatus('','GEREED');
+          ctx.close();
+          if(isLooping) esPlay(); // loop
+        };
+        setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
 
-      combinedF32 = f32;
-      lastRaw8 = new Uint8Array(total);
-      for(let i=0;i<total;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
-      document.getElementById('dlBtn').disabled = false;
+        // Sla ook op voor SAM FX / download
+        combinedF32 = f32;
+        lastRaw8 = new Uint8Array(total);
+        for(let i=0;i<total;i++) lastRaw8[i] = Math.max(0,Math.min(255,Math.round((f32[i]+1)*127.5)));
+        document.getElementById('dlBtn').disabled = false;
 
-      playPos = 0; _phase = 0;
-      clearTimeout(_xfadeTimer);
-      if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
-      if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-      _destroySlot(_slots[0]); _slots[0]=null;
-      _destroySlot(_slots[1]); _slots[1]=null;
-      _activeSlot = 0;
-
-      createPlayer();
-      buildFxChain();
-      isPlaying = true;
-      startViz();
-      setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK UITZENDEN');
-
-      // Loop: herstart na afloop
-      if(isLooping){
-        const origOnPlayEnd = onPlayEnd;
-        playerSP._esLoop = true;
-        // Overschrijf onPlayEnd tijdelijk voor loop
-        const loopCheck = setInterval(()=>{
-          if(!isPlaying || !isLooping){
-            clearInterval(loopCheck);
-          } else if(!playerSP){
-            clearInterval(loopCheck);
-            if(isLooping) esPlay();
-          }
-        }, 200);
+      } catch(e){
+        setStatus('err','Audio fout: '+e.message);
+        document.getElementById('btnPlay').classList.remove('active');
       }
     }
   });
