@@ -645,9 +645,10 @@ let _chainIn=null,_chainOut=null;
 // FX CHAIN MET CROSSFADE WISSEL
 // ═══════════════════════════════════════════════════════════════════
 let _slots=[null,null];
+let _splitGain=null;
 let _activeSlot=0;
 let _xfadeTimer=null;
-const XFADE_SEC=0.08;
+let XFADE_SEC=1.0;
 
 function _buildSlot(){
   const stages=[]; const oscList=[]; const spList=[];
@@ -764,6 +765,7 @@ function _buildSlot(){
 
 function _destroySlot(slot){
   if(!slot)return;
+  if(_splitGain){try{_splitGain.disconnect(slot.chainIn);}catch(e){}}
   try{slot.gainNode.disconnect();}catch(e){}
   slot.oscList.forEach(o=>{try{o.stop();}catch(e){}});
   slot.spList.forEach(s=>{try{s.disconnect();}catch(e){}});
@@ -772,28 +774,40 @@ function _destroySlot(slot){
 function buildFxChain(){
   if(!audioCtx)return;
   clearTimeout(_xfadeTimer);
-  const now=audioCtx.currentTime;
-  const next=(_activeSlot+1)%2;
 
-  _destroySlot(_slots[next]);
-  _slots[next]=_buildSlot();
-
-  // Verbind playerSP aan beide slots tijdens crossfade
-  if(playerSP){
-    try{playerSP.disconnect();}catch(e){}
-    playerSP.connect(_slots[next].chainIn);
-    if(_slots[_activeSlot]) try{playerSP.connect(_slots[_activeSlot].chainIn);}catch(e){}
+  if(!_splitGain){
+    _splitGain=audioCtx.createGain();
+    _splitGain.gain.value=1;
+    if(playerSP) playerSP.connect(_splitGain);
   }
 
-  // Crossfade gains
+  const now=audioCtx.currentTime;
+  const isFirst=(_slots[0]===null&&_slots[1]===null);
+  const next=(_activeSlot+1)%2;
+
+  _destroySlot(_slots[next]); _slots[next]=null;
+  _slots[next]=_buildSlot();
+  _splitGain.connect(_slots[next].chainIn);
+
   const ng=_slots[next].gainNode.gain;
+  if(isFirst||XFADE_SEC<0.05){
+    ng.setValueAtTime(1,now);
+    if(_slots[_activeSlot]) _slots[_activeSlot].gainNode.gain.setValueAtTime(0,now);
+    _activeSlot=next;
+    _chainIn=_slots[next].chainIn;
+    _chainOut=_slots[next].gainNode;
+    const oi=(_activeSlot+1)%2;
+    _destroySlot(_slots[oi]); _slots[oi]=null;
+    reconnectRecDest();
+    return;
+  }
+
   ng.cancelScheduledValues(now);
   ng.setValueAtTime(0,now);
   ng.linearRampToValueAtTime(1,now+XFADE_SEC);
 
-  const old=_slots[_activeSlot];
-  if(old){
-    const og=old.gainNode.gain;
+  if(_slots[_activeSlot]){
+    const og=_slots[_activeSlot].gainNode.gain;
     og.cancelScheduledValues(now);
     og.setValueAtTime(og.value,now);
     og.linearRampToValueAtTime(0,now+XFADE_SEC);
@@ -805,18 +819,12 @@ function buildFxChain(){
 
   _xfadeTimer=setTimeout(()=>{
     const oldIdx=(_activeSlot+1)%2;
-    _destroySlot(_slots[oldIdx]);
-    _slots[oldIdx]=null;
-    if(playerSP){
-      try{playerSP.disconnect();}catch(e){}
-      if(_slots[_activeSlot]) playerSP.connect(_slots[_activeSlot].chainIn);
-    }
-    _chainIn=_slots[_activeSlot]?_slots[_activeSlot].chainIn:masterGain;
-    _chainOut=_slots[_activeSlot]?_slots[_activeSlot].gainNode:masterGain;
+    _destroySlot(_slots[oldIdx]); _slots[oldIdx]=null;
+    _chainIn=_slots[_activeSlot].chainIn;
+    _chainOut=_slots[_activeSlot].gainNode;
     reconnectRecDest();
-  },XFADE_SEC*1000+30);
+  }, XFADE_SEC*1000+50);
 }
-
 function liveFx(){
   if(!audioCtx)return;
   if(_filtNode&&fxEnabled.filter){
@@ -906,7 +914,11 @@ function createPlayer(){
     }
     playPos=Math.floor(_phase)%bufLen;
   };
-  playerSP.connect(_chainIn||masterGain);
+  if(!_splitGain){
+    _splitGain=audioCtx.createGain();
+    _splitGain.gain.value=1;
+  }
+  playerSP.connect(_splitGain);
 
   // Tap _chainOut → dedicated recGain → _recDest for recording with FX
   _rewireRecGain();
@@ -1054,8 +1066,13 @@ async function speak(){
   document.getElementById('dlBtn').disabled=false;
   playPos=0; _phase=0;
 
-  buildFxChain();
+  clearTimeout(_xfadeTimer);
+  _destroySlot(_slots[0]); _slots[0]=null;
+  _destroySlot(_slots[1]); _slots[1]=null;
+  _activeSlot=0;
+  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
   createPlayer();
+  buildFxChain();
   isPlaying=true;
   startViz();
   setStatus('play','LIVE UITZENDEN');
@@ -1074,7 +1091,12 @@ function togglePause(){
 
 function stopAll(){
   isPaused=false; isPlaying=false;
+  clearTimeout(_xfadeTimer);
   if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
+  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
+  _destroySlot(_slots[0]); _slots[0]=null;
+  _destroySlot(_slots[1]); _slots[1]=null;
+  _activeSlot=0;
   playPos=0; _phase=0;
   stopViz();
   document.getElementById('btnPlay').classList.remove('active');
@@ -1546,9 +1568,18 @@ function _esPlayBuf(f32){
         if(next){
           _esPlayBuf(next); // naadloos — buffer was al klaar
         } else {
-          // Buffer nog niet klaar — wacht kort en herrender
+          // Buffer nog niet klaar of tekst was leeg — probeer nu
           const t = document.getElementById('textInput').value.trim();
-          _esSynth(t, f=>_esPlayBuf(f));
+          if(t){
+            _esSynth(t, f => { if(f && _esPlaying) _esPlayBuf(f); else if(_esPlaying) setTimeout(()=>{ const t2=document.getElementById('textInput').value.trim(); if(t2) _esSynth(t2,f2=>{if(f2&&_esPlaying)_esPlayBuf(f2);}); },200); });
+          } else {
+            // Leeg — wacht tot er tekst is
+            const wait = setInterval(()=>{
+              if(!_esPlaying||!isLooping){ clearInterval(wait); return; }
+              const t2 = document.getElementById('textInput').value.trim();
+              if(t2){ clearInterval(wait); _esSynth(t2, f=>{ if(f&&_esPlaying) _esPlayBuf(f); }); }
+            }, 200);
+          }
         }
       } else {
         _esPlaying = false;
@@ -1577,28 +1608,30 @@ function _esPlayBuf(f32){
 function esPlay(){
   esStop();
   if(!_espeakReady){ setStatus('err','eSpeak niet geladen'); return; }
-  const text = document.getElementById('textInput').value.trim();
-  if(!text){
-    // Leeg tekstvak — wacht op invoer
-    setStatus('play','Typ tekst om af te spelen...');
-    document.getElementById('btnPlay').classList.add('active');
-    _esPlaying = true;
-    const wait = setInterval(()=>{
-      if(!_esPlaying){ clearInterval(wait); return; }
-      const t = document.getElementById('textInput').value.trim();
-      if(t){ clearInterval(wait); _esSynth(t, f=>_esPlayBuf(f)); }
-    }, 300);
-    return;
-  }
 
   _esPlaying = true;
   document.getElementById('btnPlay').classList.add('active');
-  setStatus('play','eSPEAK SYNTHESEREN...');
-  document.getElementById('esStatus').textContent = 'Syntheseren...';
-  _esSynth(text, f=>{
-    if(!f){ setStatus('err','Geen audio'); document.getElementById('btnPlay').classList.remove('active'); _esPlaying=false; return; }
-    _esPlayBuf(f);
-  });
+  setStatus('play', isLooping ? 'eSPEAK [LOOP]' : 'eSPEAK');
+  document.getElementById('esStatus').textContent = 'Gereed...';
+
+  function renderAndPlay(){
+    if(!_esPlaying) return;
+    const text = document.getElementById('textInput').value.trim();
+    if(!text){
+      // Leeg — wacht 200ms en probeer opnieuw, loop loopt gewoon door
+      setTimeout(renderAndPlay, 200);
+      return;
+    }
+    _esSynth(text, f=>{
+      if(!f || !_esPlaying){
+        if(_esPlaying) setTimeout(renderAndPlay, 200);
+        return;
+      }
+      _esPlayBuf(f);
+    });
+  }
+
+  renderAndPlay();
 }
 
 
