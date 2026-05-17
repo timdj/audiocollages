@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>eSpeak fix test 2</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0;font-size:13px}
+button{background:#0f0;color:#000;border:none;padding:8px 16px;margin:4px;cursor:pointer;font-size:13px}
+#log{margin-top:16px;white-space:pre-wrap;color:#ccc;border-top:1px solid #333;padding-top:10px}</style>
+</head>
+<body>
+<h2>eSpeak Fix Test 2</h2>
+<button onclick="test()">Test audio</button>
+<div id="log"></div>
+<script src="espeakng.min.js"></script>
+<script>
+const L=msg=>{document.getElementById('log').textContent+='\n'+msg;};
+
+const tts=new eSpeakNG('espeakng.worker.js',function(){
+  L('Klaar!');
+  tts.set_voice('gmw/en');
+});
+
+function test(){
+  const chunks=[];
+  tts.set_voice('gmw/nl');
+  tts.synthesize('hallo wereld, dit is een test',function(arg1,arg2){
+    // arg1 = ArrayBuffer met audio
+    L('arg1.byteLength='+arg1.byteLength+' arg2='+JSON.stringify(arg2).slice(0,40));
+    if(arg1.byteLength > 0){
+      chunks.push(new Int16Array(arg1));
+    } else {
+      // byteLength=0 = einde
+      const total=chunks.reduce((s,c)=>s+c.length,0);
+      L('Einde. Total samples='+total);
+      if(total>0) play(chunks,total);
+    }
+  });
+}
+
+function play(chunks,total){
+  const ctx=new AudioContext();
+  const all=new Int16Array(total);
+  let off=0;
+  for(const c of chunks){all.set(c,off);off+=c.length;}
+  const f=new Float32Array(total);
+  for(let i=0;i<total;i++)f[i]=all[i]/32768;
+  const b=ctx.createBuffer(1,total,22050);
+  b.copyToChannel(f,0);
+  const s=ctx.createBufferSource();
+  s.buffer=b;s.connect(ctx.destination);s.start();
+  s.onended=()=>L('Klaar!');
+  L('SPEELT: '+total+' samples');
+}
+</script>
+</body>
+</html>
