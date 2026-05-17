@@ -343,9 +343,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
     <span id="statusText">GEREED</span>
   </div>
   <div class="row-btns">
-    <span id="recTime"></span>
+    <span id="liveRecTime" style="font-family:VT323,monospace;font-size:20px;color:#ff0040;min-width:50px"></span>
+    <button class="sm-btn" id="btnLiveRec" onclick="toggleLiveRec()" style="border-color:#ff0040;color:#ff0040">&#9679; REC</button>
+    <button class="sm-btn" id="dlLiveBtn" onclick="downloadLiveRec()" disabled>&#11015; OPNAME</button>
     <button class="sm-btn" id="dlBtn" onclick="downloadWav()" disabled>&#11015; WAV</button>
-    <button class="sm-btn" id="dlRecBtn" onclick="downloadRec()" disabled>&#11015; OPNAME+FX</button>
     <span id="clockDisplay" style="font-family:VT323,monospace;font-size:18px">00:00:00</span>
   </div>
 </div>
@@ -529,44 +530,71 @@ function applyLoopCrossfade(f32){
 
 // Maak tekst SAM-veilig: vervang niet-ASCII door uitgesproken equivalent
 function samSafeText(text){
-  // Veelgebruikte niet-ASCII tekens translitereren
-  const map = {
+  // Android ?123 toetsenbord: alle symbolen → uitgesproken tekst
+  const symMap = [
+    // Combinaties eerst (langste match)
+    [':)','smiley'],[':D','blij gezicht'],[':(','droef'],
+    [';)','knipoog'],[':P','tong'],['<3','hartje'],
+    ['...','puntpuntpunt'],['->','pijl rechts'],['<-','pijl links'],
+    // ?123 pagina
+    ['@',' at '],['#',' hekje '],['$',' dollar '],
+    ['_',' onderstreep '],['&',' en '],
+    ['-',' min '],['+',' plus '],['/','gedeeld door'],
+    ['*',' maal '],
+    ['"',' aanhalingsteken '],[''',' apostrof '],
+    [':',' dubbele punt '],[';',' puntkomma '],
+    ['!',' uitroep '],['?',' vraag '],
+    ['(',' haakje open '],[')',' haakje dicht '],
+    // =\< pagina
+    ['~',' tilde '],['`',' backtick '],['|',' streep '],
+    ['·',' punt '],['√',' wortel '],['π',' pi '],
+    ['÷',' gedeeld '],['×',' maal '],['¶',' alinea '],['∆',' delta '],
+    ['£',' pond '],['¢',' cent '],['€',' euro '],['¥',' yen '],
+    ['^',' macht '],['°',' graden '],['=',' is '],
+    ['{',' accolade open '],['}',' accolade dicht '],
+    ['\',' backslash '],['\',' backslash '],
+    ['%',' procent '],['©',' copyright '],['®',' registered '],
+    ['™',' trademark '],['✓',' vinkje '],
+    ['[',' blokhaakje open'],[']',' blokhaakje dicht '],
+    ['<',' kleiner dan '],['>',' groter dan '],
+    // Cijfers uitspreken
+    ['0',' nul '],['1',' een '],['2',' twee '],['3',' drie '],
+    ['4',' vier '],['5',' vijf '],['6',' zes '],['7',' zeven '],
+    ['8',' acht '],['9',' negen '],
+  ];
+
+  // ASCII niet-alfanumeriek: vervang via symMap
+  let out = text;
+  for(const [sym,word] of symMap){
+    out = out.split(sym).join(' '+word+' ');
+  }
+
+  // Niet-ASCII: translitereer of skip
+  const charMap = {
     'à':'a','á':'a','â':'a','ã':'a','ä':'ae','å':'a','æ':'ae',
     'ç':'s','è':'e','é':'e','ê':'e','ë':'e',
     'ì':'i','í':'i','î':'i','ï':'i',
     'ñ':'n','ò':'o','ó':'o','ô':'o','õ':'o','ö':'oe','ø':'o',
-    'ù':'u','ú':'u','û':'u','ü':'ue',
-    'ý':'y','ÿ':'y','ß':'ss',
+    'ù':'u','ú':'u','û':'u','ü':'ue','ý':'y','ÿ':'y','ß':'ss',
     'À':'A','Á':'A','Â':'A','Ã':'A','Ä':'AE','Å':'A','Æ':'AE',
     'Ç':'S','È':'E','É':'E','Ê':'E','Ë':'E',
     'Ì':'I','Í':'I','Î':'I','Ï':'I',
     'Ñ':'N','Ò':'O','Ó':'O','Ô':'O','Õ':'O','Ö':'OE','Ø':'O',
-    'Ù':'U','Ú':'U','Û':'U','Ü':'UE',
-    'Ý':'Y','ß':'SS',
-    // Grieks
+    'Ù':'U','Ú':'U','Û':'U','Ü':'UE','Ý':'Y',
     'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
     'π':'pi','σ':'sigma','ω':'omega','μ':'mu','λ':'lambda',
-    // Pijlen en symbolen
-    '→':' naar ','←':' terug ','↑':' omhoog ','↓':' omlaag ',
-    '≈':' ongeveer ','≠':' niet gelijk ','≤':' kleiner of gelijk ',
-    '≥':' groter of gelijk ','∞':' oneindig ',
-    '°':' graden ','±':' plus min ',
+    '→':'naar','←':'terug','↑':'omhoog','↓':'omlaag',
+    '≈':'ongeveer','≠':'niet gelijk','≤':'kleiner of gelijk',
+    '≥':'groter of gelijk','∞':'oneindig','±':'plus min',
   };
-  let out = '';
-  for(const ch of text){
+  let result = '';
+  for(const ch of out){
     const code = ch.codePointAt(0);
-    if(map[ch]){
-      out += map[ch];
-    } else if(code > 127){
-      // Onbekend niet-ASCII: probeer te skippen maar voeg spatie toe
-      // zodat SAM niet vastloopt op lege chunks
-      out += ' ';
-    } else {
-      out += ch;
-    }
+    if(charMap[ch])  result += ' '+charMap[ch]+' ';
+    else if(code>127) result += ' ';
+    else result += ch;
   }
-  // Meerdere spaties samenvoegen
-  return out.replace(/\s+/g,' ').trim();
+  return result.replace(/\s+/g,' ').trim();
 }
 
 function renderAll(text,opts){
@@ -645,9 +673,10 @@ let _chainIn=null,_chainOut=null;
 // FX CHAIN MET CROSSFADE WISSEL
 // ═══════════════════════════════════════════════════════════════════
 let _slots=[null,null];
+let _splitGain=null;
 let _activeSlot=0;
 let _xfadeTimer=null;
-const XFADE_SEC=0.08;
+let XFADE_SEC=1.0;
 
 function _buildSlot(){
   const stages=[]; const oscList=[]; const spList=[];
@@ -764,6 +793,7 @@ function _buildSlot(){
 
 function _destroySlot(slot){
   if(!slot)return;
+  if(_splitGain){try{_splitGain.disconnect(slot.chainIn);}catch(e){}}
   try{slot.gainNode.disconnect();}catch(e){}
   slot.oscList.forEach(o=>{try{o.stop();}catch(e){}});
   slot.spList.forEach(s=>{try{s.disconnect();}catch(e){}});
@@ -772,28 +802,40 @@ function _destroySlot(slot){
 function buildFxChain(){
   if(!audioCtx)return;
   clearTimeout(_xfadeTimer);
-  const now=audioCtx.currentTime;
-  const next=(_activeSlot+1)%2;
 
-  _destroySlot(_slots[next]);
-  _slots[next]=_buildSlot();
-
-  // Verbind playerSP aan beide slots tijdens crossfade
-  if(playerSP){
-    try{playerSP.disconnect();}catch(e){}
-    playerSP.connect(_slots[next].chainIn);
-    if(_slots[_activeSlot]) try{playerSP.connect(_slots[_activeSlot].chainIn);}catch(e){}
+  if(!_splitGain){
+    _splitGain=audioCtx.createGain();
+    _splitGain.gain.value=1;
+    if(playerSP) playerSP.connect(_splitGain);
   }
 
-  // Crossfade gains
+  const now=audioCtx.currentTime;
+  const isFirst=(_slots[0]===null&&_slots[1]===null);
+  const next=(_activeSlot+1)%2;
+
+  _destroySlot(_slots[next]); _slots[next]=null;
+  _slots[next]=_buildSlot();
+  _splitGain.connect(_slots[next].chainIn);
+
   const ng=_slots[next].gainNode.gain;
+  if(isFirst||XFADE_SEC<0.05){
+    ng.setValueAtTime(1,now);
+    if(_slots[_activeSlot]) _slots[_activeSlot].gainNode.gain.setValueAtTime(0,now);
+    _activeSlot=next;
+    _chainIn=_slots[next].chainIn;
+    _chainOut=_slots[next].gainNode;
+    const oi=(_activeSlot+1)%2;
+    _destroySlot(_slots[oi]); _slots[oi]=null;
+    reconnectRecDest();
+    return;
+  }
+
   ng.cancelScheduledValues(now);
   ng.setValueAtTime(0,now);
   ng.linearRampToValueAtTime(1,now+XFADE_SEC);
 
-  const old=_slots[_activeSlot];
-  if(old){
-    const og=old.gainNode.gain;
+  if(_slots[_activeSlot]){
+    const og=_slots[_activeSlot].gainNode.gain;
     og.cancelScheduledValues(now);
     og.setValueAtTime(og.value,now);
     og.linearRampToValueAtTime(0,now+XFADE_SEC);
@@ -805,18 +847,12 @@ function buildFxChain(){
 
   _xfadeTimer=setTimeout(()=>{
     const oldIdx=(_activeSlot+1)%2;
-    _destroySlot(_slots[oldIdx]);
-    _slots[oldIdx]=null;
-    if(playerSP){
-      try{playerSP.disconnect();}catch(e){}
-      if(_slots[_activeSlot]) playerSP.connect(_slots[_activeSlot].chainIn);
-    }
-    _chainIn=_slots[_activeSlot]?_slots[_activeSlot].chainIn:masterGain;
-    _chainOut=_slots[_activeSlot]?_slots[_activeSlot].gainNode:masterGain;
+    _destroySlot(_slots[oldIdx]); _slots[oldIdx]=null;
+    _chainIn=_slots[_activeSlot].chainIn;
+    _chainOut=_slots[_activeSlot].gainNode;
     reconnectRecDest();
-  },XFADE_SEC*1000+30);
+  }, XFADE_SEC*1000+50);
 }
-
 function liveFx(){
   if(!audioCtx)return;
   if(_filtNode&&fxEnabled.filter){
@@ -906,7 +942,11 @@ function createPlayer(){
     }
     playPos=Math.floor(_phase)%bufLen;
   };
-  playerSP.connect(_chainIn||masterGain);
+  if(!_splitGain){
+    _splitGain=audioCtx.createGain();
+    _splitGain.gain.value=1;
+  }
+  playerSP.connect(_splitGain);
 
   // Tap _chainOut → dedicated recGain → _recDest for recording with FX
   _rewireRecGain();
@@ -1054,8 +1094,13 @@ async function speak(){
   document.getElementById('dlBtn').disabled=false;
   playPos=0; _phase=0;
 
-  buildFxChain();
+  clearTimeout(_xfadeTimer);
+  _destroySlot(_slots[0]); _slots[0]=null;
+  _destroySlot(_slots[1]); _slots[1]=null;
+  _activeSlot=0;
+  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
   createPlayer();
+  buildFxChain();
   isPlaying=true;
   startViz();
   setStatus('play','LIVE UITZENDEN');
@@ -1074,7 +1119,12 @@ function togglePause(){
 
 function stopAll(){
   isPaused=false; isPlaying=false;
+  clearTimeout(_xfadeTimer);
   if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
+  if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
+  _destroySlot(_slots[0]); _slots[0]=null;
+  _destroySlot(_slots[1]); _slots[1]=null;
+  _activeSlot=0;
   playPos=0; _phase=0;
   stopViz();
   document.getElementById('btnPlay').classList.remove('active');
