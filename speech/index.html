@@ -1506,14 +1506,8 @@ function lcSpeak(text, st, cb){
     // Gebruik onPlayEnd hook ipv polling
     _lcOnDone = ()=>{ _lcOnDone=null; setTimeout(cb, st.delay||0); };
     createPlayer(); buildFxChain();
-    // FX ná buildFxChain zodat ze niet overschreven worden
     lcSetFx(st.fx);
     isPlaying=true; startViz();
-    // Veiligheidsnet: als onPlayEnd uitblijft na geschatte duur + 3s
-    const estDur = (combinedF32.length / 22050) * 1000 + 3000;
-    setTimeout(()=>{
-      if(_lcOnDone){ const f=_lcOnDone; _lcOnDone=null; isPlaying=false; f(); }
-    }, estDur);
 
   } else if(st.engine==='w'){
     if(!('speechSynthesis' in window)){ setTimeout(cb,100); return; }
@@ -1575,10 +1569,9 @@ function lcRun(){
     const st=lcState();
     let ti=0;
     let finished=false;
-    // Veiligheidsnet: altijd afronden na 30s
-    const safety=setTimeout(()=>{ if(!finished&&!_lcStop){ finished=true; done(); } },30000);
-    function safeDone(){ if(!finished){ finished=true; clearTimeout(safety); done(); } }
-
+    function safeDone(){
+      if(!finished){ finished=true; done(); }
+    }
     function next(){
       if(_lcStop||ti>=tokens.length){ safeDone(); return; }
       const tok=tokens[ti++];
