@@ -1643,7 +1643,16 @@ document.getElementById('btnStop').addEventListener('click', function(e){
   lcStop();
 }, {capture:true});
 
-// Pauze: SAM pauzeert, WebSpeech pauzeert, LC wacht
+// Loop knop: in LC mode alleen isLooping togglen, geen herstart
+document.getElementById('btnLoop').addEventListener('click', function(e){
+  if(document.getElementById('textInput').value.includes('(')){
+    e.stopImmediatePropagation();
+    isLooping=!isLooping;
+    document.getElementById('btnLoop').classList.toggle('active',isLooping);
+    setStatus(isLooping?'play':'','LOOP '+(isLooping?'AAN':'UIT'));
+  }
+  // Geen intercept als geen LC syntax → originele toggleLoop() werkt
+},{capture:true});
 document.getElementById('btnPause').addEventListener('click', function(e){
   if(!_lcStop && document.getElementById('textInput').value.includes('(')){
     e.stopImmediatePropagation();
