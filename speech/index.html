@@ -1485,10 +1485,13 @@ function lcSpeak(text, st, cb){
     
     // Gebruik onPlayEnd hook ipv polling
     _lcOnDone = ()=>{ _lcOnDone=null; setTimeout(cb, st.delay||0); };
-    createPlayer(); buildFxChain(); isPlaying=true; startViz();
+    createPlayer(); buildFxChain();
+    // FX ná buildFxChain zodat ze niet overschreven worden
+    lcSetFx(st.fx);
+    isPlaying=true; startViz();
 
   } else if(st.engine==='w'){
-    if(!('speechSynthesis' in window)){ setTimeout(cb,0); return; }
+    if(!('speechSynthesis' in window)){ setTimeout(cb,100); return; }
     const sel=document.getElementById('wsVoice');
     const v=sel&&sel._v?sel._v[parseInt(sel.value)]||null:null;
     const u=new SpeechSynthesisUtterance(text);
@@ -1497,8 +1500,14 @@ function lcSpeak(text, st, cb){
     u.rate=Math.max(0.1,Math.min(3,st.rate));
     u.pitch=Math.max(0,Math.min(2,st.pitch));
     u.volume=Math.max(0,Math.min(1,st.vol));
-    u.onend=()=>setTimeout(cb,st.delay||0);
-    u.onerror=()=>setTimeout(cb,0);
+    let called=false;
+    const done=()=>{ if(!called){ called=true; setTimeout(cb,st.delay||100); } };
+    u.onend=done;
+    u.onerror=done;
+    // Fallback: bereken geschatte duur en roep cb aan als onend uitblijft
+    const estMs = Math.max(1500, (text.split(' ').length * 400) / st.rate);
+    const fallback = setTimeout(done, estMs + 500);
+    u.onend=()=>{ clearTimeout(fallback); done(); };
     speechSynthesis.speak(u);
 
   } else if(st.engine==='e'){
@@ -1575,27 +1584,19 @@ function lcStop(){
 // Help tekst
 function lcHelp(){
   document.getElementById('textInput').value =
-`(t:s) hallo SAM (t:w) hallo web speech (t:e) hallo espeak
-
-(r:0.5) langzaam (r:2) snel (r:1) normaal
-
-(p:0.5) laag (p:2) hoog (p:1) midden
-
-(sp:40)(sa:200)(th:200)(mo:50) rare SAM stem
-
-(fx:reverb, wet:0.8) grote ruimte (fx:off) droog
-
+`(t:s)(r:0.5) langzaam
+(r:2) snel
+(p:0.5) laag
+(p:2) hoog
+(sp:40)(sa:200)(th:200)(mo:50) rare stem
+(fx:reverb, wet:0.8) grote ruimte
 (fx:delay, time:0.4, feedback:0.7) echo effect
-
-(fx:bitcrush, bits:3) kapot geluid (fx:off)
-
+(fx:bitcrush, bits:3) kapot
 (fx:tremolo, rate:8, depth:0.9) trillend
-
-(l:4)(p:0.5) steeds (p:1.5) hoger en lager
-
-(d:300) pauze van 300ms hierna
-
-(r: 0.5+Math.random()) willekeurige snelheid`;
+(fx:off)(r:1)(p:1) normaal
+(l:3) dit drie keer
+(d:500) na deze zin een pauze
+(t:w) nu web speech stem`;
 }
 
 // Intercept play en stop via capture — originele onclick blijft intact
