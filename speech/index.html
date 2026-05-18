@@ -813,12 +813,15 @@ function createPlayer(){
   _rewireRecGain();
 }
 
+let _lcOnDone = null; // callback voor LC engine na SAM segment
+
 function onPlayEnd(){
   isPlaying=false;
   playerSP=null;
-  document.getElementById('btnPlay').classList.remove('active');
+  if(!_lcOnDone) document.getElementById('btnPlay').classList.remove('active');
   stopViz();
-  setStatus('','GEREED');
+  if(!_lcOnDone) setStatus('','GEREED');
+  if(_lcOnDone){ const f=_lcOnDone; _lcOnDone=null; f(); }
   if(isRecording) stopRec();
 }
 
@@ -1479,10 +1482,10 @@ function lcSpeak(text, st, cb){
     if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
     if(typeof _splitGain!=='undefined'&&_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
     if(typeof _slots!=='undefined'){_destroySlot(_slots[0]);_slots[0]=null;_destroySlot(_slots[1]);_slots[1]=null;_activeSlot=0;}
+    
+    // Gebruik onPlayEnd hook ipv polling
+    _lcOnDone = ()=>{ _lcOnDone=null; setTimeout(cb, st.delay||0); };
     createPlayer(); buildFxChain(); isPlaying=true; startViz();
-    const poll=setInterval(()=>{
-      if(!isPlaying||!playerSP){ clearInterval(poll); isPlaying=false; setTimeout(cb,st.delay||0); }
-    },80);
 
   } else if(st.engine==='w'){
     if(!('speechSynthesis' in window)){ setTimeout(cb,0); return; }
