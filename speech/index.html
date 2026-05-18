@@ -163,7 +163,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
     <button class="toggle-btn active" id="btnText" onclick="setMode('text')">TEXT</button>
     <button class="toggle-btn" id="btnPhoneme" onclick="setMode('phoneme')">FONEEM</button>
     <button class="toggle-btn" id="btnSing" onclick="setMode('sing')">ZINGEN</button>
-    <button class="toggle-btn" onclick="showLCHelp()" style="border-color:#ffaa00;color:#ffaa00">? HELP</button>
+    <button class="toggle-btn" onclick="lcHelp()" style="border-color:#ffaa00;color:#ffaa00;margin-left:8px">? HELP</button>
   </div>
   <div id="phonemeHelp" style="display:none">
     <div class="phoneme-help">Fonemische notatie (hoofdletters): <code>AE AA IH EH OW UW AH AO</code> &middot; Voorbeeld: <code>DAES BUUT AXLAARM</code></div>
@@ -269,9 +269,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 
 <!-- Transport -->
 <div class="transport">
-  <button class="tbtn tbtn-play" id="btnPlay" onclick="lcRun()">&#9654; AFSPELEN</button>
+  <button class="tbtn tbtn-play" id="btnPlay" onclick="speak()">&#9654; AFSPELEN</button>
   <button class="tbtn tbtn-pause" id="btnPause" onclick="togglePause()">&#9646;&#9646; PAUZE</button>
-  <button class="tbtn tbtn-stop" id="btnStop" onclick="lcStopAll()">&#9632; STOP</button>
+  <button class="tbtn tbtn-stop" id="btnStop" onclick="stopAll()">&#9632; STOP</button>
   <button class="tbtn tbtn-loop" id="btnLoop" onclick="toggleLoop()">&#8635; LOOP</button>
 </div>
 <div class="transport2">
@@ -439,76 +439,6 @@ function loadPreset(name){
 // ═══════════════════════════════════════════════════════════════════
 // SAM RENDERING
 // ═══════════════════════════════════════════════════════════════════
-
-// Alle Android ?123 en =\< symbolen → uitgesproken tekst
-function samSafeText(t){
-  const s=[
-    [':)','smiley'],[':D','blij'],[':(',  'droef'],[';)','knipoog'],[':P','tong'],
-    ['<3','hartje'],['->','pijl rechts'],['<-','pijl links'],
-    ['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],['&','en'],
-    ['+','plus'],['*','maal'],['/','gedeeld'],['=','is'],['%','procent'],
-    ['"','aanhalingsteken'],["'",'apostrof'],[':','dubbele punt'],[';','puntkomma'],
-    ['!','uitroep'],['?','vraag'],['(','haakje open'],[')','haakje dicht'],
-    ['-','min'],['~','tilde'],['`','accent'],['|','streep'],['\\','backslash'],
-    ['^','macht'],['[','blok open'],[']','blok dicht'],
-    ['{','accolade open'],['}','accolade dicht'],
-    ['<','kleiner'],['>', 'groter'],['€','euro'],['£','pond'],
-    ['¢','cent'],['¥','yen'],['°','graden'],['©','copyright'],
-    ['®','registered'],['™','trademark'],['✓','vinkje'],
-    ['√','wortel'],['π','pi'],['÷','gedeeld'],['×','maal'],
-    ['∆','delta'],['·','punt'],['¶','alinea'],
-    ['0','nul'],['1','een'],['2','twee'],['3','drie'],['4','vier'],
-    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen'],
-  ];
-  let o=t;
-  for(const [sym,w] of s) o=o.split(sym).join(' '+w+' ');
-  // Niet-ASCII transliteratie
-  const m={'à':'a','á':'a','â':'a','ä':'ae','å':'a','æ':'ae','ç':'s',
-    'è':'e','é':'e','ê':'e','ë':'e','ì':'i','í':'i','î':'i','ï':'i',
-    'ñ':'n','ò':'o','ó':'o','ô':'o','ö':'oe','ø':'o','ù':'u','ú':'u',
-    'û':'u','ü':'ue','ý':'y','ß':'ss',
-    'α':'alpha','β':'beta','γ':'gamma','δ':'delta','ε':'epsilon',
-    'π':'pi','σ':'sigma','ω':'omega','μ':'mu','λ':'lambda'};
-  let r='';
-  for(const c of o){
-    const lc=c.toLowerCase();
-    if(m[lc]) r+=' '+m[lc]+' ';
-    else if(c.codePointAt(0)>127) r+=' ';
-    else r+=c;
-  }
-  return r.replace(/\s+/g,' ').trim();
-}
-
-
-function samSafeText(t){
-  const s=[
-    [':)','smiley'],[':D','blij'],[':(',  'droef'],[';)','knipoog'],[':P','tong'],
-    ['<3','hartje'],['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],
-    ['&','en'],['+','plus'],['*','maal'],['/','gedeeld'],['=','is'],['%','procent'],
-    ['"','aanhalingsteken'],[':','dubbele punt'],[';','puntkomma'],
-    ['!','uitroep'],['?','vraag'],['(','open'],[')',  'dicht'],['-','min'],
-    ['~','tilde'],['`','accent'],['|','streep'],['\\','backslash'],['^','macht'],
-    ['[','blok open'],[']','blok dicht'],['{','accolade open'],['}','accolade dicht'],
-    ['<','kleiner'],['>', 'groter'],['€','euro'],['£','pond'],['¢','cent'],
-    ['¥','yen'],['°','graden'],['©','copyright'],['®','registered'],['™','trademark'],
-    ['✓','vinkje'],['√','wortel'],['π','pi'],['÷','gedeeld'],['×','maal'],
-    ['0','nul'],['1','een'],['2','twee'],['3','drie'],['4','vier'],
-    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen'],
-  ];
-  let o=t;
-  for(const [sym,w] of s) o=o.split(sym).join(' '+w+' ');
-  const m={'à':'a','á':'a','â':'a','ä':'ae','é':'e','ê':'e','ë':'e','ñ':'n',
-    'ö':'oe','ü':'ue','ß':'ss','α':'alpha','β':'beta','π':'pi','σ':'sigma','μ':'mu'};
-  let r='';
-  for(const c of o){
-    const lc=c.toLowerCase();
-    if(m[lc]) r+=' '+m[lc]+' ';
-    else if(c.codePointAt(0)>127) r+=' ';
-    else r+=c;
-  }
-  return r.replace(/\s+/g,' ').trim();
-}
-
 function splitChunks(text){
   const parts=text.match(/[^.!?,\n]+[.!?,\n]?/g)||[text];
   const chunks=[]; let cur='';
@@ -543,7 +473,7 @@ function applyLoopCrossfade(f32){
 }
 
 function renderAll(text,opts){
-  const chunks=splitChunks(samSafeText(text));
+  const chunks=splitChunks(text);
   const f32parts=[]; const u8parts=[];
   for(const ch of chunks){
     try{
@@ -1375,451 +1305,355 @@ document.getElementById('textInput').addEventListener('input',()=>{
 
 // Ctrl+Enter
 document.getElementById('textInput').addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();speak();}
+  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();lcRun();}
 });
 
-// ── Live opname (tapt van masterGain = alles wat je hoort) ───────
-let _lrDest=null, _lrRec=null, _lrChunks=[], _lrBlob=null, _lrOn=false, _lrTimer=null;
-
-function toggleLiveRec(){
-  _lrOn ? _lrStop() : _lrStart();
-}
-function _lrStart(){
-  ensureCtx();
-  if(!_lrDest){ _lrDest=audioCtx.createMediaStreamDestination(); masterGain.connect(_lrDest); }
-  _lrChunks=[]; _lrBlob=null;
-  document.getElementById('dlLiveBtn').disabled=true;
-  const mimes=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg',''];
-  let mime=''; for(const m of mimes){try{if(!m||MediaRecorder.isTypeSupported(m)){mime=m;break;}}catch(e){}}
-  try{ _lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream); }
-  catch(e){ setStatus('err','Opname niet beschikbaar'); return; }
-  _lrRec.ondataavailable=e=>{if(e.data&&e.data.size>0)_lrChunks.push(e.data);};
-  _lrRec.onstop=()=>{
-    _lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'});
-    document.getElementById('dlLiveBtn').disabled=false;
-    setStatus('','OPNAME KLAAR');
-  };
-  _lrRec.start(50); _lrOn=true;
-  const t0=Date.now();
-  document.getElementById('btnLR').classList.add('active');
-  document.getElementById('btnLR').style.boxShadow='0 0 14px rgba(255,0,64,.5)';
-  _lrTimer=setInterval(()=>{
-    const s=Math.floor((Date.now()-t0)/1000);
-    document.getElementById('lrTime').textContent=
-      String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
-  },500);
-  setStatus('rec','● OPNAME');
-}
-function _lrStop(){
-  _lrOn=false; clearInterval(_lrTimer);
-  document.getElementById('lrTime').textContent='';
-  document.getElementById('btnLR').classList.remove('active');
-  document.getElementById('btnLR').style.boxShadow='none';
-  try{_lrRec.stop();}catch(e){} _lrRec=null;
-}
-function _lrDownload(){
-  if(!_lrBlob)return;
-  const t=_lrBlob.type, ext=t.includes('ogg')?'ogg':t.includes('mp4')?'mp4':'webm';
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(_lrBlob);
-  const n=new Date(), pad=v=>String(v).padStart(2,'0');
-  a.download='opname-'+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate())+'-'+pad(n.getHours())+pad(n.getMinutes())+pad(n.getSeconds())+'.'+ext;
-  a.click();
-}
-
 // ════════════════════════════════════════════════════════════════
-// LIVE CODING ENGINE — inline markup in tekstvak
+// LIVE CODING ENGINE
 // Syntaxis: (commando:waarde) tekst (commando:waarde) tekst
 // ════════════════════════════════════════════════════════════════
 
-// ── State machine ────────────────────────────────────────────────
-function LCState(){
-  return {
-    engine: 's',      // s=SAM, w=WebSpeech, e=eSpeak
-    rate:   1.0,
-    pitch:  1.0,
-    vol:    1.0,
-    // SAM params
-    speed:  72,
-    samPitch: 64,
-    throat: 128,
-    mouth:  128,
-    // FX
-    fx: {},           // {reverb:{wet:0.4}, delay:{...}, ...}
-    // Loop
-    loop:   1,        // hoeveel keer herhalen
-    loopI:  0,        // huidige iteratie
-    // Pauze
-    delay:  0,        // ms pauze na dit segment
-  };
+// Symbolen → woorden (voor SAM)
+function lcSafe(t){
+  const s=[['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],
+    ['&','en'],['+','plus'],['*','maal'],['=','is'],['%','procent'],
+    ['"','aanhalingsteken'],[':','dubbele punt'],[';','puntkomma'],
+    ['!','uitroep'],['?','vraag'],['-','min'],['~','tilde'],['|','streep'],
+    ['^','macht'],['<','kleiner'],['>','groter'],['€','euro'],['£','pond'],
+    ['°','graden'],['©','copyright'],['√','wortel'],['π','pi'],
+    ['÷','gedeeld'],['×','maal'],
+    ['0','nul'],['1','een'],['2','twee'],['3','drie'],['4','vier'],
+    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen']];
+  let o=t;
+  for(const [sym,w] of s) o=o.split(sym).join(' '+w+' ');
+  let r='';
+  for(const c of o){
+    if(c.codePointAt(0)>127) r+=' ';
+    else r+=c;
+  }
+  return r.replace(/\s+/g,' ').trim();
 }
 
-// ── Parser ───────────────────────────────────────────────────────
-// Zet tekst om in array van tokens: {type:'speak'|'cmd', ...}
+// Parser: tekst → [{type:'speak',text}|{type:'cmd',ops:{}}]
 function lcParse(text){
-  const tokens = [];
-  let i = 0;
-  let buf = '';
-
-  while(i < text.length){
-    if(text[i] === '(' ){
-      // Flush buffer als spreektekst
-      if(buf.trim()) tokens.push({type:'speak', text:buf});
-      buf = '';
-      // Lees commando tot )
-      let j = i+1;
-      while(j < text.length && text[j] !== ')') j++;
-      const inner = text.slice(i+1, j).trim();
-      tokens.push(lcParseCmd(inner));
-      i = j+1;
-    } else {
-      buf += text[i];
-      i++;
-    }
+  const tokens=[]; let i=0, buf='';
+  while(i<text.length){
+    if(text[i]==='('){
+      if(buf.trim()) tokens.push({type:'speak',text:buf.trim()});
+      buf='';
+      let j=i+1, depth=1;
+      while(j<text.length && depth>0){
+        if(text[j]==='(') depth++;
+        else if(text[j]===')') depth--;
+        if(depth>0) j++;
+        else j++;
+      }
+      const inner=text.slice(i+1,j-1).trim();
+      tokens.push(lcCmd(inner));
+      i=j;
+    } else { buf+=text[i]; i++; }
   }
-  if(buf.trim()) tokens.push({type:'speak', text:buf});
+  if(buf.trim()) tokens.push({type:'speak',text:buf.trim()});
   return tokens;
 }
 
-function lcParseCmd(inner){
-  // Formaat: "key:value" of "key:value, key:value" of "d:200" etc.
-  const cmd = {type:'cmd', ops:{}};
-  const parts = inner.split(',');
+function lcCmd(inner){
+  const ops={}; 
+  const parts=inner.split(',');
   for(const part of parts){
-    const [k,v] = part.split(':').map(s=>s.trim());
-    if(!k) continue;
-    // Evalueer wiskundige expressies veilig
-    let val = v;
-    if(v !== undefined){
-      try{
-        // Vervang t door de huidige tijd in seconden
-        const expr = v.replace(/\bt\b/g, (Date.now()/1000).toFixed(3));
-        const n = Function('"use strict"; const Math=globalThis.Math; return ('+expr+')')();
-        if(typeof n === 'number' && isFinite(n)) val = n;
-      }catch(e){ val = isNaN(parseFloat(v)) ? v : parseFloat(v); }
-    }
-    cmd.ops[k] = val;
+    const idx=part.indexOf(':');
+    if(idx<0){ ops[part.trim()]=true; continue; }
+    const k=part.slice(0,idx).trim();
+    const vraw=part.slice(idx+1).trim();
+    let v=vraw;
+    try{
+      const expr=vraw.replace(/\bt\b/g,(performance.now()/1000).toFixed(3));
+      const n=Function('"use strict";const Math=globalThis.Math;return('+expr+')')();
+      if(typeof n==='number'&&isFinite(n)) v=n;
+      else v=isNaN(parseFloat(vraw))?vraw:parseFloat(vraw);
+    }catch(e){ v=isNaN(parseFloat(vraw))?vraw:parseFloat(vraw); }
+    ops[k]=v;
   }
-  return cmd;
+  return {type:'cmd',ops};
 }
 
-// ── State updater ─────────────────────────────────────────────────
-function lcApplyCmd(cmd, state){
-  const ops = cmd.ops;
-  // Stem/engine
-  if(ops.t !== undefined){
-    if(ops.t==='s'||ops.t==='sam')   state.engine='s';
-    if(ops.t==='w'||ops.t==='ws')    state.engine='w';
-    if(ops.t==='e'||ops.t==='es')    state.engine='e';
-  }
-  // Spraakparameters
-  if(ops.r  !== undefined) state.rate   = parseFloat(ops.r);
-  if(ops.p  !== undefined) state.pitch  = parseFloat(ops.p);
-  if(ops.v  !== undefined) state.vol    = parseFloat(ops.v);
-  // SAM specifiek
-  if(ops.sp !== undefined) state.speed  = Math.round(parseFloat(ops.sp));
-  if(ops.sa !== undefined) state.samPitch = Math.round(parseFloat(ops.sa));
-  if(ops.th !== undefined) state.throat = Math.round(parseFloat(ops.th));
-  if(ops.mo !== undefined) state.mouth  = Math.round(parseFloat(ops.mo));
-  // Pauze
-  if(ops.d  !== undefined) state.delay  = parseFloat(ops.d);
-  // FX aan/uitzetten
-  if(ops.fx !== undefined){
-    const fxName = ops.fx;
-    if(fxName === 'off' || fxName === 'none'){
-      state.fx = {};
-    } else {
-      if(!state.fx[fxName]) state.fx[fxName] = {};
-      // Kopieer alle andere params naar fx state
-      for(const [k,v] of Object.entries(ops)){
-        if(k !== 'fx') state.fx[fxName][k] = v;
+// State
+function lcState(){
+  return {engine:'s',rate:1,pitch:1,vol:1,
+    speed:72,sPitch:64,throat:128,mouth:128,
+    fx:{},loop:1,delay:0};
+}
+
+function lcApply(cmd,st){
+  const o=cmd.ops;
+  if(o.t!==undefined){ if('sS'.includes(String(o.t))) st.engine='s'; else if('wW'.includes(String(o.t))) st.engine='w'; else if('eE'.includes(String(o.t))) st.engine='e'; }
+  if(o.r!==undefined) st.rate=+o.r;
+  if(o.p!==undefined) st.pitch=+o.p;
+  if(o.v!==undefined) st.vol=+o.v;
+  if(o.sp!==undefined) st.speed=Math.round(+o.sp);
+  if(o.sa!==undefined) st.sPitch=Math.round(+o.sa);
+  if(o.th!==undefined) st.throat=Math.round(+o.th);
+  if(o.mo!==undefined) st.mouth=Math.round(+o.mo);
+  if(o.d!==undefined) st.delay=+o.d;
+  if(o.l!==undefined) st.loop=Math.max(1,Math.round(+o.l));
+  if(o.loop!==undefined) st.loop=Math.max(1,Math.round(+o.loop));
+  if(o.fx!==undefined){
+    const name=String(o.fx);
+    if(name==='off'||name==='none') st.fx={};
+    else {
+      if(!st.fx[name]) st.fx[name]={};
+      for(const [k,v] of Object.entries(o)){
+        if(k!=='fx') st.fx[name][k]=v;
       }
     }
   }
-  // FX parameters direct
-  const fxKeys = ['wet','dry','rate','depth','size','decay','feedback','time','freq','bits','ds'];
-  const activeFx = Object.keys(state.fx);
-  if(activeFx.length > 0){
-    for(const k of fxKeys){
-      if(ops[k] !== undefined){
-        // Pas toe op het laatste actieve fx
-        const last = activeFx[activeFx.length-1];
-        state.fx[last][k] = ops[k];
-      }
-    }
-  }
-  // Loop
-  if(ops.loop !== undefined) state.loop = Math.max(1, parseInt(ops.loop));
-  if(ops.l    !== undefined) state.loop = Math.max(1, parseInt(ops.l));
-  // Reset
-  if(ops.reset !== undefined || ops.r0 !== undefined){
-    Object.assign(state, LCState());
-  }
+  if(o.reset!==undefined) Object.assign(st,lcState());
 }
 
-// ── FX toepassen op SAM engine ───────────────────────────────────
-function lcApplyFxToSam(fxState){
-  // Zet FX aan/uit op basis van state
-  const fxNames = ['distortion','filter','reverb','delay','chorus','tremolo','bitcrush','ringmod','pitchshift'];
-  for(const name of fxNames){
-    const short = {distortion:'dist',filter:'filt',reverb:'rev',delay:'delay',
-                   chorus:'chorus',tremolo:'trem',bitcrush:'bit',ringmod:'ring',pitchshift:'pitch'}[name]||name;
-    const wantOn = !!(fxState[name] || fxState[short]);
-    if(wantOn !== fxEnabled[name]){
-      fxEnabled[name] = wantOn;
-      const btn = document.getElementById('fx-'+name);
-      const sec = document.getElementById('sec-'+name);
-      if(btn){ btn.classList.toggle('on',wantOn); btn.classList.toggle('hot',wantOn); }
-      if(sec) sec.style.display = wantOn ? 'block' : 'none';
-    }
-    // Pas parameters toe als het effect aan staat
-    if(wantOn){
-      const params = fxState[name] || fxState[short] || {};
-      const setEl = (id,v)=>{ const el=document.getElementById(id); if(el&&v!==undefined){ el.value=v; const p=((v-el.min)/(el.max-el.min))*100; el.style.setProperty('--val',p+'%'); const lv=document.getElementById(id+'Val'); if(lv)lv.textContent=parseFloat(v); } };
-      if(params.wet   !== undefined) setEl(name==='reverb'?'revWet':name==='delay'?'delWet':name==='chorus'?'chorWet':name==='ringmod'?'ringWet':'',params.wet);
-      if(params.rate  !== undefined) setEl(name==='chorus'?'chorRate':name==='tremolo'?'tremRate':'',params.rate);
-      if(params.depth !== undefined) setEl(name==='chorus'?'chorDepth':name==='tremolo'?'tremDepth':'',params.depth);
-      if(params.freq  !== undefined) setEl(name==='ringmod'?'ringFreq':'',params.freq);
-      if(params.bits  !== undefined) setEl('bitBits',params.bits);
-      if(params.size  !== undefined) setEl('revSize',params.size);
-      if(params.decay !== undefined) setEl('revDecay',params.decay);
-      if(params.time  !== undefined) setEl('delTime',params.time);
-      if(params.feedback !== undefined) setEl('delFb',params.feedback);
-    }
-  }
-  if(Object.keys(fxState).length > 0) buildFxChain();
+// SAM sliders instellen
+function lcSetSam(st){
+  const set=(id,v)=>{
+    const el=document.getElementById(id); if(!el) return;
+    const val=Math.max(+el.min,Math.min(+el.max,Math.round(v)));
+    el.value=val;
+    el.style.setProperty('--val',((val-+el.min)/(+el.max-+el.min))*100+'%');
+    const lv=document.getElementById(id+'Val'); if(lv) lv.textContent=val;
+  };
+  set('speed', st.speed);
+  set('pitch', Math.round(st.sPitch * st.pitch));
+  set('throat',st.throat);
+  set('mouth', st.mouth);
 }
 
-// ── Segment afspelen ─────────────────────────────────────────────
-function lcSpeakSegment(text, state, onDone){
-  if(!text.trim()){ setTimeout(onDone, state.delay||0); return; }
+// FX toepassen
+function lcSetFx(fxState){
+  const ALL=['distortion','filter','reverb','delay','chorus','tremolo','bitcrush','ringmod','pitchshift'];
+  let changed=false;
+  for(const name of ALL){
+    const wantOn=!!(fxState[name]);
+    if(wantOn!==fxEnabled[name]){
+      fxEnabled[name]=wantOn;
+      const btn=document.getElementById('fx-'+name);
+      const sec=document.getElementById('sec-'+name);
+      if(btn){btn.classList.toggle('on',wantOn);btn.classList.toggle('hot',wantOn);}
+      if(sec) sec.style.display=wantOn?'block':'none';
+      changed=true;
+    }
+    if(wantOn && fxState[name]){
+      const p=fxState[name];
+      const setP=(id,v)=>{if(v===undefined)return;const el=document.getElementById(id);if(!el)return;el.value=v;el.style.setProperty('--val',((v-+el.min)/(+el.max-+el.min))*100+'%');const lv=document.getElementById(id+'Val');if(lv)lv.textContent=parseFloat(v);};
+      if(name==='reverb'){ setP('revWet',p.wet);setP('revSize',p.size);setP('revDecay',p.decay); }
+      if(name==='delay'){  setP('delWet',p.wet);setP('delTime',p.time);setP('delFb',p.feedback); }
+      if(name==='chorus'){ setP('chorWet',p.wet);setP('chorRate',p.rate);setP('chorDepth',p.depth); }
+      if(name==='tremolo'){setP('tremDepth',p.depth);setP('tremRate',p.rate); }
+      if(name==='distortion'){setP('distDrive',p.drive);setP('distTone',p.tone); }
+      if(name==='bitcrush'){setP('bitBits',p.bits);setP('bitDs',p.ds); }
+      if(name==='ringmod'){setP('ringFreq',p.freq);setP('ringWet',p.wet); }
+      if(name==='pitchshift'){setP('psRate',p.rate);setP('psDetune',p.detune); }
+      if(name==='filter'){setP('filtFreq',p.freq);setP('filtQ',p.q); }
+    }
+  }
+  if(changed && typeof buildFxChain==='function') buildFxChain();
+}
 
-  if(state.engine === 's'){
-    // SAM
-    // Pas sliders aan
-    const setS = (id,v)=>{ const el=document.getElementById(id); if(el){ el.value=v; const p=((v-el.min)/(el.max-el.min))*100; el.style.setProperty('--val',p+'%'); const lv=document.getElementById(id+'Val'); if(lv)lv.textContent=v; } };
-    setS('speed',  Math.max(0,Math.min(255, state.speed)));
-    setS('pitch',  Math.max(0,Math.min(255, Math.round(state.samPitch * state.pitch))));
-    setS('throat', Math.max(0,Math.min(255, state.throat)));
-    setS('mouth',  Math.max(0,Math.min(255, state.mouth)));
-    lcApplyFxToSam(state.fx);
+// Segment afspelen
+function lcSpeak(text, st, cb){
+  if(!text){ setTimeout(cb, st.delay||0); return; }
 
-    const opts = {
-      speed:  parseInt(document.getElementById('speed').value),
-      pitch:  parseInt(document.getElementById('pitch').value),
-      throat: parseInt(document.getElementById('throat').value),
-      mouth:  parseInt(document.getElementById('mouth').value),
-      singmode: false, phonetic: false,
-    };
-    const result = renderAll(samSafeText(text), opts);
-    if(!result){ setTimeout(onDone, state.delay||0); return; }
-
+  if(st.engine==='s'){
+    lcSetSam(st);
+    lcSetFx(st.fx);
+    const opts={speed:+document.getElementById('speed').value,
+      pitch:+document.getElementById('pitch').value,
+      throat:+document.getElementById('throat').value,
+      mouth:+document.getElementById('mouth').value,
+      singmode:false,phonetic:false};
+    const res=renderAll(lcSafe(text),opts);
+    if(!res){ setTimeout(cb,0); return; }
     ensureCtx();
     if(audioCtx.state==='suspended') audioCtx.resume();
-
-    combinedF32 = result.f32;
-    lastRaw8    = result.u8;
+    combinedF32=res.f32; lastRaw8=res.u8;
+    document.getElementById('dlBtn').disabled=false;
     playPos=0; _phase=0;
-
     clearTimeout(_xfadeTimer);
     if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
-    if(_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-    _destroySlot(_slots[0]); _slots[0]=null;
-    _destroySlot(_slots[1]); _slots[1]=null;
-    _activeSlot=0;
+    if(typeof _splitGain!=='undefined'&&_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
+    if(typeof _slots!=='undefined'){_destroySlot(_slots[0]);_slots[0]=null;_destroySlot(_slots[1]);_slots[1]=null;_activeSlot=0;}
+    createPlayer(); buildFxChain(); isPlaying=true; startViz();
+    const poll=setInterval(()=>{
+      if(!isPlaying||!playerSP){ clearInterval(poll); isPlaying=false; setTimeout(cb,st.delay||0); }
+    },80);
 
-    createPlayer();
-    buildFxChain();
-    isPlaying=true;
-    startViz();
-
-    // Wacht tot buffer afgespeeld is
-    const checkDone = setInterval(()=>{
-      if(!isPlaying || !playerSP){
-        clearInterval(checkDone);
-        isPlaying=false;
-        setTimeout(onDone, state.delay||0);
-      }
-    },100);
-
-  } else if(state.engine === 'w'){
-    // Web Speech
-    if(!('speechSynthesis' in window)){ setTimeout(onDone,0); return; }
-    const vsel = document.getElementById('wsVoice');
-    const voice = vsel&&vsel._v ? vsel._v[parseInt(vsel.value)]||null : null;
-    const u = new SpeechSynthesisUtterance(text);
-    if(voice) u.voice = voice;
-    u.lang   = voice ? voice.lang : (navigator.language||'nl-NL');
-    u.rate   = Math.max(0.1, Math.min(3, state.rate));
-    u.pitch  = Math.max(0,   Math.min(2, state.pitch));
-    u.volume = Math.max(0,   Math.min(1, state.vol));
-    u.onend  = ()=> setTimeout(onDone, state.delay||0);
-    u.onerror= ()=> setTimeout(onDone, 0);
+  } else if(st.engine==='w'){
+    if(!('speechSynthesis' in window)){ setTimeout(cb,0); return; }
+    const sel=document.getElementById('wsVoice');
+    const v=sel&&sel._v?sel._v[parseInt(sel.value)]||null:null;
+    const u=new SpeechSynthesisUtterance(text);
+    if(v) u.voice=v;
+    u.lang=v?v.lang:(navigator.language||'nl-NL');
+    u.rate=Math.max(0.1,Math.min(3,st.rate));
+    u.pitch=Math.max(0,Math.min(2,st.pitch));
+    u.volume=Math.max(0,Math.min(1,st.vol));
+    u.onend=()=>setTimeout(cb,st.delay||0);
+    u.onerror=()=>setTimeout(cb,0);
     speechSynthesis.speak(u);
 
-  } else if(state.engine === 'e'){
-    // eSpeak
-    if(!_espeakReady){ setTimeout(onDone,0); return; }
-    const vsel = document.getElementById('esVoice');
+  } else if(st.engine==='e'){
+    if(typeof _espeakReady==='undefined'||!_espeakReady){ setTimeout(cb,0); return; }
+    const vsel=document.getElementById('esVoice');
     _espeakTts.set_voice(vsel?vsel.value:'gmw/en');
-    try{_espeakTts.set_rate(Math.round(state.rate*175));}catch(e){}
-    try{_espeakTts.set_pitch(Math.round(state.pitch*50));}catch(e){}
+    try{_espeakTts.set_rate(Math.round(st.rate*175));}catch(e){}
+    try{_espeakTts.set_pitch(Math.round(st.pitch*50));}catch(e){}
     const chunks=[];
-    _espeakTts.synthesize(text, function(arg1,arg2){
-      if(arg1.byteLength>0) chunks.push(new Float32Array(arg1.slice(0)));
+    _espeakTts.synthesize(text,function(a1){
+      if(a1.byteLength>0) chunks.push(new Float32Array(a1.slice(0)));
       else {
-        const total=chunks.reduce((s,c)=>s+c.length,0);
-        if(total===0){ setTimeout(onDone,0); return; }
-        const f32=new Float32Array(total);
-        let off=0; for(const c of chunks){f32.set(c,off);off+=c.length;}
-        _esCtx=new(window.AudioContext||window.webkitAudioContext)();
-        const buf=_esCtx.createBuffer(1,total,44100);
-        buf.copyToChannel(f32,0);
-        _esSrc=_esCtx.createBufferSource();
-        _esSrc.buffer=buf; _esSrc.connect(_esCtx.destination); _esSrc.start();
-        _esSrc.onended=()=>{ _esSrc=null; setTimeout(onDone, state.delay||0); };
+        const tot=chunks.reduce((s,c)=>s+c.length,0);
+        if(!tot){ setTimeout(cb,0); return; }
+        const f=new Float32Array(tot); let off=0;
+        for(const c of chunks){f.set(c,off);off+=c.length;}
+        const ctx=new(window.AudioContext||window.webkitAudioContext)();
+        const buf=ctx.createBuffer(1,tot,44100);
+        buf.copyToChannel(f,0);
+        const src=ctx.createBufferSource();
+        src.buffer=buf; src.connect(ctx.destination); src.start();
+        src.onended=()=>{ ctx.close(); setTimeout(cb,st.delay||0); };
       }
     });
   }
 }
 
-// ── Hoofd scheduler ──────────────────────────────────────────────
-let _lcRunning = false;
-let _lcStop    = false;
-let _lcHighlight = -1;
+// Hoofd run
+let _lcStop=false;
 
 function lcRun(){
-  const text = document.getElementById('textInput').value;
-  if(!text.trim()) return;
-  _lcStop    = false;
-  _lcRunning = true;
+  const text=document.getElementById('textInput').value;
+  if(!text.trim()){ speak(); return; } // leeg → normale SAM
+  _lcStop=false;
   document.getElementById('btnPlay').classList.add('active');
   setStatus('play','LIVE CODING...');
 
-  function runOnce(onDone){
-    const tokens = lcParse(text);
-    const state  = LCState();
-    let ti = 0;
-
+  function once(done){
+    const tokens=lcParse(text);
+    const st=lcState();
+    let ti=0;
     function next(){
-      if(_lcStop || ti >= tokens.length){ onDone(); return; }
-      const tok = tokens[ti++];
-
-      if(tok.type === 'cmd'){
-        lcApplyCmd(tok, state);
-        // Highlight positie
-        next();
-      } else {
-        // Spreek segment
-        // Loop binnen segment
-        let loopI = 0;
-        function speakLoop(){
-          if(_lcStop){ onDone(); return; }
-          if(loopI >= state.loop){ state.loop=1; state.loopI=0; next(); return; }
-          state.loopI = loopI++;
-          // Herbereken wiskunde in state (t = huidige tijd)
-          lcSpeakSegment(tok.text, state, ()=>{
-            if(_lcStop){ onDone(); return; }
-            speakLoop();
-          });
-        }
-        speakLoop();
+      if(_lcStop||ti>=tokens.length){ done(); return; }
+      const tok=tokens[ti++];
+      if(tok.type==='cmd'){ lcApply(tok,st); next(); return; }
+      // spreek met loop
+      let li=0, lim=st.loop;
+      function rep(){
+        if(_lcStop||li>=lim){ st.loop=1; next(); return; }
+        li++;
+        // Herbereken t in expressies bij elke herhaling
+        lcSpeak(tok.text, st, rep);
       }
+      rep();
     }
     next();
   }
 
   function loop(){
-    if(_lcStop){ _lcRunning=false; document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); return; }
-    const doLoop = isLooping;
-    runOnce(()=>{
-      if(_lcStop||!doLoop){ _lcRunning=false; document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); }
-      else loop();
-    });
+    if(_lcStop){ document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); return; }
+    once(()=>{ if(isLooping&&!_lcStop) loop(); else { document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); } });
   }
   loop();
 }
 
-function lcStopAll(){
-  _lcStop=true; _lcRunning=false;
+function lcStop(){
+  _lcStop=true;
   speechSynthesis.cancel();
   stopAll();
-  if(_esSrc){try{_esSrc.stop();}catch(e){} _esSrc=null;}
   document.getElementById('btnPlay').classList.remove('active');
   setStatus('','GESTOPT');
 }
 
 // Help tekst
-function showLCHelp(){
-  const help = [
-    '── LIVE CODING SYNTAXIS ──────────────────────────',
-    '(t:s)   → SAM engine       (t:w) → Web Speech',
-    '(t:e)   → eSpeak           ',
-    '(r:0.5) → snelheid halve   (r:2) → dubbele snelheid',
-    '(p:2.0) → hoge toon        (p:0.5) → lage toon',
-    '(v:0.3) → zacht            (v:1.0) → vol',
-    '(sp:60) → SAM speed        (sa:128) → SAM pitch',
-    '(th:200)→ SAM throat       (mo:50) → SAM mouth',
-    '(fx:reverb, wet:0.7) → reverb aan',
-    '(fx:delay, time:0.3, feedback:0.6)',
-    '(fx:chorus, rate:2, depth:5)',
-    '(fx:distortion, wet:1)',
-    '(fx:tremolo, rate:8, depth:0.9)',
-    '(fx:bitcrush, bits:4)',
-    '(fx:ringmod, freq:200)',
-    '(fx:off) → alle fx uit',
-    '(d:500) → pauze 500ms',
-    '(l:3)   → herhaal 3x',
-    '(reset) → alles op standaard',
-    '',
-    '── WISKUNDE ──────────────────────────────────────',
-    '(p: sin(t)*0.5+1.0) oscillerende toon',
-    '(r: 0.5+Math.random()*1.5) willekeurige snelheid',
-    '',
-    '── VOORBEELD ─────────────────────────────────────',
-    '(t:s)(fx:reverb,wet:0.6) hallo (t:w)(p:1.5) wereld',
-    '(l:4)(p: 0.5+i*0.3) steeds hoger (t:e) einde',
-  ].join('\n');
-  document.getElementById('textInput').value = help;
+function lcHelp(){
+  document.getElementById('textInput').value =
+`(t:s) hallo SAM (t:w) hallo web speech (t:e) hallo espeak
+
+(r:0.5) langzaam (r:2) snel (r:1) normaal
+
+(p:0.5) laag (p:2) hoog (p:1) midden
+
+(sp:40)(sa:200)(th:200)(mo:50) rare SAM stem
+
+(fx:reverb, wet:0.8) grote ruimte (fx:off) droog
+
+(fx:delay, time:0.4, feedback:0.7) echo effect
+
+(fx:bitcrush, bits:3) kapot geluid (fx:off)
+
+(fx:tremolo, rate:8, depth:0.9) trillend
+
+(l:4)(p:0.5) steeds (p:1.5) hoger en lager
+
+(d:300) pauze van 300ms hierna
+
+(r: 0.5+Math.random()) willekeurige snelheid`;
 }
 
+// Intercept play en stop via capture — originele onclick blijft intact
+document.getElementById('btnPlay').addEventListener('click', function(e){
+  const text = document.getElementById('textInput').value.trim();
+  // Alleen intercepten als er LC syntax in zit
+  if(text.includes('(')){
+    e.stopImmediatePropagation();
+    lcRun();
+  }
+  // Anders: originele speak() via onclick werkt gewoon
+}, {capture:true});
 
+document.getElementById('btnStop').addEventListener('click', function(e){
+  if(_lcStop===false && document.getElementById('textInput').value.includes('(')){
+    // LC was actief
+  }
+  lcStop(); // altijd ook LC stoppen
+}, {capture:true});
+
+// Live rec
 let _lrDest=null,_lrRec=null,_lrChunks=[],_lrBlob=null,_lrOn=false,_lrTimer=null;
-function toggleLiveRec(){ _lrOn?_lrStop():_lrStart(); }
-function _lrStart(){
-  ensureCtx();
-  if(!_lrDest){_lrDest=audioCtx.createMediaStreamDestination();masterGain.connect(_lrDest);}
-  _lrChunks=[];_lrBlob=null;
+function toggleLiveRec(){ _lrOn?_lrStop2():_lrStart2(); }
+function _lrStart2(){
+  if(typeof ensureCtx==='function') ensureCtx();
+  if(!_lrDest&&typeof audioCtx!=='undefined'&&audioCtx){
+    _lrDest=audioCtx.createMediaStreamDestination(); masterGain.connect(_lrDest);
+  }
+  if(!_lrDest){ setStatus('err','Start eerst audio'); return; }
+  _lrChunks=[]; _lrBlob=null;
   document.getElementById('dlLiveBtn').disabled=true;
-  const mimes=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg',''];
+  const mimes=['audio/webm;codecs=opus','audio/webm','audio/ogg',''];
   let mime=''; for(const m of mimes){try{if(!m||MediaRecorder.isTypeSupported(m)){mime=m;break;}}catch(e){}}
-  try{_lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream);}
-  catch(e){setStatus('err','Opname niet beschikbaar');return;}
+  try{ _lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream); }
+  catch(e){ setStatus('err','Opname niet beschikbaar'); return; }
   _lrRec.ondataavailable=e=>{if(e.data&&e.data.size>0)_lrChunks.push(e.data);};
-  _lrRec.onstop=()=>{_lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'});document.getElementById('dlLiveBtn').disabled=false;setStatus('','OPNAME KLAAR');};
-  _lrRec.start(50);_lrOn=true;
+  _lrRec.onstop=()=>{ _lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'}); document.getElementById('dlLiveBtn').disabled=false; setStatus('','OPNAME KLAAR'); };
+  _lrRec.start(50); _lrOn=true;
   const t0=Date.now();
-  document.getElementById('btnLR').classList.add('active');
-  document.getElementById('btnLR').style.boxShadow='0 0 14px rgba(255,0,64,.5)';
-  _lrTimer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);document.getElementById('lrTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');},500);
+  const btn=document.getElementById('btnLR');
+  btn.classList.add('active'); btn.style.boxShadow='0 0 14px rgba(255,0,64,.5)';
+  _lrTimer=setInterval(()=>{ const s=Math.floor((Date.now()-t0)/1000); document.getElementById('lrTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); },500);
   setStatus('rec','● OPNAME');
 }
-function _lrStop(){
-  _lrOn=false;clearInterval(_lrTimer);
+function _lrStop2(){
+  _lrOn=false; clearInterval(_lrTimer);
   document.getElementById('lrTime').textContent='';
-  document.getElementById('btnLR').classList.remove('active');
-  document.getElementById('btnLR').style.boxShadow='none';
-  try{_lrRec.stop();}catch(e){}_lrRec=null;
+  const btn=document.getElementById('btnLR');
+  btn.classList.remove('active'); btn.style.boxShadow='none';
+  try{_lrRec.stop();}catch(e){} _lrRec=null;
 }
 function _lrDownload(){
-  if(!_lrBlob)return;
-  const t=_lrBlob.type,ext=t.includes('ogg')?'ogg':t.includes('mp4')?'mp4':'webm';
+  if(!_lrBlob) return;
+  const ext=_lrBlob.type.includes('ogg')?'ogg':'webm';
+  const n=new Date(), pad=v=>String(v).padStart(2,'0');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(_lrBlob);
-  const n=new Date(),pad=v=>String(v).padStart(2,'0');
-  a.download='opname-'+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate())+'-'+pad(n.getHours())+pad(n.getMinutes())+pad(n.getSeconds())+'.'+ext;
+  a.download='opname-'+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate())+'-'+pad(n.getHours())+pad(n.getMinutes())+'.'+ext;
   a.click();
 }
+
 </script>
 </body>
 </html>
