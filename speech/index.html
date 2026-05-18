@@ -840,8 +840,9 @@ function _rewireRecGain(){
 function toggleLoop(){
   isLooping=!isLooping;
   document.getElementById('btnLoop').classList.toggle('active',isLooping);
-  // Herrender met of zonder crossfade
-  if(combinedF32) liveRender();
+  // Alleen liveRender als er geen LC-syntax in de tekst zit
+  const text=document.getElementById('textInput').value;
+  if(combinedF32 && !text.includes('(')) liveRender();
   setStatus(isPlaying?'play':'',isLooping?'LOOP AAN':'LOOP UIT');
   setTimeout(()=>setStatus(isPlaying?'play':'',isPlaying?(isLooping?'LIVE UITZENDEN [LOOP]':'LIVE UITZENDEN'):'GEREED'),1200);
 }
@@ -1643,16 +1644,8 @@ document.getElementById('btnStop').addEventListener('click', function(e){
   lcStop();
 }, {capture:true});
 
-// Loop knop: in LC mode alleen isLooping togglen, geen herstart
-document.getElementById('btnLoop').addEventListener('click', function(e){
-  if(document.getElementById('textInput').value.includes('(')){
-    e.stopImmediatePropagation();
-    isLooping=!isLooping;
-    document.getElementById('btnLoop').classList.toggle('active',isLooping);
-    setStatus(isLooping?'play':'','LOOP '+(isLooping?'AAN':'UIT'));
-  }
-  // Geen intercept als geen LC syntax → originele toggleLoop() werkt
-},{capture:true});
+// Loop knop: toggleLoop() is nu veilig voor LC mode
+// Geen extra interceptor nodig
 document.getElementById('btnPause').addEventListener('click', function(e){
   if(!_lcStop && document.getElementById('textInput').value.includes('(')){
     e.stopImmediatePropagation();
