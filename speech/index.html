@@ -821,7 +821,8 @@ function onPlayEnd(){
   if(!_lcOnDone) document.getElementById('btnPlay').classList.remove('active');
   stopViz();
   if(!_lcOnDone) setStatus('','GEREED');
-  if(_lcOnDone){ const f=_lcOnDone; _lcOnDone=null; f(); }
+  if(_lcOnDone && !_lcStop){ const f=_lcOnDone; _lcOnDone=null; f(); }
+  else { _lcOnDone=null; }
   if(isRecording) stopRec();
 }
 
@@ -888,10 +889,14 @@ function setStatus(state,text){
 // LIVE RENDER (SAM params changed while playing)
 // ═══════════════════════════════════════════════════════════════════
 function liveRender(){
+  // Skip als LC engine actief is of als tekst LC-syntax bevat
+  if(_lcStop===false && _lcOnDone!==null) return;
   clearTimeout(renderTimer);
   renderTimer=setTimeout(()=>{
     const text=document.getElementById('textInput').value.trim();
     if(!text) return;
+    // Skip als tekst LC-syntax bevat
+    if(text.includes('(')) return;
     const opts=getSamOpts();
     if(isPlaying) setStatus('play','RENDEREN...');
     const result=renderAll(text,opts);
@@ -966,6 +971,14 @@ async function speak(){
 }
 
 function togglePause(){
+  // LC actief: pauzeer speechSynthesis
+  if(_lcOnDone!==null||(!isPlaying&&!isPaused)){
+    if('speechSynthesis' in window){
+      if(!isPaused){ speechSynthesis.pause(); isPaused=true; document.getElementById('btnPause').classList.add('active'); setStatus('pause','GEPAUZEERD'); }
+      else { speechSynthesis.resume(); isPaused=false; document.getElementById('btnPause').classList.remove('active'); setStatus('play','LIVE CODING...'); }
+    }
+    return;
+  }
   if(!isPlaying&&!isPaused)return;
   isPaused=!isPaused;
   document.getElementById('btnPause').classList.toggle('active',isPaused);
@@ -978,6 +991,8 @@ function togglePause(){
 
 function stopAll(){
   isPaused=false; isPlaying=false;
+  _lcStop=true; _lcOnDone=null; // stop LC loop
+  speechSynthesis.cancel();
   if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
   playPos=0; _phase=0;
   stopViz();
@@ -1297,9 +1312,13 @@ let _isTyping=false;
 document.getElementById('textInput').addEventListener('input',()=>{
   _isTyping=true;
   clearTimeout(_typingTimer);
-  // Toon direct dat er iets aan het veranderen is
+  const txt=document.getElementById('textInput').value;
+  // LC syntax? Geen liveRender
+  if(txt.includes('(')){
+    _isTyping=false;
+    return;
+  }
   if(isPlaying) setStatus('play','TYPEN... ✎');
-  // Wacht 400ms na laatste toetsaanslag voor render
   _typingTimer=setTimeout(()=>{
     _isTyping=false;
     liveRender();
@@ -1472,7 +1491,7 @@ function lcSpeak(text, st, cb){
       mouth:+document.getElementById('mouth').value,
       singmode:false,phonetic:false};
     const res=renderAll(lcSafe(text),opts);
-    if(!res){ setTimeout(cb,0); return; }
+    if(!res){ setTimeout(cb, 100); return; } // Mislukt → gewoon verder
     ensureCtx();
     if(audioCtx.state==='suspended') audioCtx.resume();
     combinedF32=res.f32; lastRaw8=res.u8;
@@ -1575,6 +1594,7 @@ function lcRun(){
 
 function lcStop(){
   _lcStop=true;
+  _lcOnDone=null; // voorkom dat hangende callback de loop herstart
   speechSynthesis.cancel();
   stopAll();
   document.getElementById('btnPlay').classList.remove('active');
@@ -1611,10 +1631,26 @@ document.getElementById('btnPlay').addEventListener('click', function(e){
 }, {capture:true});
 
 document.getElementById('btnStop').addEventListener('click', function(e){
-  if(_lcStop===false && document.getElementById('textInput').value.includes('(')){
-    // LC was actief
+  e.stopImmediatePropagation();
+  lcStop();
+}, {capture:true});
+
+// Pauze: SAM pauzeert, WebSpeech pauzeert, LC wacht
+document.getElementById('btnPause').addEventListener('click', function(e){
+  if(!_lcStop && document.getElementById('textInput').value.includes('(')){
+    e.stopImmediatePropagation();
+    if(isPaused){
+      isPaused=false;
+      document.getElementById('btnPause').classList.remove('active');
+      speechSynthesis.resume();
+    } else {
+      isPaused=true;
+      document.getElementById('btnPause').classList.add('active');
+      speechSynthesis.pause();
+      setStatus('pause','GEPAUZEERD');
+    }
   }
-  lcStop(); // altijd ook LC stoppen
+  // Anders: originele togglePause() via onclick
 }, {capture:true});
 
 // Live rec
