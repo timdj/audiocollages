@@ -1508,6 +1508,11 @@ function lcSpeak(text, st, cb){
     // FX ná buildFxChain zodat ze niet overschreven worden
     lcSetFx(st.fx);
     isPlaying=true; startViz();
+    // Veiligheidsnet: als onPlayEnd uitblijft na geschatte duur + 3s
+    const estDur = (combinedF32.length / 22050) * 1000 + 3000;
+    setTimeout(()=>{
+      if(_lcOnDone){ const f=_lcOnDone; _lcOnDone=null; isPlaying=false; f(); }
+    }, estDur);
 
   } else if(st.engine==='w'){
     if(!('speechSynthesis' in window)){ setTimeout(cb,100); return; }
@@ -1568,17 +1573,20 @@ function lcRun(){
     const tokens=lcParse(text);
     const st=lcState();
     let ti=0;
+    let finished=false;
+    // Veiligheidsnet: altijd afronden na 30s
+    const safety=setTimeout(()=>{ if(!finished&&!_lcStop){ finished=true; done(); } },30000);
+    function safeDone(){ if(!finished){ finished=true; clearTimeout(safety); done(); } }
+
     function next(){
-      if(_lcStop||ti>=tokens.length){ done(); return; }
+      if(_lcStop||ti>=tokens.length){ safeDone(); return; }
       const tok=tokens[ti++];
       if(tok.type==='cmd'){ lcApply(tok,st); next(); return; }
-      // spreek met loop
       let li=0, lim=st.loop;
       function rep(){
         if(_lcStop||li>=lim){ st.loop=1; next(); return; }
         li++;
-        // Herbereken t in expressies bij elke herhaling
-        lcSpeak(tok.text, st, rep);
+        lcSpeak(tok.text, st, ()=>{ if(!_lcStop) rep(); else safeDone(); });
       }
       rep();
     }
