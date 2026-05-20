@@ -1364,6 +1364,34 @@ function lcParse(text){
 
 function lcCmd(inner){
   const ops={};
+  // Compacte FX: "fx:dt:400,3000" → expandeer naar "fx:distortion, drive:400, tone:3000"
+  const fxShorts={'dt':'distortion','fi':'filter','rv':'reverb','dl':'delay',
+    'ch':'chorus','tr':'tremolo','bc':'bitcrush','rm':'ringmod','ps':'pitchshift'};
+  const fxParamOrder={'distortion':['drive','tone'],'filter':['freq','q','type'],
+    'reverb':['wet','size','decay'],'delay':['time','feedback','wet'],
+    'chorus':['rate','depth','wet'],'tremolo':['rate','depth'],
+    'bitcrush':['bits','ds'],'ringmod':['freq','wet'],'pitchshift':['rate','detune']};
+  const fxTypeMap={'lp':'lowpass','hp':'highpass','bp':'bandpass','nt':'notch'};
+  // Check voor compacte fx notatie: "fx:dt:v1,v2,v3"
+  const fxCompact=inner.match(/^fx:([a-z]{2})((?::[^,]+)*)((?:,[^,]+)*)$/);
+  if(fxCompact){
+    const short=fxCompact[1];
+    const full=fxShorts[short];
+    if(full){
+      ops.fx=full;
+      // Waarden na de tweede : en via komma's
+      const valStr=(fxCompact[2].replace(/^:/,'')+fxCompact[3]).split(',').filter(v=>v);
+      const paramOrder=fxParamOrder[full]||[];
+      valStr.forEach((v,i)=>{
+        const paramName=paramOrder[i];
+        if(!paramName) return;
+        const val=fxTypeMap[v.trim()]||v.trim();
+        if(!isNaN(parseFloat(val))) ops[paramName]=parseFloat(val);
+        else ops[paramName]=val;
+      });
+      return {type:'cmd',ops};
+    }
+  }
   const parts=inner.split(',');
   for(const part of parts){
     const idx=part.indexOf(':');
@@ -1497,8 +1525,11 @@ function lcSpeak(text, st, cb){
     createPlayer(); buildFxChain(); lcSetFx(st.fx);
     isPlaying=true; startViz();
     // Wacht exact de afspeelduur van de buffer
-    const durMs = Math.ceil((res.f32.length / (audioCtx.sampleRate||22050)) * 1000);
-    setTimeout(cb, durMs + (st.delay||0));
+    // SAM buffer is altijd 22050Hz — duur is samples/22050 seconden
+    const durMs = Math.ceil((res.f32.length / 22050) * 1000);
+    let _cbFired=false;
+    const _cbOnce=()=>{ if(_cbFired)return; _cbFired=true; setTimeout(cb, st.delay||0); };
+    setTimeout(_cbOnce, durMs);
 
   } else if(st.engine==='w'){
     if(!('speechSynthesis' in window)){ setTimeout(cb,50); return; }
@@ -1533,17 +1564,36 @@ function lcSpeak(text, st, cb){
         if(!tot){ setTimeout(cb,50); return; }
         const f=new Float32Array(tot); let off=0;
         for(const c of chunks){f.set(c,off);off+=c.length;}
-        try{
-          const ctx=new(window.AudioContext||window.webkitAudioContext)();
-          const buf=ctx.createBuffer(1,tot,44100);
-          buf.copyToChannel(f,0);
-          const src=ctx.createBufferSource();
-          src.buffer=buf; src.connect(ctx.destination); src.start();
-          let fired=false;
-          const done=()=>{ if(fired)return; fired=true; ctx.close(); setTimeout(cb,st.delay||0); };
-          src.onended=done;
-          setTimeout(done,(tot/44100)*1000+800);
-        }catch(e){ setTimeout(cb,50); }
+        // Resample eSpeak (44100Hz) naar audioCtx sampleRate via OfflineAudioContext
+        ensureCtx();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        const esSr=44100;
+        const targetSr=audioCtx.sampleRate;
+        const offline=new OfflineAudioContext(1, Math.ceil(tot*targetSr/esSr), targetSr);
+        const srcBuf=offline.createBuffer(1,tot,esSr);
+        srcBuf.copyToChannel(f,0);
+        const srcNode=offline.createBufferSource();
+        srcNode.buffer=srcBuf;
+        srcNode.connect(offline.destination);
+        srcNode.start();
+        offline.startRendering().then(function(rendered){
+          const resampled=rendered.getChannelData(0);
+          combinedF32=resampled;
+          lastRaw8=new Uint8Array(resampled.length);
+          for(let i=0;i<resampled.length;i++) lastRaw8[i]=Math.max(0,Math.min(255,Math.round((resampled[i]+1)*127.5)));
+          document.getElementById('dlBtn').disabled=false;
+          playPos=0; _phase=0;
+          clearTimeout(_xfadeTimer);
+          if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
+          _destroySlot(_slots[0]);_slots[0]=null;
+          _destroySlot(_slots[1]);_slots[1]=null;
+          _activeSlot=0;
+          lcSetFx(st.fx);
+          createPlayer(); buildFxChain();
+          isPlaying=true; startViz();
+          const durMs=Math.ceil((resampled.length/targetSr)*1000);
+          setTimeout(cb, durMs+(st.delay||0));
+        }).catch(function(){ setTimeout(cb,50); });
       }
     });
   }
@@ -1554,6 +1604,42 @@ function lcSpeak(text, st, cb){
 // ════════════════════════════════════════════════════════════════
 let _lcStop=false;
 
+
+
+// Compacte FX namen → volledige namen + parameters
+const FX_SHORTS={
+  'dt':'distortion','fi':'filter','rv':'reverb',
+  'dl':'delay','ch':'chorus','tr':'tremolo',
+  'bc':'bitcrush','rm':'ringmod','ps':'pitchshift'
+};
+const FX_PARAM_ORDER={
+  'distortion':['drive','tone'],
+  'filter':['freq','q','type'],
+  'reverb':['wet','size','decay'],
+  'delay':['time','feedback','wet'],
+  'chorus':['rate','depth','wet'],
+  'tremolo':['rate','depth'],
+  'bitcrush':['bits','ds'],
+  'ringmod':['freq','wet'],
+  'pitchshift':['rate','detune']
+};
+const FX_TYPE_MAP={'lp':'lowpass','hp':'highpass','bp':'bandpass','nt':'notch'};
+
+function lcExpandFx(ops){
+  if(!ops.fx) return ops;
+  const shortName=String(ops.fx);
+  const fullName=FX_SHORTS[shortName]||shortName;
+  if(fullName===shortName) return ops; // al volledig
+  // Haal positie-parameters op: rest van de waarden in ops
+  const paramOrder=FX_PARAM_ORDER[fullName]||[];
+  const newOps={fx:fullName};
+  // Kopieer benoemde params
+  for(const [k,v] of Object.entries(ops)) if(k!=='fx') newOps[k]=v;
+  return newOps;
+}
+
+// Patch lcCmd om compacte FX te expanderen
+const _origLcCmd=lcCmd;
 
 // ── Dispatcher functies ────────────────────────────────────────
 function engPlay(){
@@ -1567,57 +1653,129 @@ function engStop(){
 function engLoop(){
   toggleLoop(); // toggleLoop is al veilig voor LC mode
 }
+
+// ════════════════════════════════════════════════════════════════
+// PARALLELLE LOOP ENGINE — (&...&) blokken
+// ════════════════════════════════════════════════════════════════
+let _parLoops = []; // actieve AudioBufferSourceNodes
+
+function parStopAll(){
+  _parLoops.forEach(s=>{ try{s.stop();}catch(e){} });
+  _parLoops = [];
+}
+
+// Render tekst naar SAM buffer en start als loopende audio
+function parStartLoop(text, st){
+  if(!text.trim()) return;
+  lcSetSam(st);
+  const opts={
+    speed:  +document.getElementById('speed').value,
+    pitch:  +document.getElementById('pitch').value,
+    throat: +document.getElementById('throat').value,
+    mouth:  +document.getElementById('mouth').value,
+    singmode:false, phonetic:false
+  };
+  const res = renderAll(lcSafe(text), opts);
+  if(!res) return;
+  ensureCtx();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+
+  // Crossfade inbakken voor naadloze loop
+  const f32 = applyLoopCrossfade(res.f32);
+
+  const buf = audioCtx.createBuffer(1, f32.length, 22050);
+  buf.copyToChannel(f32, 0);
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.loop   = true;
+
+  // Verbind met masterGain via FX chain als beschikbaar
+  const dest = (typeof _chainIn !== 'undefined' && _chainIn) ? _chainIn : masterGain;
+  src.connect(dest);
+  src.start();
+  _parLoops.push(src);
+}
+
+// Parse tekst: splits in lineaire tokens + (&...&) blokken
+function lcParseWithLoops(text){
+  const result = []; // {type:'linear',text} of {type:'loop',text,st}
+  let i=0, buf='';
+  while(i < text.length){
+    if(text[i]==='(' && text[i+1]==='&'){
+      // Flush lineaire buffer
+      if(buf.trim()) result.push({type:'linear', text:buf});
+      buf='';
+      // Zoek sluitende &)
+      let j=i+2;
+      while(j<text.length && !(text[j]==='&' && text[j+1]===')')) j++;
+      const inner=text.slice(i+2,j).trim();
+      result.push({type:'loop', text:inner});
+      i=j+2;
+    } else {
+      buf+=text[i++];
+    }
+  }
+  if(buf.trim()) result.push({type:'linear', text:buf});
+  return result;
+}
+
 function lcRun(){
   const startText=document.getElementById('textInput').value;
   if(!startText.trim()){ speak(); return; }
   _lcStop=false;
+  parStopAll(); // stop vorige sessie
   document.getElementById('btnPlay').classList.add('active');
   setStatus('play','LIVE CODING...');
+
+  // Start (&...&) loops — eenmalig bij begin, lopen door tot STOP
+  const firstSrc=document.getElementById('textInput').value;
+  const firstBlocks=lcParseWithLoops(firstSrc);
+  const loopSt=lcState();
+  firstBlocks.forEach(b=>{ if(b.type==='loop') parStartLoop(b.text, loopSt); });
 
   function runOnce(onDone){
     const src=document.getElementById('textInput').value;
     if(!src.trim()){ onDone(); return; }
-    const tokens=lcParse(src);
+
+    // Alleen lineaire tekst — loops lopen al
+    const blocks=lcParseWithLoops(src);
+    const linearText=blocks.filter(b=>b.type==='linear').map(b=>b.text).join(' ');
+    if(!linearText.trim()){ onDone(); return; }
+
+    const tokens=lcParse(linearText);
     const st=lcState();
     let ti=0;
 
     function next(){
       if(_lcStop){ onDone(); return; }
-      // Verwerk alle commando-tokens met while (geen recursie)
       while(ti<tokens.length && tokens[ti].type==='cmd'){
-        lcApply(tokens[ti],st);
-        ti++;
+        lcApply(tokens[ti],st); ti++;
       }
       if(ti>=tokens.length){ onDone(); return; }
-      // Spreeksegment
       const tok=tokens[ti++];
-      const lim=st.loop;
-      st.loop=1; // reset na uitlezen
-      let li=0;
-      function rep(){
-        if(_lcStop){ onDone(); return; }
-        if(li>=lim){ next(); return; }
-        li++;
-        lcSpeak(tok.text, st, rep);
-      }
-      rep();
+      lcSpeak(tok.text, st, next);
     }
     next();
   }
 
   function go(){
     if(_lcStop){
+      parStopAll();
       document.getElementById('btnPlay').classList.remove('active');
       setStatus('','GESTOPT'); return;
     }
     runOnce(()=>{
       if(_lcStop){
+        parStopAll();
         document.getElementById('btnPlay').classList.remove('active');
         setStatus('','GESTOPT');
       } else if(isLooping){
+        // Loop herstart lineaire tekst — parallelle loops lopen gewoon door
         setStatus('play','LC LOOP ↺');
         go();
       } else {
+        parStopAll();
         document.getElementById('btnPlay').classList.remove('active');
         setStatus('','GEREED');
       }
@@ -1625,10 +1783,10 @@ function lcRun(){
   }
   go();
 }
-
 function lcStop(){
   _lcStop=true;
   _lcOnDone=null;
+  parStopAll();
   speechSynthesis.cancel();
   stopAll();
   document.getElementById('btnPlay').classList.remove('active');
@@ -1638,18 +1796,19 @@ function lcStop(){
 // Help tekst
 function lcHelp(){
   document.getElementById('textInput').value =
-`(t:s)(r:0.5) langzaam
+`(& das boot &)(& alarm &)
+(t:s)(r:0.5) langzaam
 (r:2) snel
 (r:1)(p:0.5) laag
 (p:2) hoog
-(p:1)(sp:40)(sa:200)(th:200)(mo:50) rare stem
-(sp:72)(sa:64)(th:128)(mo:128)(fx:reverb, wet:0.8) grote ruimte
-(fx:delay, time:0.4, feedback:0.7) echo effect
-(fx:off)(fx:bitcrush, bits:3) kapot geluid
-(fx:off)(fx:tremolo, rate:8, depth:0.9) trillend
+(sp:40)(sa:200)(th:200)(mo:50) vreemde stem
+(fx:rv:0.8,3,4) grote ruimte
+(fx:dl:0.4,0.7,0.5) echo effect
+(fx:bc:3,2) kapot geluid
+(fx:tr:8,0.9) trillend
 (fx:off)(r:1)(p:1) normaal
-(d:500) hierna een pauze
-(t:w) web speech stem`;
+(d:500) pauze
+(t:w) web speech`;
 }
 
 // Web Speech stemmen laden
