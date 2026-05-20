@@ -124,6 +124,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 @keyframes pulse-led{from{opacity:.65}to{opacity:1}}
 @keyframes rec-pulse{from{box-shadow:0 0 5px #ff0040}to{box-shadow:0 0 20px #ff0040,0 0 40px #ff004066}}
 </style>
+<script src="espeakng.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -269,10 +270,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 
 <!-- Transport -->
 <div class="transport">
-  <button class="tbtn tbtn-play" id="btnPlay" onclick="speak()">&#9654; AFSPELEN</button>
+  <button class="tbtn tbtn-play" id="btnPlay" onclick="engPlay()">&#9654; AFSPELEN</button>
   <button class="tbtn tbtn-pause" id="btnPause" onclick="togglePause()">&#9646;&#9646; PAUZE</button>
-  <button class="tbtn tbtn-stop" id="btnStop" onclick="stopAll()">&#9632; STOP</button>
-  <button class="tbtn tbtn-loop" id="btnLoop" onclick="toggleLoop()">&#8635; LOOP</button>
+  <button class="tbtn tbtn-stop" id="btnStop" onclick="engStop()">&#9632; STOP</button>
+  <button class="tbtn tbtn-loop" id="btnLoop" onclick="engLoop()">&#8635; LOOP</button>
 </div>
 <div class="transport2">
   <button class="tbtn tbtn-rec" id="btnRecLive" onclick="toggleRec()">&#9679; LIVE OPNAME</button>
@@ -289,7 +290,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
     <span id="recTime"></span>
     <span id="lrTime" style="font-family:VT323,monospace;font-size:18px;color:#ff0040;min-width:44px"></span>
     <button class="sm-btn" id="btnLR" onclick="toggleLiveRec()" style="border-color:#ff0040;color:#ff0040">&#9679; REC</button>
-    <button class="sm-btn" id="dlLiveBtn" onclick="_lrDownload()" disabled>&#11015; OPNAME</button>
+    <button class="sm-btn" id="dlLiveBtn" onclick="lrDownload()" disabled>&#11015; OPNAME</button>
     <button class="sm-btn" id="dlBtn" onclick="downloadWav()" disabled>&#11015; WAV</button>
     <span id="clockDisplay" style="font-family:VT323,monospace;font-size:18px">00:00:00</span>
   </div>
@@ -813,16 +814,11 @@ function createPlayer(){
   _rewireRecGain();
 }
 
-let _lcOnDone = null; // callback voor LC engine na SAM segment
-
 function onPlayEnd(){
-  isPlaying=false;
-  playerSP=null;
-  if(!_lcOnDone) document.getElementById('btnPlay').classList.remove('active');
+  isPlaying=false; playerSP=null;
+  document.getElementById('btnPlay').classList.remove('active');
   stopViz();
-  if(!_lcOnDone) setStatus('','GEREED');
-  if(_lcOnDone && !_lcStop){ const f=_lcOnDone; _lcOnDone=null; f(); }
-  else { _lcOnDone=null; }
+  setStatus('','GEREED');
   if(isRecording) stopRec();
 }
 
@@ -840,9 +836,8 @@ function _rewireRecGain(){
 function toggleLoop(){
   isLooping=!isLooping;
   document.getElementById('btnLoop').classList.toggle('active',isLooping);
-  // Alleen liveRender als er geen LC-syntax in de tekst zit
-  const text=document.getElementById('textInput').value;
-  if(combinedF32 && !text.includes('(')) liveRender();
+  const txt=document.getElementById('textInput').value;
+  if(combinedF32 && !txt.includes('(')) liveRender();
   setStatus(isPlaying?'play':'',isLooping?'LOOP AAN':'LOOP UIT');
   setTimeout(()=>setStatus(isPlaying?'play':'',isPlaying?(isLooping?'LIVE UITZENDEN [LOOP]':'LIVE UITZENDEN'):'GEREED'),1200);
 }
@@ -890,14 +885,10 @@ function setStatus(state,text){
 // LIVE RENDER (SAM params changed while playing)
 // ═══════════════════════════════════════════════════════════════════
 function liveRender(){
-  // Skip als LC engine actief is of als tekst LC-syntax bevat
-  if(_lcStop===false && _lcOnDone!==null) return;
   clearTimeout(renderTimer);
   renderTimer=setTimeout(()=>{
     const text=document.getElementById('textInput').value.trim();
     if(!text) return;
-    // Skip als tekst LC-syntax bevat
-    if(text.includes('(')) return;
     const opts=getSamOpts();
     if(isPlaying) setStatus('play','RENDEREN...');
     const result=renderAll(text,opts);
@@ -972,14 +963,6 @@ async function speak(){
 }
 
 function togglePause(){
-  // LC actief: pauzeer speechSynthesis
-  if(_lcOnDone!==null||(!isPlaying&&!isPaused)){
-    if('speechSynthesis' in window){
-      if(!isPaused){ speechSynthesis.pause(); isPaused=true; document.getElementById('btnPause').classList.add('active'); setStatus('pause','GEPAUZEERD'); }
-      else { speechSynthesis.resume(); isPaused=false; document.getElementById('btnPause').classList.remove('active'); setStatus('play','LIVE CODING...'); }
-    }
-    return;
-  }
   if(!isPlaying&&!isPaused)return;
   isPaused=!isPaused;
   document.getElementById('btnPause').classList.toggle('active',isPaused);
@@ -992,8 +975,6 @@ function togglePause(){
 
 function stopAll(){
   isPaused=false; isPlaying=false;
-  _lcStop=true; _lcOnDone=null; // stop LC loop
-  speechSynthesis.cancel();
   if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
   playPos=0; _phase=0;
   stopViz();
@@ -1313,51 +1294,54 @@ let _isTyping=false;
 document.getElementById('textInput').addEventListener('input',()=>{
   _isTyping=true;
   clearTimeout(_typingTimer);
-  const txt=document.getElementById('textInput').value;
-  // LC syntax? Geen liveRender
-  if(txt.includes('(')){
-    _isTyping=false;
-    return;
-  }
+  // Toon direct dat er iets aan het veranderen is
   if(isPlaying) setStatus('play','TYPEN... ✎');
+  // Wacht 400ms na laatste toetsaanslag voor render
   _typingTimer=setTimeout(()=>{
     _isTyping=false;
     liveRender();
   },400);
 });
 
-// Ctrl+Enter
+// Ctrl+Enter → lcRun
 document.getElementById('textInput').addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();lcRun();}
+  if(e.key==='Enter'&&e.ctrlKey){e.preventDefault();document.getElementById('textInput').value.includes('(')?lcRun():speak();}
 });
 
 // ════════════════════════════════════════════════════════════════
-// LIVE CODING ENGINE
-// Syntaxis: (commando:waarde) tekst (commando:waarde) tekst
+// SYMBOLEN → WOORDEN (voor SAM)
 // ════════════════════════════════════════════════════════════════
-
-// Symbolen → woorden (voor SAM)
 function lcSafe(t){
-  const s=[['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],
+  const s=[
+    ['@','at'],['#','hekje'],['$','dollar'],['_','onderstreep'],
     ['&','en'],['+','plus'],['*','maal'],['=','is'],['%','procent'],
     ['"','aanhalingsteken'],[':','dubbele punt'],[';','puntkomma'],
-    ['!','uitroep'],['?','vraag'],['-','min'],['~','tilde'],['|','streep'],
-    ['^','macht'],['<','kleiner'],['>','groter'],['€','euro'],['£','pond'],
-    ['°','graden'],['©','copyright'],['√','wortel'],['π','pi'],
-    ['÷','gedeeld'],['×','maal'],
+    ['!','uitroep'],['?','vraag'],['-','min'],['~','tilde'],
+    ['|','streep'],['^','macht'],['<','kleiner'],['>','groter'],
+    ['€','euro'],['£','pond'],['¢','cent'],['¥','yen'],
+    ['°','graden'],['©','copyright'],['®','registered'],['™','trademark'],
+    ['✓','vinkje'],['√','wortel'],['π','pi'],['÷','gedeeld'],['×','maal'],
     ['0','nul'],['1','een'],['2','twee'],['3','drie'],['4','vier'],
-    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen']];
+    ['5','vijf'],['6','zes'],['7','zeven'],['8','acht'],['9','negen'],
+  ];
   let o=t;
   for(const [sym,w] of s) o=o.split(sym).join(' '+w+' ');
+  const m={'à':'a','á':'a','â':'a','ä':'ae','é':'e','ê':'e','ë':'e',
+    'ñ':'n','ö':'oe','ü':'ue','ß':'ss','α':'alpha','β':'beta',
+    'γ':'gamma','π':'pi','μ':'mu','σ':'sigma','ω':'omega'};
   let r='';
   for(const c of o){
-    if(c.codePointAt(0)>127) r+=' ';
+    const lc=c.toLowerCase();
+    if(m[lc]) r+=' '+m[lc]+' ';
+    else if(c.codePointAt(0)>127) r+=' ';
     else r+=c;
   }
   return r.replace(/\s+/g,' ').trim();
 }
 
-// Parser: tekst → [{type:'speak',text}|{type:'cmd',ops:{}}]
+// ════════════════════════════════════════════════════════════════
+// LIVE CODING PARSER
+// ════════════════════════════════════════════════════════════════
 function lcParse(text){
   const tokens=[]; let i=0, buf='';
   while(i<text.length){
@@ -1365,23 +1349,21 @@ function lcParse(text){
       if(buf.trim()) tokens.push({type:'speak',text:buf.trim()});
       buf='';
       let j=i+1, depth=1;
-      while(j<text.length && depth>0){
+      while(j<text.length&&depth>0){
         if(text[j]==='(') depth++;
         else if(text[j]===')') depth--;
-        if(depth>0) j++;
-        else j++;
+        j++;
       }
-      const inner=text.slice(i+1,j-1).trim();
-      tokens.push(lcCmd(inner));
+      tokens.push(lcCmd(text.slice(i+1,j-1).trim()));
       i=j;
-    } else { buf+=text[i]; i++; }
+    } else { buf+=text[i++]; }
   }
   if(buf.trim()) tokens.push({type:'speak',text:buf.trim()});
   return tokens;
 }
 
 function lcCmd(inner){
-  const ops={}; 
+  const ops={};
   const parts=inner.split(',');
   for(const part of parts){
     const idx=part.indexOf(':');
@@ -1400,7 +1382,6 @@ function lcCmd(inner){
   return {type:'cmd',ops};
 }
 
-// State
 function lcState(){
   return {engine:'s',rate:1,pitch:1,vol:1,
     speed:72,sPitch:64,throat:128,mouth:128,
@@ -1409,7 +1390,12 @@ function lcState(){
 
 function lcApply(cmd,st){
   const o=cmd.ops;
-  if(o.t!==undefined){ if('sS'.includes(String(o.t))) st.engine='s'; else if('wW'.includes(String(o.t))) st.engine='w'; else if('eE'.includes(String(o.t))) st.engine='e'; }
+  if(o.t!==undefined){
+    const tv=String(o.t).toLowerCase();
+    if(tv==='s'||tv==='sam') st.engine='s';
+    else if(tv==='w'||tv==='ws') st.engine='w';
+    else if(tv==='e'||tv==='es') st.engine='e';
+  }
   if(o.r!==undefined) st.rate=+o.r;
   if(o.p!==undefined) st.pitch=+o.p;
   if(o.v!==undefined) st.vol=+o.v;
@@ -1425,15 +1411,15 @@ function lcApply(cmd,st){
     if(name==='off'||name==='none') st.fx={};
     else {
       if(!st.fx[name]) st.fx[name]={};
-      for(const [k,v] of Object.entries(o)){
-        if(k!=='fx') st.fx[name][k]=v;
-      }
+      for(const [k,v] of Object.entries(o)) if(k!=='fx') st.fx[name][k]=v;
     }
   }
   if(o.reset!==undefined) Object.assign(st,lcState());
 }
 
-// SAM sliders instellen
+// ════════════════════════════════════════════════════════════════
+// SAM SLIDERS + FX INSTELLEN
+// ════════════════════════════════════════════════════════════════
 function lcSetSam(st){
   const set=(id,v)=>{
     const el=document.getElementById(id); if(!el) return;
@@ -1442,18 +1428,17 @@ function lcSetSam(st){
     el.style.setProperty('--val',((val-+el.min)/(+el.max-+el.min))*100+'%');
     const lv=document.getElementById(id+'Val'); if(lv) lv.textContent=val;
   };
-  set('speed', st.speed);
-  set('pitch', Math.round(st.sPitch * st.pitch));
+  set('speed',st.speed);
+  set('pitch',Math.round(st.sPitch*st.pitch));
   set('throat',st.throat);
-  set('mouth', st.mouth);
+  set('mouth',st.mouth);
 }
 
-// FX toepassen
-function lcSetFx(fxState){
+function lcSetFx(fxSt){
   const ALL=['distortion','filter','reverb','delay','chorus','tremolo','bitcrush','ringmod','pitchshift'];
   let changed=false;
   for(const name of ALL){
-    const wantOn=!!(fxState[name]);
+    const wantOn=!!(fxSt[name]);
     if(wantOn!==fxEnabled[name]){
       fxEnabled[name]=wantOn;
       const btn=document.getElementById('fx-'+name);
@@ -1462,37 +1447,42 @@ function lcSetFx(fxState){
       if(sec) sec.style.display=wantOn?'block':'none';
       changed=true;
     }
-    if(wantOn && fxState[name]){
-      const p=fxState[name];
-      const setP=(id,v)=>{if(v===undefined)return;const el=document.getElementById(id);if(!el)return;el.value=v;el.style.setProperty('--val',((v-+el.min)/(+el.max-+el.min))*100+'%');const lv=document.getElementById(id+'Val');if(lv)lv.textContent=parseFloat(v);};
-      if(name==='reverb'){ setP('revWet',p.wet);setP('revSize',p.size);setP('revDecay',p.decay); }
-      if(name==='delay'){  setP('delWet',p.wet);setP('delTime',p.time);setP('delFb',p.feedback); }
-      if(name==='chorus'){ setP('chorWet',p.wet);setP('chorRate',p.rate);setP('chorDepth',p.depth); }
-      if(name==='tremolo'){setP('tremDepth',p.depth);setP('tremRate',p.rate); }
-      if(name==='distortion'){setP('distDrive',p.drive);setP('distTone',p.tone); }
-      if(name==='bitcrush'){setP('bitBits',p.bits);setP('bitDs',p.ds); }
-      if(name==='ringmod'){setP('ringFreq',p.freq);setP('ringWet',p.wet); }
-      if(name==='pitchshift'){setP('psRate',p.rate);setP('psDetune',p.detune); }
-      if(name==='filter'){setP('filtFreq',p.freq);setP('filtQ',p.q); }
+    if(wantOn&&fxSt[name]){
+      const p=fxSt[name];
+      const setP=(id,v)=>{if(v===undefined)return;const el=document.getElementById(id);if(!el)return;
+        el.value=v;el.style.setProperty('--val',((v-+el.min)/(+el.max-+el.min))*100+'%');
+        const lv=document.getElementById(id+'Val');if(lv)lv.textContent=parseFloat(v);};
+      if(name==='reverb'){setP('revWet',p.wet);setP('revSize',p.size);setP('revDecay',p.decay);}
+      if(name==='delay'){setP('delWet',p.wet);setP('delTime',p.time);setP('delFb',p.feedback);}
+      if(name==='chorus'){setP('chorWet',p.wet);setP('chorRate',p.rate);setP('chorDepth',p.depth);}
+      if(name==='tremolo'){setP('tremDepth',p.depth);setP('tremRate',p.rate);}
+      if(name==='distortion'){setP('distDrive',p.drive);setP('distTone',p.tone);}
+      if(name==='bitcrush'){setP('bitBits',p.bits);setP('bitDs',p.ds);}
+      if(name==='ringmod'){setP('ringFreq',p.freq);setP('ringWet',p.wet);}
+      if(name==='pitchshift'){setP('psRate',p.rate);setP('psDetune',p.detune);}
+      if(name==='filter'){setP('filtFreq',p.freq);setP('filtQ',p.q);}
     }
   }
-  if(changed && typeof buildFxChain==='function') buildFxChain();
+  if(changed) buildFxChain();
 }
 
-// Segment afspelen
+// ════════════════════════════════════════════════════════════════
+// SEGMENT AFSPELEN
+// ════════════════════════════════════════════════════════════════
 function lcSpeak(text, st, cb){
-  if(!text){ setTimeout(cb, st.delay||0); return; }
+  if(!text||!text.trim()){ setTimeout(cb,st.delay||0); return; }
 
   if(st.engine==='s'){
     lcSetSam(st);
-    lcSetFx(st.fx);
-    const opts={speed:+document.getElementById('speed').value,
+    const opts={
+      speed:+document.getElementById('speed').value,
       pitch:+document.getElementById('pitch').value,
       throat:+document.getElementById('throat').value,
       mouth:+document.getElementById('mouth').value,
-      singmode:false,phonetic:false};
+      singmode:false,phonetic:false
+    };
     const res=renderAll(lcSafe(text),opts);
-    if(!res){ setTimeout(cb, 100); return; } // Mislukt → gewoon verder
+    if(!res){ setTimeout(cb,50); return; }
     ensureCtx();
     if(audioCtx.state==='suspended') audioCtx.resume();
     combinedF32=res.f32; lastRaw8=res.u8;
@@ -1500,17 +1490,18 @@ function lcSpeak(text, st, cb){
     playPos=0; _phase=0;
     clearTimeout(_xfadeTimer);
     if(playerSP){try{playerSP.disconnect();}catch(e){} playerSP=null;}
-    if(typeof _splitGain!=='undefined'&&_splitGain){try{_splitGain.disconnect();}catch(e){} _splitGain=null;}
-    if(typeof _slots!=='undefined'){_destroySlot(_slots[0]);_slots[0]=null;_destroySlot(_slots[1]);_slots[1]=null;_activeSlot=0;}
-    
-    // Gebruik onPlayEnd hook ipv polling
-    _lcOnDone = ()=>{ _lcOnDone=null; setTimeout(cb, st.delay||0); };
-    createPlayer(); buildFxChain();
-    lcSetFx(st.fx);
+    _destroySlot(_slots[0]);_slots[0]=null;
+    _destroySlot(_slots[1]);_slots[1]=null;
+    _activeSlot=0;
+    // Bereken duur als backup-timer
+    createPlayer(); buildFxChain(); lcSetFx(st.fx);
     isPlaying=true; startViz();
+    // Wacht exact de afspeelduur van de buffer
+    const durMs = Math.ceil((res.f32.length / (audioCtx.sampleRate||22050)) * 1000);
+    setTimeout(cb, durMs + (st.delay||0));
 
   } else if(st.engine==='w'){
-    if(!('speechSynthesis' in window)){ setTimeout(cb,100); return; }
+    if(!('speechSynthesis' in window)){ setTimeout(cb,50); return; }
     const sel=document.getElementById('wsVoice');
     const v=sel&&sel._v?sel._v[parseInt(sel.value)]||null:null;
     const u=new SpeechSynthesisUtterance(text);
@@ -1519,84 +1510,125 @@ function lcSpeak(text, st, cb){
     u.rate=Math.max(0.1,Math.min(3,st.rate));
     u.pitch=Math.max(0,Math.min(2,st.pitch));
     u.volume=Math.max(0,Math.min(1,st.vol));
-    let called=false;
-    const done=()=>{ if(!called){ called=true; setTimeout(cb,st.delay||100); } };
-    u.onend=done;
-    u.onerror=done;
-    // Fallback: bereken geschatte duur en roep cb aan als onend uitblijft
-    const estMs = Math.max(1500, (text.split(' ').length * 400) / st.rate);
-    const fallback = setTimeout(done, estMs + 500);
-    u.onend=()=>{ clearTimeout(fallback); done(); };
+    let fired=false;
+    const done=()=>{ if(fired)return; fired=true; setTimeout(cb,st.delay||0); };
+    u.onend=()=>done();
+    u.onerror=()=>done();
     speechSynthesis.speak(u);
 
   } else if(st.engine==='e'){
-    if(typeof _espeakReady==='undefined'||!_espeakReady){ setTimeout(cb,0); return; }
+    // eSpeak — valt terug op SAM als niet beschikbaar
+    if(typeof _espeakReady==='undefined'||!_espeakReady){
+      st.engine='s'; lcSpeak(text,st,cb); return;
+    }
     const vsel=document.getElementById('esVoice');
-    _espeakTts.set_voice(vsel?vsel.value:'gmw/en');
+    try{_espeakTts.set_voice(vsel?vsel.value:'gmw/nl');}catch(e){}
     try{_espeakTts.set_rate(Math.round(st.rate*175));}catch(e){}
     try{_espeakTts.set_pitch(Math.round(st.pitch*50));}catch(e){}
     const chunks=[];
-    _espeakTts.synthesize(text,function(a1){
-      if(a1.byteLength>0) chunks.push(new Float32Array(a1.slice(0)));
+    _espeakTts.synthesize(text,function(arg1){
+      if(arg1.byteLength>0) chunks.push(new Float32Array(arg1.slice(0)));
       else {
         const tot=chunks.reduce((s,c)=>s+c.length,0);
-        if(!tot){ setTimeout(cb,0); return; }
+        if(!tot){ setTimeout(cb,50); return; }
         const f=new Float32Array(tot); let off=0;
         for(const c of chunks){f.set(c,off);off+=c.length;}
-        const ctx=new(window.AudioContext||window.webkitAudioContext)();
-        const buf=ctx.createBuffer(1,tot,44100);
-        buf.copyToChannel(f,0);
-        const src=ctx.createBufferSource();
-        src.buffer=buf; src.connect(ctx.destination); src.start();
-        src.onended=()=>{ ctx.close(); setTimeout(cb,st.delay||0); };
+        try{
+          const ctx=new(window.AudioContext||window.webkitAudioContext)();
+          const buf=ctx.createBuffer(1,tot,44100);
+          buf.copyToChannel(f,0);
+          const src=ctx.createBufferSource();
+          src.buffer=buf; src.connect(ctx.destination); src.start();
+          let fired=false;
+          const done=()=>{ if(fired)return; fired=true; ctx.close(); setTimeout(cb,st.delay||0); };
+          src.onended=done;
+          setTimeout(done,(tot/44100)*1000+800);
+        }catch(e){ setTimeout(cb,50); }
       }
     });
   }
 }
 
-// Hoofd run
+// ════════════════════════════════════════════════════════════════
+// HOOFD SCHEDULER
+// ════════════════════════════════════════════════════════════════
 let _lcStop=false;
 
+
+// ── Dispatcher functies ────────────────────────────────────────
+function engPlay(){
+  const txt=document.getElementById('textInput').value.trim();
+  if(txt.includes('(')) lcRun();
+  else speak();
+}
+function engStop(){
+  lcStop(); // stopt LC, SAM en WebSpeech
+}
+function engLoop(){
+  toggleLoop(); // toggleLoop is al veilig voor LC mode
+}
 function lcRun(){
-  const text=document.getElementById('textInput').value;
-  if(!text.trim()){ speak(); return; } // leeg → normale SAM
+  const startText=document.getElementById('textInput').value;
+  if(!startText.trim()){ speak(); return; }
   _lcStop=false;
   document.getElementById('btnPlay').classList.add('active');
   setStatus('play','LIVE CODING...');
 
-  function once(done){
-    const tokens=lcParse(text);
+  function runOnce(onDone){
+    const src=document.getElementById('textInput').value;
+    if(!src.trim()){ onDone(); return; }
+    const tokens=lcParse(src);
     const st=lcState();
     let ti=0;
-    let finished=false;
-    function safeDone(){
-      if(!finished){ finished=true; done(); }
-    }
+
     function next(){
-      if(_lcStop||ti>=tokens.length){ safeDone(); return; }
+      if(_lcStop){ onDone(); return; }
+      // Verwerk alle commando-tokens met while (geen recursie)
+      while(ti<tokens.length && tokens[ti].type==='cmd'){
+        lcApply(tokens[ti],st);
+        ti++;
+      }
+      if(ti>=tokens.length){ onDone(); return; }
+      // Spreeksegment
       const tok=tokens[ti++];
-      if(tok.type==='cmd'){ lcApply(tok,st); next(); return; }
-      let li=0, lim=st.loop;
+      const lim=st.loop;
+      st.loop=1; // reset na uitlezen
+      let li=0;
       function rep(){
-        if(_lcStop||li>=lim){ st.loop=1; next(); return; }
+        if(_lcStop){ onDone(); return; }
+        if(li>=lim){ next(); return; }
         li++;
-        lcSpeak(tok.text, st, ()=>{ if(!_lcStop) rep(); else safeDone(); });
+        lcSpeak(tok.text, st, rep);
       }
       rep();
     }
     next();
   }
 
-  function loop(){
-    if(_lcStop){ document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); return; }
-    once(()=>{ if(isLooping&&!_lcStop) loop(); else { document.getElementById('btnPlay').classList.remove('active'); setStatus('','GEREED'); } });
+  function go(){
+    if(_lcStop){
+      document.getElementById('btnPlay').classList.remove('active');
+      setStatus('','GESTOPT'); return;
+    }
+    runOnce(()=>{
+      if(_lcStop){
+        document.getElementById('btnPlay').classList.remove('active');
+        setStatus('','GESTOPT');
+      } else if(isLooping){
+        setStatus('play','LC LOOP ↺');
+        go();
+      } else {
+        document.getElementById('btnPlay').classList.remove('active');
+        setStatus('','GEREED');
+      }
+    });
   }
-  loop();
+  go();
 }
 
 function lcStop(){
   _lcStop=true;
-  _lcOnDone=null; // voorkom dat hangende callback de loop herstart
+  _lcOnDone=null;
   speechSynthesis.cancel();
   stopAll();
   document.getElementById('btnPlay').classList.remove('active');
@@ -1608,95 +1640,100 @@ function lcHelp(){
   document.getElementById('textInput').value =
 `(t:s)(r:0.5) langzaam
 (r:2) snel
-(p:0.5) laag
+(r:1)(p:0.5) laag
 (p:2) hoog
-(sp:40)(sa:200)(th:200)(mo:50) rare stem
-(fx:reverb, wet:0.8) grote ruimte
+(p:1)(sp:40)(sa:200)(th:200)(mo:50) rare stem
+(sp:72)(sa:64)(th:128)(mo:128)(fx:reverb, wet:0.8) grote ruimte
 (fx:delay, time:0.4, feedback:0.7) echo effect
-(fx:bitcrush, bits:3) kapot
-(fx:tremolo, rate:8, depth:0.9) trillend
+(fx:off)(fx:bitcrush, bits:3) kapot geluid
+(fx:off)(fx:tremolo, rate:8, depth:0.9) trillend
 (fx:off)(r:1)(p:1) normaal
-(l:3) dit drie keer
-(d:500) na deze zin een pauze
-(t:w) nu web speech stem`;
+(d:500) hierna een pauze
+(t:w) web speech stem`;
 }
 
-// Intercept play en stop via capture — originele onclick blijft intact
-document.getElementById('btnPlay').addEventListener('click', function(e){
-  const text = document.getElementById('textInput').value.trim();
-  // Alleen intercepten als er LC syntax in zit
-  if(text.includes('(')){
-    e.stopImmediatePropagation();
-    lcRun();
-  }
-  // Anders: originele speak() via onclick werkt gewoon
-}, {capture:true});
+// Web Speech stemmen laden
+let _wsVoicesLoaded=false;
+function wsLoadVoices(){
+  if(_wsVoicesLoaded) return;
+  const sel=document.getElementById('wsVoice');
+  if(!sel) return;
+  const vv=speechSynthesis.getVoices();
+  if(!vv.length) return;
+  _wsVoicesLoaded=true;
+  sel.innerHTML='';
+  const sorted=[...vv].sort((a,b)=>{
+    if(a.lang.startsWith('nl')&&!b.lang.startsWith('nl'))return -1;
+    if(!a.lang.startsWith('nl')&&b.lang.startsWith('nl'))return 1;
+    return a.lang.localeCompare(b.lang)||a.name.localeCompare(b.name);
+  });
+  let last='',firstNl=true;
+  sorted.forEach((v,i)=>{
+    const lg=v.lang.slice(0,5).toUpperCase();
+    if(lg!==last){sel.appendChild(Object.assign(document.createElement('optgroup'),{label:lg}));last=lg;}
+    const o=document.createElement('option');
+    o.value=i; o.textContent=v.name+(v.localService?' ★':'');
+    if(v.lang.startsWith('nl')&&firstNl){o.selected=true;firstNl=false;}
+    sel.lastElementChild.appendChild(o);
+  });
+  sel._v=sorted;
+}
+if('speechSynthesis' in window){
+  speechSynthesis.onvoiceschanged=wsLoadVoices;
+  wsLoadVoices();
+  setTimeout(wsLoadVoices,300);
+  setTimeout(wsLoadVoices,1200);
+}
 
-document.getElementById('btnStop').addEventListener('click', function(e){
-  e.stopImmediatePropagation();
-  lcStop();
-}, {capture:true});
 
-// Loop knop: toggleLoop() is nu veilig voor LC mode
-// Geen extra interceptor nodig
-document.getElementById('btnPause').addEventListener('click', function(e){
-  if(!_lcStop && document.getElementById('textInput').value.includes('(')){
-    e.stopImmediatePropagation();
-    if(isPaused){
-      isPaused=false;
-      document.getElementById('btnPause').classList.remove('active');
-      speechSynthesis.resume();
-    } else {
-      isPaused=true;
-      document.getElementById('btnPause').classList.add('active');
-      speechSynthesis.pause();
-      setStatus('pause','GEPAUZEERD');
-    }
-  }
-  // Anders: originele togglePause() via onclick
-}, {capture:true});
 
-// Live rec
+// ════════════════════════════════════════════════════════════════
+// LIVE OPNAME
+// ════════════════════════════════════════════════════════════════
 let _lrDest=null,_lrRec=null,_lrChunks=[],_lrBlob=null,_lrOn=false,_lrTimer=null;
-function toggleLiveRec(){ _lrOn?_lrStop2():_lrStart2(); }
-function _lrStart2(){
-  if(typeof ensureCtx==='function') ensureCtx();
-  if(!_lrDest&&typeof audioCtx!=='undefined'&&audioCtx){
-    _lrDest=audioCtx.createMediaStreamDestination(); masterGain.connect(_lrDest);
-  }
-  if(!_lrDest){ setStatus('err','Start eerst audio'); return; }
-  _lrChunks=[]; _lrBlob=null;
+function toggleLiveRec(){ _lrOn?_lrStop():_lrStart(); }
+function _lrStart(){
+  ensureCtx();
+  if(!_lrDest){_lrDest=audioCtx.createMediaStreamDestination();masterGain.connect(_lrDest);}
+  _lrChunks=[];_lrBlob=null;
   document.getElementById('dlLiveBtn').disabled=true;
   const mimes=['audio/webm;codecs=opus','audio/webm','audio/ogg',''];
-  let mime=''; for(const m of mimes){try{if(!m||MediaRecorder.isTypeSupported(m)){mime=m;break;}}catch(e){}}
-  try{ _lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream); }
-  catch(e){ setStatus('err','Opname niet beschikbaar'); return; }
+  let mime='';for(const m of mimes){try{if(!m||MediaRecorder.isTypeSupported(m)){mime=m;break;}}catch(e){}}
+  try{_lrRec=mime?new MediaRecorder(_lrDest.stream,{mimeType:mime}):new MediaRecorder(_lrDest.stream);}
+  catch(e){setStatus('err','Opname niet beschikbaar');return;}
   _lrRec.ondataavailable=e=>{if(e.data&&e.data.size>0)_lrChunks.push(e.data);};
-  _lrRec.onstop=()=>{ _lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'}); document.getElementById('dlLiveBtn').disabled=false; setStatus('','OPNAME KLAAR'); };
-  _lrRec.start(50); _lrOn=true;
+  _lrRec.onstop=()=>{
+    _lrBlob=new Blob(_lrChunks,{type:_lrRec.mimeType||'audio/webm'});
+    document.getElementById('dlLiveBtn').disabled=false;
+    setStatus('','OPNAME KLAAR');
+  };
+  _lrRec.start(50);_lrOn=true;
   const t0=Date.now();
   const btn=document.getElementById('btnLR');
-  btn.classList.add('active'); btn.style.boxShadow='0 0 14px rgba(255,0,64,.5)';
-  _lrTimer=setInterval(()=>{ const s=Math.floor((Date.now()-t0)/1000); document.getElementById('lrTime').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); },500);
+  btn.classList.add('active');btn.style.boxShadow='0 0 14px rgba(255,0,64,.5)';
+  _lrTimer=setInterval(()=>{
+    const s=Math.floor((Date.now()-t0)/1000);
+    document.getElementById('lrTime').textContent=
+      String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  },500);
   setStatus('rec','● OPNAME');
 }
-function _lrStop2(){
-  _lrOn=false; clearInterval(_lrTimer);
+function _lrStop(){
+  _lrOn=false;clearInterval(_lrTimer);
   document.getElementById('lrTime').textContent='';
   const btn=document.getElementById('btnLR');
-  btn.classList.remove('active'); btn.style.boxShadow='none';
-  try{_lrRec.stop();}catch(e){} _lrRec=null;
+  btn.classList.remove('active');btn.style.boxShadow='none';
+  try{_lrRec.stop();}catch(e){}_lrRec=null;
 }
-function _lrDownload(){
-  if(!_lrBlob) return;
+function lrDownload(){
+  if(!_lrBlob)return;
   const ext=_lrBlob.type.includes('ogg')?'ogg':'webm';
-  const n=new Date(), pad=v=>String(v).padStart(2,'0');
+  const n=new Date(),pad=v=>String(v).padStart(2,'0');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(_lrBlob);
   a.download='opname-'+n.getFullYear()+pad(n.getMonth()+1)+pad(n.getDate())+'-'+pad(n.getHours())+pad(n.getMinutes())+'.'+ext;
   a.click();
 }
-
 </script>
 </body>
 </html>
