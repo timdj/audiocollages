@@ -304,19 +304,33 @@
           </div>
         </div>
 
-        <label>Aantal slices</label>
+        <label>Aantal frames (totaal)</label>
         <div class="vars">
           <div class="var">
-            <label>Aantal (slider)</label>
+            <label>Frames (slider)</label>
             <input id="sliceCountSl" type="range" min="2" max="1800" step="1" value="857"/>
             <div class="small" id="sliceCountVal">857</div>
           </div>
           <div class="var">
-            <label>Aantal (nummer)</label>
+            <label>Frames (nummer)</label>
             <input id="sliceCountNum" type="number" min="2" max="1800" step="1" value="857"/>
           </div>
         </div>
-        <div class="small">Aantal wordt standaard berekend als <code>exportLengte / tijd</code>. Bij 60s en 0.07s is dat 857.</div>
+        <div class="small">Aantal frames = <code>exportLengte / frameTijd</code>. Bij 60s en 0.07s is dat 857 frames.</div>
+
+        <label>Aantal unieke slices (grid)</label>
+        <div class="vars">
+          <div class="var">
+            <label>Slices (slider)</label>
+            <input id="uniqueSliceCountSl" type="range" min="4" max="256" step="1" value="32"/>
+            <div class="small" id="uniqueSliceCountVal">32</div>
+          </div>
+          <div class="var">
+            <label>Slices (nummer)</label>
+            <input id="uniqueSliceCountNum" type="number" min="4" max="256" step="1" value="32"/>
+          </div>
+        </div>
+        <div class="small">Het aantal <b>unieke</b> rechthoekjes waarmee het grid van de afbeelding wordt ingedeeld. Elke frame pakt een willekeurige slice. Lager = grotere blokken, hoger = meer detail maar kleiner.</div>
       </div>
 
 
@@ -2090,6 +2104,9 @@ const ui = {
   sliceCountSl: document.getElementById('sliceCountSl'),
   sliceCountNum: document.getElementById('sliceCountNum'),
   sliceCountVal: document.getElementById('sliceCountVal'),
+  uniqueSliceCountSl: document.getElementById('uniqueSliceCountSl'),
+  uniqueSliceCountNum: document.getElementById('uniqueSliceCountNum'),
+  uniqueSliceCountVal: document.getElementById('uniqueSliceCountVal'),
 
 };
 
@@ -2326,19 +2343,41 @@ function recomputeTimeFromCount(){
   syncFrameTime(+t.toFixed(2));
 }
 
+let liveImgLoopStop = null;
+
 function hookImgControls(){
   ui.videoMode?.addEventListener('change', ()=>{
     resetImageSequenceState();
+    if(liveImgLoopStop){ liveImgLoopStop(); liveImgLoopStop = null; }
     setImgModeUI();
-    if(isImageVideoMode()) drawCurrentImageModeToCanvas();
+    if(isImageVideoMode()){
+      try{ viz?.stop(); }catch{}
+      if(sourceImageBitmap){
+        liveImgLoopStop = startImageSliceLoop();
+      } else {
+        drawCurrentImageModeToCanvas();
+      }
+    } else {
+      try{ viz?.start(); }catch{}
+    }
   });
-  ui.imageUpload?.addEventListener('change', (e)=> loadSourceImage(e.target.files?.[0] || null));
+  ui.imageUpload?.addEventListener('change', async (e)=>{
+    await loadSourceImage(e.target.files?.[0] || null);
+    if(isImageVideoMode() && sourceImageBitmap){
+      try{ viz?.stop(); }catch{}
+      if(liveImgLoopStop){ liveImgLoopStop(); liveImgLoopStop = null; }
+      liveImgLoopStop = startImageSliceLoop();
+    }
+  });
 
   ui.frameTimeSl?.addEventListener('input', ()=>{ syncFrameTime(ui.frameTimeSl.value); recomputeCountFromTime(); });
   ui.frameTimeNum?.addEventListener('input', ()=>{ syncFrameTime(ui.frameTimeNum.value); recomputeCountFromTime(); });
 
   ui.sliceCountSl?.addEventListener('input', ()=>{ syncSliceCount(ui.sliceCountSl.value); recomputeTimeFromCount(); });
   ui.sliceCountNum?.addEventListener('input', ()=>{ syncSliceCount(ui.sliceCountNum.value); recomputeTimeFromCount(); });
+
+  ui.uniqueSliceCountSl?.addEventListener('input', ()=>{ syncUniqueSliceCount(ui.uniqueSliceCountSl.value); resetImageSequenceState(); drawCurrentImageModeToCanvas(); });
+  ui.uniqueSliceCountNum?.addEventListener('input', ()=>{ syncUniqueSliceCount(ui.uniqueSliceCountNum.value); resetImageSequenceState(); drawCurrentImageModeToCanvas(); });
 
   // When export length changes, keep time and recompute count (image mode expectation)
   const oldSyncExportLen = syncExportLen;
@@ -2353,6 +2392,7 @@ function hookImgControls(){
   // initial
   syncFrameTime(0.07);
   recomputeCountFromTime();
+  syncUniqueSliceCount(32);
   setImgModeUI();
 }
 hookImgControls();
@@ -2374,15 +2414,28 @@ function sliceAspectFromUI(){
   return 1;
 }
 
+function getUniqueSliceCount(){
+  const v = +(ui.uniqueSliceCountNum?.value || 32);
+  return clamp(v|0, 4, 256);
+}
+
+function syncUniqueSliceCount(v){
+  const x = clamp((+v||0)|0, 4, 256);
+  if(ui.uniqueSliceCountSl) ui.uniqueSliceCountSl.value = x;
+  if(ui.uniqueSliceCountNum) ui.uniqueSliceCountNum.value = x;
+  if(ui.uniqueSliceCountVal) ui.uniqueSliceCountVal.textContent = String(x);
+}
+
 function computeSliceRects(N){
   const bmp = sourceImageBitmap;
   if(!bmp) return [];
+  // N is the number of UNIQUE slices (the grid), not the total frame count
   const target = sliceAspectFromUI();
   // cols/rows approx target
   let cols = Math.ceil(Math.sqrt(N * target));
-  cols = clamp(cols, 1, 2000);
+  cols = clamp(cols, 1, 200);
   let rows = Math.ceil(N / cols);
-  rows = clamp(rows, 1, 2000);
+  rows = clamp(rows, 1, 200);
 
   const rects = [];
   for(let i=0;i<N;i++){
@@ -2440,11 +2493,14 @@ function drawRandomSliceToCanvas(){
   const ctx = cv.getContext('2d');
   if(!ctx) return;
 
+  // Recompute total frame count (for display/sync only)
   const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
   const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
-  const N = clamp(Math.round(lenSec / t), 2, 1800);
-  syncSliceCount(N);
+  const totalFrames = clamp(Math.round(lenSec / t), 2, 1800);
+  syncSliceCount(totalFrames);
 
+  // Use UNIQUE slice count for the grid
+  const N = getUniqueSliceCount();
   const rects = computeSliceRects(N);
   if(!rects.length) return;
   const rect = rects[(Math.random() * rects.length)|0];
@@ -2459,11 +2515,14 @@ function drawStereoRandomSlicesToCanvas(){
   const ctx = cv.getContext('2d');
   if(!ctx) return;
 
+  // Recompute total frame count (for display/sync only)
   const lenSec = clamp(+ui.expLen?.value || 60, 1, 1800);
   const t = clamp(+ui.frameTimeNum?.value || 0.07, 0.05, 60);
-  const N = clamp(Math.round(lenSec / t), 2, 1800);
-  syncSliceCount(N);
+  const totalFrames = clamp(Math.round(lenSec / t), 2, 1800);
+  syncSliceCount(totalFrames);
 
+  // Use UNIQUE slice count for the grid
+  const N = getUniqueSliceCount();
   const rects = computeSliceRects(N);
   if(!rects.length) return;
 
@@ -3138,6 +3197,8 @@ async function exportVideo(){
     return;
   }
   // When exporting in image-slices mode, we temporarily drive the canvas ourselves.
+  // IMPORTANT: the FFT visualizer (viz) uses requestAnimationFrame which runs at 60fps
+  // and would overwrite the image slices every frame. Stop it first.
   let stopImgLoop = null;
   const restoreVizAfter = !!(viz);
   if(isImgMode){
@@ -3175,12 +3236,16 @@ async function exportVideo(){
       playStartTime = audioCtx.currentTime;
       if(ui.start) ui.start.disabled = true;
       if(ui.stop) ui.stop.disabled = false;
-      // Start visualizer if present
-      try{ viz?.start(); }catch{}
+      // Start visualizer only when NOT in image mode (otherwise image loop drives the canvas)
+      if(!isImgMode){ try{ viz?.start(); }catch{} }
       startRandStartTimer();
     }catch(e){
       try{ stopImgLoop && stopImgLoop(); }catch{}
-      if(isImgMode){ try{ viz?.start(); }catch{} }
+      if(isImgMode){
+        if(sourceImageBitmap) liveImgLoopStop = startImageSliceLoop();
+      } else {
+        try{ viz?.start(); }catch{}
+      }
       setExportBusy(false);
       alert('Kan niet starten voor export:\n' + e.message);
       return;
@@ -3215,7 +3280,12 @@ async function exportVideo(){
     alert("MP4 opnemen wordt door deze browser niet ondersteund via MediaRecorder. Probeer Chrome/Edge (desktop) of exporteer WAV + combineer extern.");
     if(ui.exportNote) ui.exportNote.textContent = "MP4 export niet ondersteund in deze browser.";
     try{ stopImgLoop && stopImgLoop(); }catch{}
-    if(isImgMode){ try{ viz?.start(); }catch{} }
+    if(isImgMode){
+      // restart live image loop (export aborted)
+      if(sourceImageBitmap) liveImgLoopStop = startImageSliceLoop();
+    } else {
+      try{ viz?.start(); }catch{}
+    }
     setExportBusy(false);
     return;
   }
@@ -3240,7 +3310,12 @@ async function exportVideo(){
   try{ atracksRec.forEach(t=>t.stop()); }catch{}
   try{ vstream.getTracks().forEach(t=>t.stop()); }catch{}
   try{ stopImgLoop && stopImgLoop(); }catch{}
-  if(isImgMode){ try{ viz?.start(); }catch{} }
+  if(isImgMode){
+    // After export: restart live image loop on canvas, keep viz stopped
+    if(sourceImageBitmap){ liveImgLoopStop = startImageSliceLoop(); }
+  } else {
+    if(restoreVizAfter){ try{ viz?.start(); }catch{} }
+  }
 
   const blob = new Blob(chunks, {type: "video/mp4"});
   const ext = "mp4";
