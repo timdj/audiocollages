@@ -1,9 +1,23 @@
 <!doctype html>
 <html lang="nl">
 <head>
+<title>DSP Mega Rack – effecten, loop, FFT en offline WAV export</title>
+<meta name="description" content="Alles-in-één DSP rack: audio laden, loopen, effecten toepassen, realtime FFT visualiseren en offline renderen/exporteren naar WAV." />
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
+<meta name="theme-color" content="#ffffff" />
+<link rel="canonical" href="https://example.com/dsp-mega-rack_all-in-one_auto-start_fft_export.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="DSP Mega Rack – effecten, loop, FFT en offline WAV export" />
+<meta property="og:description" content="Alles-in-één DSP rack: audio laden, loopen, effecten toepassen, realtime FFT visualiseren en offline renderen/exporteren naar WAV." />
+<meta property="og:url" content="https://example.com/dsp-mega-rack_all-in-one_auto-start_fft_export.html" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="DSP Mega Rack – effecten, loop, FFT en offline WAV export" />
+<meta name="twitter:description" content="Alles-in-één DSP rack: audio laden, loopen, effecten toepassen, realtime FFT visualiseren en offline renderen/exporteren naar WAV." />
+<script type="application/ld+json">{&quot;@context&quot;: &quot;https://schema.org&quot;, &quot;@type&quot;: &quot;WebPage&quot;, &quot;name&quot;: &quot;DSP Mega Rack – effecten, loop, FFT en offline WAV export&quot;, &quot;description&quot;: &quot;Alles-in-één DSP rack: audio laden, loopen, effecten toepassen, realtime FFT visualiseren en offline renderen/exporteren naar WAV.&quot;, &quot;url&quot;: &quot;https://example.com/dsp-mega-rack_all-in-one_auto-start_fft_export.html&quot;, &quot;inLanguage&quot;: &quot;nl&quot;, &quot;isPartOf&quot;: {&quot;@type&quot;: &quot;WebSite&quot;, &quot;name&quot;: &quot;Offline Audio &amp; MIDI Tools&quot;, &quot;url&quot;: &quot;https://example.com/&quot;}}</script>
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DSP Mega Rack – Alles-in-één (Loop + Effecten + WAV export)</title>
+  
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.35}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
@@ -20,6 +34,17 @@
     .bypass{display:flex;align-items:center;justify-content:space-between;gap:10px}
     canvas{width:100%;height:180px;border:1px solid #eee;border-radius:12px}
   </style>
+
+<style id="white-black-theme">
+:root{color-scheme:light !important;}
+html,body{background:#fff !important;color:#000 !important;}
+body{margin:0 !important;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif !important;line-height:1.5 !important;}
+a{color:#000 !important;text-decoration:underline !important;text-underline-offset:3px !important;}
+a:hover{opacity:.75 !important;}
+/* Make common controls readable even if the page was designed dark */
+button,input,select,textarea{color:#000 !important;background:#fff !important;border-color:#000 !important;}
+canvas,video{max-width:100% !important;height:auto !important;}
+</style>
 </head>
 <body>
   <h1>DSP Mega Rack – Alles-in-één</h1>
@@ -47,7 +72,7 @@
 
       <div class="bypass">
         <label style="display:flex;align-items:center;gap:8px;margin:0">
-          <input id="loopOn" type="checkbox"> Loop
+          <input id="loopOn" type="checkbox" checked> Loop
         </label>
         <span class="small">Loop regio (s)</span>
       </div>
@@ -87,7 +112,7 @@
       <div class="card">
         <div class="bypass">
           <h3 style="margin:0">Distortion</h3>
-          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="distOn" type="checkbox"> Aan</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="distOn" type="checkbox" checked> Aan</label>
         </div>
         <label>Drive
           <input id="distDrive" type="range" min="0" max="1" step="0.001" value="0.25">
@@ -102,7 +127,7 @@
       <div class="card">
         <div class="bypass">
           <h3 style="margin:0">Compressor</h3>
-          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="compOn" type="checkbox"> Aan</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="compOn" type="checkbox" checked> Aan</label>
         </div>
         <label>Threshold (dB)
           <input id="compTh" type="range" min="-60" max="0" step="1" value="-24">
@@ -227,7 +252,7 @@
       <div class="card">
         <div class="bypass">
           <h3 style="margin:0">FIR low-pass</h3>
-          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="firOn" type="checkbox"> Aan</label>
+          <label style="display:flex;gap:8px;align-items:center;margin:0"><input id="firOn" type="checkbox" checked> Aan</label>
         </div>
         <label>Cutoff (Hz)
           <input id="firF" type="range" min="40" max="12000" step="1" value="1800">
@@ -867,9 +892,8 @@
     exportBtn.disabled=true;
     setStatus("export: offline render…");
 
-    const extraTailSec=4.0;
     const sr=buffer.sampleRate;
-    const totalLength=Math.ceil((buffer.duration+extraTailSec)*sr);
+    const totalLength=buffer.length;
     const off=new OfflineAudioContext(2,totalLength,sr);
 
     // Build offline chain mirroring realtime (same architecture)
