@@ -22,99 +22,71 @@
     canvas{width:512px;max-width:100%;height:auto;border-radius:12px;border:1px solid #24243a;background:#000;image-rendering:pixelated}
 
     /* ── RADIO PORTAL ── */
-    #radioPortal{background:#0d0d1a;border:2px solid #3a1a6a;border-radius:16px;padding:16px;margin-bottom:18px}
-    #radioPortal h2{font-size:15px;margin:0 0 10px;color:#c084fc;letter-spacing:.08em}
-    .radio-status{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-    .radio-dot{width:12px;height:12px;border-radius:50%;background:#333;flex-shrink:0;transition:background .3s}
-    .radio-dot.on{background:#a855f7;box-shadow:0 0 8px #a855f7}
-    .radio-dot.loading{background:#f59e0b;animation:pulse .6s infinite alternate}
-    @keyframes pulse{to{opacity:.3}}
-    #radioStatusText{font-size:13px;color:#d4d4e8}
-    .radio-track-info{background:#10101e;border:1px solid #2a1a4a;border-radius:10px;padding:10px;margin-bottom:10px;min-height:44px}
-    .radio-track-title{font-size:13px;color:#e0d4fc;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .radio-track-drum{font-size:11px;color:#9370db;opacity:.85}
-    .radio-countdown{font-size:11px;color:#6b6b8a;margin-top:4px}
-    .radio-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-    .radio-btn-big{background:#3b0764;border:1px solid #6b21a8;color:#e9d5ff;font-size:13px;border-radius:10px;padding:10px;cursor:pointer;transition:background .15s}
-    .radio-btn-big:hover{background:#4c0a8e}
-    .radio-btn-big:disabled{opacity:.4;cursor:not-allowed}
-    .radio-btn-skip{background:#1e1230;border:1px solid #4a2080;color:#c4b5fd;font-size:12px}
-    .radio-btn-skip:hover{background:#2a1a50}
-    #radioFolder{display:none}
-    .radio-files-badge{font-size:11px;color:#7c6a9e;margin-top:4px}
-    .radio-interval-row{display:flex;gap:8px;align-items:center;margin-top:8px}
-    .radio-interval-row label{margin:0;font-size:11px;white-space:nowrap;opacity:.8;flex-shrink:0}
-    .radio-interval-row input{flex:1;margin:0}
-    .radio-sep{border:none;border-top:1px solid #1e1e30;margin:10px 0}
-    .radio-log{background:#080810;border:1px solid #1a1a28;border-radius:8px;padding:8px;font-size:10px;font-family:monospace;color:#6868a0;max-height:80px;overflow-y:auto;margin-top:6px}
+    #radioPortal{background:#0d0d1a;border:2px solid #3a1a6a;border-radius:16px;padding:14px;margin-bottom:18px}
+    #radioPortal h2{font-size:14px;margin:0 0 10px;color:#c084fc;letter-spacing:.06em}
+    .rp-row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+    .rp-row label{font-size:11px;opacity:.8;white-space:nowrap;margin:0;width:auto}
+    .rp-dot{width:11px;height:11px;border-radius:50%;background:#333;flex-shrink:0;transition:background .3s}
+    .rp-dot.on{background:#a855f7;box-shadow:0 0 7px #a855f7}
+    .rp-dot.loading{background:#f59e0b;animation:rpulse .6s infinite alternate}
+    @keyframes rpulse{to{opacity:.25}}
+    .rp-track{background:#10101e;border:1px solid #2a1a4a;border-radius:8px;padding:8px 10px;font-size:12px;margin-top:6px;min-height:36px}
+    .rp-track span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d4d4f0}
+    .rp-track span+span{color:#9370db;margin-top:2px;font-size:11px}
+    .rp-countdown{font-size:11px;color:#6060a0;margin-top:3px}
+    .rp-badge{font-size:11px;color:#7c6a9e;margin-top:4px}
+    .rp-btn{cursor:pointer;border-radius:9px;padding:8px 12px;font-size:12px;border:1px solid #6b21a8;background:#3b0764;color:#e9d5ff;margin-top:6px}
+    .rp-btn:hover{background:#4c0a8e}
+    .rp-btn:disabled{opacity:.4;cursor:not-allowed}
+    .rp-btn.sec{background:#1e1230;border-color:#4a2080;color:#c4b5fd}
+    .rp-btn.sec:hover{background:#2a1a50}
+    .rp-log{background:#080810;border:1px solid #1a1a28;border-radius:7px;padding:6px 8px;font-size:10px;font-family:monospace;color:#5858a0;max-height:60px;overflow-y:auto;margin-top:8px}
+    .rp-sep{border:none;border-top:1px solid #1e1e30;margin:10px 0}
   </style>
 </head>
 <body>
   <h1>Sonic Pi-achtig sample slicing — BPM + sleep/wait + FFT video (stopt altijd, geen gekraak)</h1>
 
-<body>
-  <h1>📻 Webradio Portal — Offline (lokale map)</h1>
-
+  <!-- ══════════════ RADIO PORTAL ══════════════ -->
   <div id="radioPortal">
-    <h2>📻 WEBRADIO PORTAL — LOKALE MAP</h2>
+    <h2>📻 RADIO PORTAL — map → spoor 1 + spoor 2 → bestaande instellingen</h2>
 
-    <div class="radio-status">
-      <div class="radio-dot" id="radioDot"></div>
-      <span id="radioStatusText">Inactief — kies een map om te starten</span>
+    <div class="rp-row">
+      <div class="rp-dot" id="rpDot"></div>
+      <span id="rpStatus" style="font-size:12px">Inactief — kies een map of bestanden</span>
     </div>
 
-    <div class="radio-track-info">
-      <div class="radio-track-title" id="radioTrackMain">— spoor 1: geen hoofd-sample —</div>
-      <div class="radio-track-drum" id="radioTrackDrum">— spoor 2: geen drum-sample —</div>
-      <div class="radio-countdown" id="radioCountdown"></div>
+    <div class="rp-track">
+      <span id="rpTrack1">Spoor 1 (hoofd): —</span>
+      <span id="rpTrack2">Spoor 2 (drum): —</span>
     </div>
+    <div class="rp-countdown" id="rpCountdown"></div>
+    <div class="rp-badge" id="rpBadge">Geen bestanden geladen.</div>
 
-    <div class="radio-files-badge" id="radioFilesBadge">Geen bestanden geladen.</div>
+    <!-- Mapkiezer (File System Access, Chrome/Edge) -->
+    <button id="rpBtnFolder" class="rp-btn" style="width:100%;margin-top:8px">📁 Kies map (Chrome/Edge — File System Access)</button>
+    <!-- Fallback: meerdere losse bestanden -->
+    <input id="rpFallback" type="file" accept="audio/*" multiple style="margin-top:6px"/>
+    <div class="small" style="margin-top:3px">↑ Fallback voor andere browsers: selecteer meerdere bestanden.</div>
 
-    <button id="radioBtnFolder" class="radio-btn-big" style="margin-top:8px">📁 Kies map met audiobestanden (Chrome/Edge)</button>
-    <input id="radioFolderFallback" type="file" accept="audio/*" multiple style="margin-top:6px"/>
-    <div class="small" style="margin-top:4px">↑ Fallback: selecteer meerdere bestanden als mapkiezer niet werkt.</div>
+    <hr class="rp-sep"/>
 
-    <hr class="radio-sep"/>
-
-    <div class="radio-interval-row" style="margin-top:8px">
+    <div class="rp-row">
       <label>Interval (sec)</label>
-      <input id="radioInterval" type="range" min="10" max="300" step="5" value="60" style="flex:1;margin:0"/>
-      <input id="radioIntervalNum" type="number" min="10" max="300" step="5" value="60" style="width:60px;flex:none;margin:0"/>
-      <span id="radioIntervalVal" style="font-size:11px;color:#7c6a9e;white-space:nowrap">60s</span>
+      <input id="rpIntervalSl" type="range" min="10" max="300" step="5" value="60" style="flex:1;margin:0"/>
+      <input id="rpIntervalNum" type="number" min="10" max="300" step="5" value="60" style="width:58px;margin:0"/>
+      <span id="rpIntervalVal" style="font-size:11px;color:#7c6a9e">60s</span>
     </div>
 
-    <div class="radio-interval-row" style="margin-top:6px">
-      <label>Drum algo</label>
-      <select id="radioDrumAlgoSelect" style="margin:0;flex:1;font-size:12px">
-        <option value="chaos_map" selected>Chaos map</option>
-        <option value="amen">Amen (jungle)</option>
-        <option value="afrobeat">Afrobeat</option>
-        <option value="funk">Funk</option>
-        <option value="footwork">Footwork / Juke</option>
-        <option value="euclidean_5_16">Euclidisch E(5,16)</option>
-        <option value="euclidean_7_16">Euclidisch E(7,16)</option>
-        <option value="fibonacci_pulse">Fibonacci pulse</option>
-        <option value="density_wave">Density wave</option>
-        <option value="binary_count">Binary counter</option>
-        <option value="gray_code">Gray code</option>
-        <option value="machine_panic">Machine panic</option>
-        <option value="random_authority">Random authority</option>
-        <option value="random">🎲 Willekeurig elke wissel</option>
-      </select>
+    <div class="rp-row" style="gap:6px;margin-top:8px">
+      <button id="rpBtnStart" class="rp-btn" disabled>▶ Start radio</button>
+      <button id="rpBtnStop"  class="rp-btn" disabled>■ Stop</button>
+      <button id="rpBtnSkip"  class="rp-btn sec" disabled>⏭ Volgende</button>
     </div>
 
-    <div class="radio-grid" style="margin-top:10px">
-      <button id="radioBtnStart" class="radio-btn-big" disabled>▶ START RADIO</button>
-      <button id="radioBtnStop"  class="radio-btn-big" disabled>■ STOP</button>
-      <button id="radioBtnSkip"  class="radio-btn-big radio-btn-skip" disabled>⏭ Sla over</button>
-      <button id="radioBtnShuffle" class="radio-btn-big radio-btn-skip" disabled>🔀 Shuffle nu</button>
-    </div>
-
-    <div class="radio-log" id="radioLog">log…</div>
+    <div class="rp-log" id="rpLog">—</div>
   </div>
 
-  <div class="row">
   <div class="row">
     <div class="card">
       <label>Audio upload</label>
@@ -4157,374 +4129,267 @@ const CONTROVERSIAL_ALGOS = {
   final_insult(step){ return [{slice:15, amp:step%32===0?2.0:0.1, durSteps:step%32===0?8:1}]; }
 };
 
+// ══════════════════════════════════════════════════════════════
+//  RADIO PORTAL
+//  Voedt de bestaande twee file-inputs met willekeurige bestanden
+//  uit een map. Alle overige instellingen van de pagina blijven
+//  ongewijzigd — BPM, algoritme, FX, alles.
+// ══════════════════════════════════════════════════════════════
+(function(){
 
+  // ── DOM ────────────────────────────────────────────────────
+  const rpDot        = document.getElementById('rpDot');
+  const rpStatus     = document.getElementById('rpStatus');
+  const rpTrack1     = document.getElementById('rpTrack1');
+  const rpTrack2     = document.getElementById('rpTrack2');
+  const rpCountdown  = document.getElementById('rpCountdown');
+  const rpBadge      = document.getElementById('rpBadge');
+  const rpBtnFolder  = document.getElementById('rpBtnFolder');
+  const rpFallback   = document.getElementById('rpFallback');
+  const rpIntervalSl = document.getElementById('rpIntervalSl');
+  const rpIntervalNum= document.getElementById('rpIntervalNum');
+  const rpIntervalVal= document.getElementById('rpIntervalVal');
+  const rpBtnStart   = document.getElementById('rpBtnStart');
+  const rpBtnStop    = document.getElementById('rpBtnStop');
+  const rpBtnSkip    = document.getElementById('rpBtnSkip');
+  const rpLog        = document.getElementById('rpLog');
 
-// ── Gedeelde radio helpers ─────────────────────────────────
-const ALL_ALGO_NAMES = [
-  'chaos_map','euclidean_3_8','euclidean_5_16','euclidean_7_16',
-  'fibonacci_pulse','density_wave','binary_count','gray_code','canons',
-  'poly_3_4','bjorklund_rotate','microrhythm','inverse_shuffle','pitch_ladder',
-  'amen','dnb_twostep','breakbeat_classic','boom_bap','four_on_floor',
-  'trap','shuffle','reggaeton','dubstep_halftime','house_garage',
-  'samba','bossa_nova','afrobeat','funk','jazz_comping','cumbia',
-  'baile_funk','footwork','grime','dancehall','soca','bhangra','taiko',
-  'clave_32','clave_23','tresillo','waltz','five_four','seven_eight'
-];
+  // ── State ──────────────────────────────────────────────────
+  let rpFiles   = [];   // [{name, getFile()}]
+  let rpActive  = false;
+  let rpTimer   = null;
+  let rpCdTimer = null;
+  let rpSecsLeft= 0;
+  let rpMainQ   = [];
+  let rpDrumQ   = [];
 
-function radioSharedInit(){
-  'use strict';
-
-  // ── State ────────────────────────────────────────────────
-  let radioFiles  = [];
-  let radioActive = false;
-  let radioTimer  = null;
-  let radioCountdownTimer = null;
-  let radioSecondsLeft = 0;
-  let mainQueue   = [];
-  let drumQueue   = [];
-
-  // ── DOM ──────────────────────────────────────────────────
-  const dot         = document.getElementById('radioDot');
-  const statusTxt   = document.getElementById('radioStatusText');
-  const trackMain   = document.getElementById('radioTrackMain');
-  const trackDrum   = document.getElementById('radioTrackDrum');
-  const countdown   = document.getElementById('radioCountdown');
-  const filesBadge  = document.getElementById('radioFilesBadge');
-  const intervalSl  = document.getElementById('radioInterval');
-  const intervalNum = document.getElementById('radioIntervalNum');
-  const intervalVal = document.getElementById('radioIntervalVal');
-  const drumAlgoSel = document.getElementById('radioDrumAlgoSelect');
-  const btnStart    = document.getElementById('radioBtnStart');
-  const btnStop     = document.getElementById('radioBtnStop');
-  const btnSkip     = document.getElementById('radioBtnSkip');
-  const btnShuffle  = document.getElementById('radioBtnShuffle');
-  const logEl       = document.getElementById('radioLog');
-
-  // ── Log ──────────────────────────────────────────────────
-  function radioLog(msg){
+  // ── Log ────────────────────────────────────────────────────
+  function rplog(msg){
     const t = new Date().toLocaleTimeString('nl-NL');
-    logEl.textContent = '[' + t + '] ' + msg + '\n' + logEl.textContent.slice(0,1500);
+    rpLog.textContent = '['+t+'] '+msg+'\n'+rpLog.textContent.slice(0,1200);
   }
 
-  // ── Interval sync ────────────────────────────────────────
-  function syncInterval(v){
-    const x = Math.max(10, Math.min(300, +v || 60));
-    intervalSl.value = x; intervalNum.value = x;
-    intervalVal.textContent = x + 's';
+  // ── Interval sync ──────────────────────────────────────────
+  function syncSec(v){
+    const x = Math.max(10, Math.min(300, +v||60));
+    rpIntervalSl.value = x; rpIntervalNum.value = x;
+    rpIntervalVal.textContent = x+'s';
+    return x;
   }
-  intervalSl.addEventListener('input',  ()=> syncInterval(intervalSl.value));
-  intervalNum.addEventListener('input', ()=> syncInterval(intervalNum.value));
-  syncInterval(60);
+  rpIntervalSl.addEventListener('input',  ()=> syncSec(rpIntervalSl.value));
+  rpIntervalNum.addEventListener('input', ()=> syncSec(rpIntervalNum.value));
+  syncSec(60);
 
-  // ── Shuffled playlist queue ───────────────────────────────
-  function fisherYates(arr){
+  // ── Dot ────────────────────────────────────────────────────
+  function setDot(s){
+    rpDot.className = 'rp-dot'+(s==='on'?' on':s==='loading'?' loading':'');
+  }
+
+  // ── Shuffled queue ─────────────────────────────────────────
+  function shuffle(arr){
     const a = arr.slice();
-    for(let i = a.length-1; i > 0; i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [a[i],a[j]] = [a[j],a[i]];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
     }
     return a;
   }
 
-  function refillQueues(){
-    mainQueue = fisherYates(radioFiles);
-    drumQueue = fisherYates(radioFiles);
+  function refill(){
+    rpMainQ = shuffle(rpFiles);
+    rpDrumQ = shuffle(rpFiles);
     // Zorg dat positie 0 niet hetzelfde bestand is op beide sporen
-    if(drumQueue.length > 1 && mainQueue[0] && drumQueue[0] &&
-       drumQueue[0].name === mainQueue[0].name){
-      [drumQueue[0], drumQueue[1]] = [drumQueue[1], drumQueue[0]];
+    if(rpDrumQ.length>1 && rpMainQ[0] && rpDrumQ[0] &&
+       rpDrumQ[0].name === rpMainQ[0].name){
+      [rpDrumQ[0],rpDrumQ[1]] = [rpDrumQ[1],rpDrumQ[0]];
     }
-    radioLog('Nieuwe ronde: ' + mainQueue.length + ' bestanden geshuffeld (2 sporen).');
+    rplog('Nieuwe ronde: '+rpFiles.length+' bestanden geshuffeld.');
   }
 
-  function nextFromQueue(){
-    if(radioFiles.length < 2) return null;
-    if(mainQueue.length === 0 || drumQueue.length === 0) refillQueues();
-    const main = mainQueue.shift();
-    let   drum = drumQueue.shift();
-    // Nooit hetzelfde bestand op beide sporen tegelijk
-    if(drum && main && drum.name === main.name && drumQueue.length > 0){
-      drumQueue.unshift(drum);
-      drum = drumQueue.shift();
+  function nextPair(){
+    if(rpFiles.length < 2) return null;
+    if(!rpMainQ.length || !rpDrumQ.length) refill();
+    const main = rpMainQ.shift();
+    let   drum = rpDrumQ.shift();
+    // Nooit hetzelfde bestand op beide sporen
+    if(drum && main && drum.name===main.name && rpDrumQ.length>0){
+      rpDrumQ.unshift(drum);
+      drum = rpDrumQ.shift();
     }
-    return { main, drum };
+    return {main, drum};
   }
 
-  // ── Drum algo instellen ───────────────────────────────────
-  function applyRadioDrumAlgo(){
-    const sel = drumAlgoSel.value;
-    const algo = sel === 'random'
-      ? ALL_ALGO_NAMES[Math.floor(Math.random()*ALL_ALGO_NAMES.length)]
-      : sel;
-    if(ui.drumAlgo){
-      ui.drumAlgo.value = algo;
-      ui.drumAlgo.dispatchEvent(new Event('change'));
-    }
-    radioLog('Drum algo (spoor 2) \u2192 ' + algo);
+  // ── Laad een File-object in een <input type="file"> ────────
+  // Dit zet het bestand in het input-veld en vuurt het change-event,
+  // zodat de bestaande event-handlers het precies zo verwerken
+  // als wanneer de gebruiker zelf een bestand kiest.
+  function injectFile(inputEl, file){
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    inputEl.files = dt.files;
+    inputEl.dispatchEvent(new Event('change', {bubbles:true}));
   }
 
-  // ── Laad paar: spoor1=hoofd(algo), spoor2=drum(drumAlgo) ─
-  async function loadPair(pair){
+  // ── Speel het volgende paar ────────────────────────────────
+  async function playNextPair(){
+    const pair = nextPair();
     if(!pair) return;
-    setDot('loading');
-    statusTxt.textContent = 'Laden: ' + pair.main.name + ' + ' + pair.drum.name + '...';
-    trackMain.textContent = '\u23F3 Spoor 1: ' + pair.main.name;
-    trackDrum.textContent = '\u23F3 Spoor 2: ' + pair.drum.name;
-    radioLog('Laden spoor1: ' + pair.main.name + ' | spoor2: ' + pair.drum.name);
-    try{
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      await audioCtx.resume();
 
-      // Beide buffers parallel ophalen
-      const [mainBuf, drumBuf] = await Promise.all([
-        pair.main.getBuffer(),
-        pair.drum.getBuffer()
+    setDot('loading');
+    rpStatus.textContent = 'Laden...';
+    rpTrack1.textContent = 'Spoor 1 (hoofd): ⏳ '+pair.main.name;
+    rpTrack2.textContent = 'Spoor 2 (drum):  ⏳ '+pair.drum.name;
+    rplog('Laden: '+pair.main.name+' | drum: '+pair.drum.name);
+
+    try{
+      // Haal File-objecten op
+      const [f1, f2] = await Promise.all([
+        pair.main.getFile(),
+        pair.drum.getFile()
       ]);
 
-      // Vernieuw engine met spoor 1 (hoofd-sample)
-      buffer     = mainBuf;
-      drumBuffer = drumBuf;
+      // Zet drum-sample eerst zodat hij klaar is als hoofd laadt
+      injectFile(ui.drumFile, f2);
 
-      const wasPlaying = !!playState;
-      const revBuf = makeReversedBuffer(audioCtx, mainBuf);
-      const oldEng = currentEngine;
+      // Wacht kort zodat drumBuffer geladen is voor de engine start
+      await new Promise(r => setTimeout(r, 80));
 
-      const newEng = new SliceEngine(audioCtx, mainBuf, revBuf);
-      newEng.setMaster(wasPlaying ? 0 : +ui.master.value);
-      newEng.setFade(+ui.fade.value);
-      newEng.setFFT(+ui.fftSize.value, +ui.smooth.value);
-      newEng.setLimiter(ui.limiter.value === 'on');
-      newEng.getVarsFn = getVars;
-      engine = newEng;
-      currentEngine = newEng;
+      // Zet hoofd-sample — de bestaande change-handler start
+      // automatisch playback als de pagina al speelde (crossfade)
+      injectFile(ui.file, f1);
 
-      // Koppel spoor 2 (drum-sample) aan de drum-laag
-      try{ newEng.setDrumBuffer(drumBuf); }catch(e){}
-
-      // Drum layer aanzetten
-      if(ui.drumEnable && !ui.drumEnable.checked){
-        ui.drumEnable.checked = true;
-        ui.drumEnable.dispatchEvent(new Event('change'));
+      // Als we nog niet speelden: wacht op buffer laden dan Start
+      if(!playState){
+        await new Promise(r => setTimeout(r, 400));
+        if(buffer && ui.start && !ui.start.disabled){
+          ui.start.click();
+        }
       }
 
-      // Drum algoritme instellen
-      applyRadioDrumAlgo();
-
-      // Start beide sporen
-      const algoFn = compileAlgo();
-      const vars   = getVars();
-      newEng.setAlgoFn(algoFn);
-      newEng.start(algoFn, vars);
-      newEng.rampMaster(+ui.master.value, 1.2);
-
-      if(oldEng && wasPlaying){
-        try{ oldEng.rampMaster(0, 1.0); }catch(e){}
-        setTimeout(()=>{ try{ oldEng.stop(); }catch(e){}; }, 1300);
-      }
-      playState     = true;
-      playStartTime = audioCtx.currentTime;
-      startRandStartTimer();
-
-      try{ viz && viz.stop(); }catch(e){}
-      viz = makeVisualizer(newEng, ui.cv);
-      viz.start();
-      wireLiveControls();
-
-      if(ui.start) ui.start.disabled = true;
-      if(ui.stop)  ui.stop.disabled  = false;
-
-      trackMain.textContent = '\u25B6 Spoor 1: ' + pair.main.name + ' (' + mainBuf.duration.toFixed(1) + 's)';
-      trackDrum.textContent = '\uD83E\uDD41 Spoor 2: ' + pair.drum.name + ' (' + drumBuf.duration.toFixed(1) + 's)';
-      statusTxt.textContent = 'On air: ' + pair.main.name;
+      rpTrack1.textContent = 'Spoor 1 (hoofd): ▶ '+pair.main.name;
+      rpTrack2.textContent = 'Spoor 2 (drum):  🥁 '+pair.drum.name;
+      rpStatus.textContent = 'On air: '+pair.main.name;
       setDot('on');
-      radioLog('On air \u2713 | spoor1: ' + mainBuf.duration.toFixed(1) + 's | spoor2: ' + drumBuf.duration.toFixed(1) + 's');
+      rplog('On air ✓');
+
     }catch(e){
       setDot('off');
-      statusTxt.textContent = 'Fout: ' + e.message;
-      radioLog('FOUT: ' + e.message);
+      rpStatus.textContent = 'Fout: '+e.message;
+      rplog('FOUT: '+e.message);
     }
   }
 
-  // ── Countdown ────────────────────────────────────────────
-  function startCountdown(sec){
-    if(radioCountdownTimer) clearInterval(radioCountdownTimer);
-    radioSecondsLeft = sec;
-    renderCountdown();
-    radioCountdownTimer = setInterval(()=>{
-      radioSecondsLeft = Math.max(0, radioSecondsLeft-1);
-      renderCountdown();
-    }, 1000);
+  // ── Countdown ──────────────────────────────────────────────
+  function startCd(sec){
+    if(rpCdTimer) clearInterval(rpCdTimer);
+    rpSecsLeft = sec;
+    showCd();
+    rpCdTimer = setInterval(()=>{
+      rpSecsLeft = Math.max(0, rpSecsLeft-1);
+      showCd();
+    },1000);
   }
-  function renderCountdown(){
-    const m = Math.floor(radioSecondsLeft/60);
-    const s = radioSecondsLeft%60;
-    countdown.textContent = radioSecondsLeft > 0
-      ? 'Volgende wissel over: ' + m + ':' + String(s).padStart(2,'0')
+  function showCd(){
+    const m=Math.floor(rpSecsLeft/60), s=rpSecsLeft%60;
+    rpCountdown.textContent = rpSecsLeft>0
+      ? 'Volgende wissel over: '+m+':'+String(s).padStart(2,'0')
       : 'Wisselen...';
   }
 
-  // ── Herstart interval timer ───────────────────────────────
-  function restartTimer(tickFn){
-    if(radioTimer) clearInterval(radioTimer);
-    const sec = +intervalSl.value || 60;
-    startCountdown(sec);
-    radioTimer = setInterval(async ()=>{
-      if(!radioActive) return;
-      await tickFn();
+  // ── Herstart interval-timer ─────────────────────────────────
+  function restartTimer(){
+    if(rpTimer) clearInterval(rpTimer);
+    const sec = +rpIntervalSl.value||60;
+    startCd(sec);
+    rpTimer = setInterval(async()=>{
+      if(!rpActive) return;
+      await playNextPair();
+      startCd(+rpIntervalSl.value||60);
     }, sec*1000);
   }
 
-  // ── Start/Stop/Skip/Shuffle ───────────────────────────────
-  function setupControls(tickFn, updateFiles){
-    btnStart.addEventListener('click', async ()=>{
-      radioActive = true;
-      btnStart.disabled   = true;
-      btnStop.disabled    = false;
-      btnSkip.disabled    = false;
-      btnShuffle.disabled = false;
-      radioLog('Radio gestart (2 sporen).');
-      if(updateFiles) await updateFiles();
-      await tickFn();
-      restartTimer(tickFn);
-    });
-
-    btnStop.addEventListener('click', ()=>{
-      radioActive = false;
-      if(radioTimer){ clearInterval(radioTimer); radioTimer = null; }
-      if(radioCountdownTimer){ clearInterval(radioCountdownTimer); radioCountdownTimer = null; }
-      setDot('off');
-      countdown.textContent = '';
-      statusTxt.textContent = 'Gestopt.';
-      btnStart.disabled   = false;
-      btnStop.disabled    = true;
-      btnSkip.disabled    = true;
-      btnShuffle.disabled = true;
-      radioLog('Radio gestopt.');
-      try{ stopRandStartTimer(); }catch(e){}
-      playState = false;
-      try{ engine && engine.stop(); currentEngine && currentEngine.stop(); }catch(e){}
-      if(ui.start) ui.start.disabled = !buffer;
-      if(ui.stop)  ui.stop.disabled  = true;
-    });
-
-    btnSkip.addEventListener('click', async ()=>{
-      if(!radioActive) return;
-      if(radioTimer){ clearInterval(radioTimer); radioTimer = null; }
-      if(radioCountdownTimer){ clearInterval(radioCountdownTimer); radioCountdownTimer = null; }
-      radioLog('Overgeslagen.');
-      await tickFn();
-      restartTimer(tickFn);
-    });
-
-    btnShuffle.addEventListener('click', async ()=>{
-      if(!radioActive) return;
-      radioLog('Handmatige shuffle (2 sporen).');
-      const pair = nextFromQueue();
-      if(pair) await loadPair(pair);
-    });
-
-    intervalSl.addEventListener('change',  ()=>{ if(radioActive) restartTimer(tickFn); });
-    intervalNum.addEventListener('change', ()=>{ if(radioActive) restartTimer(tickFn); });
+  // ── Update bestandenlijst ───────────────────────────────────
+  function setFiles(files){
+    rpFiles = files;
+    rpMainQ = []; rpDrumQ = [];
+    rpBadge.textContent = rpFiles.length>=2
+      ? '✓ '+rpFiles.length+' bestanden beschikbaar'
+      : rpFiles.length===1
+        ? '⚠ Minimaal 2 bestanden nodig.'
+        : '⚠ Geen bestanden geladen.';
+    rpBtnStart.disabled = rpFiles.length < 2;
+    rplog(rpFiles.length+' bestanden geladen.');
   }
 
-  // ── Dot helper ───────────────────────────────────────────
-  function setDot(state){
-    dot.className = 'radio-dot'
-      + (state==='on' ? ' on' : state==='loading' ? ' loading' : '');
-  }
-
-  // ── Publieke interface ────────────────────────────────────
-  return {
-    radioLog, setDot, statusTxt,
-    get radioFiles(){ return radioFiles; },
-    setFiles(f){
-      const prevCount = radioFiles.length;
-      radioFiles = f;
-      filesBadge.textContent = radioFiles.length >= 2
-        ? '\u2713 ' + radioFiles.length + ' bestanden beschikbaar (2 sporen)'
-        : radioFiles.length === 1
-          ? '\u26A0 Slechts 1 bestand \u2014 minimaal 2 nodig.'
-          : '\u26A0 Geen audiobestanden.';
-      if(radioFiles.length !== prevCount){
-        mainQueue = []; drumQueue = [];
-        radioLog('Lijst veranderd \u2192 queues gereset.');
-      }
-    },
-    nextFromQueue, loadPair, startCountdown,
-    setupControls,
-    isActive(){ return radioActive; }
-  };
-}
-
-// ══════════════════════════════════════════════════════════════
-//  RADIO PORTAL — OFFLINE (lokale map)
-// ══════════════════════════════════════════════════════════════
-(function(){
-  const R = radioSharedInit();
-
-  const btnFolder = document.getElementById('radioBtnFolder');
-  const fallback  = document.getElementById('radioFolderFallback');
-
-  // ── Bestand naar {name, getBuffer} entry ─────────────────
-  function fileEntry(file){
-    return {
-      name: file.name,
-      getBuffer: async ()=>{
-        const arr = await file.arrayBuffer();
-        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-        return audioCtx.decodeAudioData(arr.slice(0));
-      }
-    };
-  }
-
-  // ── File System Access API (Chrome/Edge) ──────────────────
-  if(btnFolder) btnFolder.addEventListener('click', async ()=>{
+  // ── Mapkiezer (File System Access API) ─────────────────────
+  rpBtnFolder.addEventListener('click', async ()=>{
     if(!window.showDirectoryPicker){
-      R.radioLog('File System Access niet beschikbaar. Gebruik de fallback hieronder.');
+      rplog('File System Access niet beschikbaar. Gebruik de fallback.');
       return;
     }
     try{
       const dir = await window.showDirectoryPicker({mode:'read'});
       const entries = [];
-      for await (const [name, handle] of dir.entries()){
-        if(handle.kind !== 'file') continue;
+      for await(const [name, handle] of dir.entries()){
+        if(handle.kind!=='file') continue;
         if(!name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/)) continue;
-        entries.push({
-          name,
-          getBuffer: async ()=>{
-            const f   = await handle.getFile();
-            const arr = await f.arrayBuffer();
-            if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-            return audioCtx.decodeAudioData(arr.slice(0));
-          }
-        });
+        entries.push({ name, getFile: ()=> handle.getFile() });
       }
-      R.setFiles(entries);
-      R.radioLog('Map geladen: ' + entries.length + ' bestanden (2 sporen).');
-      document.getElementById('radioBtnStart').disabled = entries.length < 2;
+      setFiles(entries);
     }catch(e){
-      if(e.name !== 'AbortError') R.radioLog('Fout map: ' + e.message);
+      if(e.name!=='AbortError') rplog('Fout map: '+e.message);
     }
   });
 
-  // ── Fallback: meerdere bestanden ──────────────────────────
-  if(fallback) fallback.addEventListener('change', async ()=>{
-    const files = Array.from(fallback.files||[])
+  // ── Fallback: losse bestanden ───────────────────────────────
+  rpFallback.addEventListener('change', ()=>{
+    const files = Array.from(rpFallback.files||[])
       .filter(f=> f.name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/));
-    R.setFiles(files.map(fileEntry));
-    R.radioLog('Fallback: ' + files.length + ' bestanden geladen (2 sporen).');
-    document.getElementById('radioBtnStart').disabled = files.length < 2;
+    setFiles(files.map(f=>({ name:f.name, getFile:()=> Promise.resolve(f) })));
   });
 
-  // ── Tick: pakt volgend paar uit shuffled queue ────────────
-  async function tick(){
-    const pair = R.nextFromQueue();
-    if(pair) await R.loadPair(pair);
-    R.startCountdown(+document.getElementById('radioInterval').value || 60);
-  }
+  // ── Start ───────────────────────────────────────────────────
+  rpBtnStart.addEventListener('click', async ()=>{
+    rpActive = true;
+    rpBtnStart.disabled = true;
+    rpBtnStop.disabled  = false;
+    rpBtnSkip.disabled  = false;
+    rplog('Radio gestart.');
+    await playNextPair();
+    restartTimer();
+  });
 
-  R.setupControls(tick, null);
-  R.radioLog('Offline radio gereed. Kies een map met minimaal 2 audiobestanden.');
+  // ── Stop ────────────────────────────────────────────────────
+  rpBtnStop.addEventListener('click', ()=>{
+    rpActive = false;
+    if(rpTimer)  { clearInterval(rpTimer);  rpTimer=null; }
+    if(rpCdTimer){ clearInterval(rpCdTimer);rpCdTimer=null; }
+    setDot('off');
+    rpCountdown.textContent = '';
+    rpStatus.textContent    = 'Gestopt.';
+    rpBtnStart.disabled = rpFiles.length<2;
+    rpBtnStop.disabled  = true;
+    rpBtnSkip.disabled  = true;
+    rplog('Radio gestopt.');
+    // Stop de engine via de bestaande Stop-knop
+    if(ui.stop && !ui.stop.disabled) ui.stop.click();
+  });
+
+  // ── Volgende (skip) ─────────────────────────────────────────
+  rpBtnSkip.addEventListener('click', async ()=>{
+    if(!rpActive) return;
+    if(rpTimer)  { clearInterval(rpTimer);  rpTimer=null; }
+    if(rpCdTimer){ clearInterval(rpCdTimer);rpCdTimer=null; }
+    rplog('Overgeslagen.');
+    await playNextPair();
+    restartTimer();
+  });
+
+  // Interval aanpassen terwijl radio loopt
+  rpIntervalSl.addEventListener('change',  ()=>{ if(rpActive) restartTimer(); });
+  rpIntervalNum.addEventListener('change', ()=>{ if(rpActive) restartTimer(); });
+
+  rplog('Radio portal gereed.');
 })();
 
 </script>
