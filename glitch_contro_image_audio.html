@@ -182,6 +182,44 @@
             <option value="compression_hell">Compression hell</option>
             <option value="groove_erasure">Groove erasure</option>
             <option value="final_insult">Final insult</option>
+            <optgroup label="─── Wereld / Genre ───">
+            <option value="samba">Samba (2-bar surdo + tamborim)</option>
+            <option value="bossa_nova">Bossa Nova (clave + rimshot)</option>
+            <option value="afrobeat">Afrobeat (fela-stijl, 12/8 feel)</option>
+            <option value="funk">Funk (JB-stijl, ghost notes)</option>
+            <option value="jazz_comping">Jazz Comping (ride + snare)</option>
+            <option value="cumbia">Cumbia (Colombia)</option>
+            <option value="baile_funk">Baile Funk (Rio, tamborim)</option>
+            <option value="footwork">Footwork / Juke (Chicago, 160bpm-feel)</option>
+            <option value="grime">Grime (140bpm half-time feel)</option>
+            <option value="dancehall">Dancehall (one-drop)</option>
+            <option value="soca">Soca / Bacchanal</option>
+            <option value="bhangra">Bhangra (dhol-stijl)</option>
+            <option value="taiko">Taiko (Japanse trommel)</option>
+            <option value="clave_32">Clave 3-2 (Cubaans)</option>
+            <option value="clave_23">Clave 2-3 (Cubaans)</option>
+            <option value="tresillo">Tresillo (3+3+2)</option>
+            <option value="waltz">Wals (3/4 — 12 steps)</option>
+            <option value="five_four">5/4 Polyritmisch</option>
+            <option value="seven_eight">7/8 Odd meter</option>
+            </optgroup>
+            <optgroup label="─── Algoritmisch / Experimenteel ───">
+            <option value="euclidean_3_8">Euclidisch E(3,8)</option>
+            <option value="euclidean_5_16">Euclidisch E(5,16)</option>
+            <option value="euclidean_7_16">Euclidisch E(7,16)</option>
+            <option value="poly_3_4">Polyritmisch 3 tegen 4</option>
+            <option value="fibonacci_pulse">Fibonacci pulse</option>
+            <option value="density_wave">Density wave</option>
+            <option value="sparse_drone">Sparse drone (minimalistisch)</option>
+            <option value="chaos_map">Chaos map (logistisch)</option>
+            <option value="pitch_ladder">Pitch ladder (rate climbing)</option>
+            <option value="inverse_shuffle">Inverse shuffle</option>
+            <option value="bjorklund_rotate">Bjorklund rotate (E(5,8) +offset)</option>
+            <option value="binary_count">Binary counter</option>
+            <option value="gray_code">Gray code ritme</option>
+            <option value="canons">Kanonisch (canon ritme)</option>
+            <option value="microrhythm">Micro-ritme (nanogrid)</option>
+            </optgroup>
           </select>
           <div class="small">Deze patterns slicen je 2e sample (intern 16 slices) en spelen fragmenten op een 16-step grid.</div>
         </div>
@@ -987,6 +1025,401 @@ const DRUM_ALGOS = {
     if([0,9,12].includes(s)) hits.push({slice:0, amp:0.95, durSteps:2});
     if([4,8,14].includes(s)) hits.push({slice:8, amp:0.95, durSteps:2});
     if([2,6,10,15].includes(s)) hits.push({slice:12, amp:0.45, durSteps:1});
+    return hits;
+  },
+
+  // ─── WERELD / GENRE ─────────────────────────────────────────────────
+
+  // 11) Samba (2-bar: surdo + tamborim + rimshot)
+  samba(step, v){
+    const s = step % 32;
+    const hits = [];
+    // surdo (lage drum) op 8 en 24
+    if(s===0||s===8||s===16||s===24) hits.push({slice:0, amp:s%16===8?1.1:0.6, durSteps:2});
+    // tamborim: 3+3+2 feel herhaling
+    if([1,4,7,9,12,15,17,20,23,25,28,31].includes(s)) hits.push({slice:12, amp:0.55, durSteps:1, rate:1.1});
+    // rimshot op de snare-positie
+    if([4,12,20,28].includes(s)) hits.push({slice:8, amp:0.75, durSteps:1});
+    return hits;
+  },
+
+  // 12) Bossa Nova (clave + rimshot cross-stick)
+  bossa_nova(step, v){
+    const s = step % 16;
+    const hits = [];
+    // clave 3-2 feel voor bossa: 0,3,6,10,12
+    if([0,3,6,10,12].includes(s)) hits.push({slice:12, amp:0.65, durSteps:1, rate:1.05});
+    // surdo (lichte bas)
+    if(s===0) hits.push({slice:0, amp:0.8, durSteps:2});
+    if(s===8) hits.push({slice:0, amp:0.55, durSteps:2});
+    // rimshot cross-stick
+    if([4,12].includes(s)) hits.push({slice:8, amp:0.6, durSteps:1, rate:0.95});
+    return hits;
+  },
+
+  // 13) Afrobeat (Fela-stijl, 12/8 feel op 16e grid)
+  afrobeat(step, v){
+    const s = step % 24; // 24 = 2 bars van 12/8
+    const hits = [];
+    // lage bas-drum: 0, 6, 12, 18
+    if([0,6,12,18].includes(s)) hits.push({slice:0, amp:0.95, durSteps:2});
+    // snare: 4, 10, 16, 22
+    if([4,10,16,22].includes(s)) hits.push({slice:8, amp:0.9, durSteps:1});
+    // hi-hat: elke 2 stappen
+    if(s%2===0) hits.push({slice:12, amp:0.35, durSteps:1, rate:1.0});
+    // bell-lijn (agogo-feel): 0,3,4,6,9,10,12,15,16,18,21,22
+    if([0,3,4,9,10,15,16,21].includes(s)) hits.push({slice:14, amp:0.4, durSteps:1, rate:1.2});
+    return hits;
+  },
+
+  // 14) Funk (James Brown-stijl, ghost notes, syncopatie)
+  funk(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick: 0, 3, 8, 11 (syncopated)
+    if([0,3,8,11].includes(s)) hits.push({slice:0, amp:s===0||s===8?1.0:0.7, durSteps:s===0?2:1});
+    // snare: 4, 12 (+ ghost op 5 en 13)
+    if([4,12].includes(s)) hits.push({slice:8, amp:1.0, durSteps:1});
+    if([5,13].includes(s)) hits.push({slice:8, amp:0.25, durSteps:1, rate:1.1}); // ghost
+    if([6,7,14,15].includes(s)) hits.push({slice:8, amp:0.18, durSteps:1, rate:1.2}); // ghosttrain
+    // hi-hat: alle 16e, zachter op even stappen
+    hits.push({slice:12, amp:s%2===0?0.5:0.3, durSteps:1, rate:1.0});
+    return hits;
+  },
+
+  // 15) Jazz Comping (ride cymbal + snare brush)
+  jazz_comping(step, v){
+    const s = step % 12; // triplet feel: 3 per kwart = 12 per maat
+    const hits = [];
+    // ride: elke triplet, sterker op 1e en 3e beat
+    hits.push({slice:12, amp:[0,6].includes(s)?0.75:0.4, durSteps:1, rate:0.95});
+    // snare brush comp: 2,5,8,10
+    if([2,5,8,10].includes(s)) hits.push({slice:8, amp:0.35, durSteps:1, rate:0.9});
+    // bas: 0 en 6
+    if([0,6].includes(s)) hits.push({slice:0, amp:0.8, durSteps:2});
+    return hits;
+  },
+
+  // 16) Cumbia (Colombia)
+  cumbia(step, v){
+    const s = step % 16;
+    const hits = [];
+    // caja (scherpte trom): 0,2,8,10
+    if([0,2,8,10].includes(s)) hits.push({slice:0, amp:s===0||s===8?1.0:0.65, durSteps:1});
+    // llamador (hoge trom): 4, 12
+    if([4,12].includes(s)) hits.push({slice:8, amp:0.8, durSteps:1});
+    // guacharaca (scraper feel, hoge rate): 1,3,5,7,9,11,13,15
+    if(s%2===1) hits.push({slice:12, amp:0.3, durSteps:1, rate:1.4});
+    return hits;
+  },
+
+  // 17) Baile Funk (Rio, 130+ bpm, tamborim + rebolo)
+  baile_funk(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick: 0, 4, 8, 10, 12
+    if([0,4,8,10,12].includes(s)) hits.push({slice:0, amp:s===0?1.1:0.8, durSteps:s===0?2:1});
+    // snare: 4, 12 (plus lichte slag op 6)
+    if([4,12].includes(s)) hits.push({slice:8, amp:1.0, durSteps:1});
+    if(s===6) hits.push({slice:8, amp:0.45, durSteps:1});
+    // tamborim hoge tonen: alle 16e (alternerend)
+    hits.push({slice:12, amp:s%2===0?0.6:0.35, durSteps:1, rate:s%4===0?1.0:1.15});
+    return hits;
+  },
+
+  // 18) Footwork / Juke (Chicago, 160bpm-feel, complexe hats)
+  footwork(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick op onverwachte plekken: 0,2,3,8,9,13
+    if([0,2,3,8,9,13].includes(s)) hits.push({slice:0, amp:s===0?1.1:0.75, durSteps:1});
+    // clap/snare: 4, 12 (+ extra op 7)
+    if([4,7,12].includes(s)) hits.push({slice:8, amp:s===7?0.5:1.0, durSteps:1});
+    // hi-hat: elke stap
+    hits.push({slice:12, amp:0.4 + (s%3===0?0.2:0), durSteps:1, rate:0.9+s*0.01});
+    return hits;
+  },
+
+  // 19) Grime (140bpm, halftime snare op stap 8)
+  grime(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick: 0 en 5 (syncopated)
+    if([0,5].includes(s)) hits.push({slice:0, amp:s===0?1.1:0.7, durSteps:s===0?2:1});
+    // snare (halftime): 8
+    if(s===8) hits.push({slice:8, amp:1.1, durSteps:2});
+    // hi-hat: elke twee stappen + een extra op 10
+    if([2,4,6,10,12,14].includes(s)) hits.push({slice:12, amp:0.4, durSteps:1, rate:1.05});
+    // sub-step hi-hat roll: 14,15 (build naar 0)
+    if(s===15) hits.push({slice:12, amp:0.6, durSteps:1, rate:1.3});
+    return hits;
+  },
+
+  // 20) Dancehall (one-drop: snare + kick samen op slag 2 en 4 = stap 4 en 12)
+  dancehall(step, v){
+    const s = step % 16;
+    const hits = [];
+    // one-drop: kick + snare samen
+    if([4,12].includes(s)){
+      hits.push({slice:0, amp:0.95, durSteps:2});
+      hits.push({slice:8, amp:1.05, durSteps:1});
+    }
+    // lichte kick anticipatie: 3 en 11
+    if([3,11].includes(s)) hits.push({slice:0, amp:0.4, durSteps:1});
+    // hi-hat (ska-feel offbeats): 2,6,10,14
+    if([2,6,10,14].includes(s)) hits.push({slice:12, amp:0.5, durSteps:1, rate:1.0});
+    return hits;
+  },
+
+  // 21) Soca / Bacchanal (Trinidad, driving 4-on-the-floor + cowbell)
+  soca(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick op elke kwart
+    if([0,4,8,12].includes(s)) hits.push({slice:0, amp:1.0, durSteps:2});
+    // snare/steel pan: 2, 6, 10, 14
+    if([2,6,10,14].includes(s)) hits.push({slice:8, amp:0.75, durSteps:1, rate:1.1});
+    // cowbell feel (hoge snelle noten): alle oneven stappen
+    if(s%2===1) hits.push({slice:13, amp:0.4, durSteps:1, rate:1.3});
+    return hits;
+  },
+
+  // 22) Bhangra (dhol-stijl: lage bas + hoge slag)
+  bhangra(step, v){
+    const s = step % 16;
+    const hits = [];
+    // dhol lage kant: 0, 2, 8, 10
+    if([0,2,8,10].includes(s)) hits.push({slice:0, amp:s===0||s===8?1.1:0.65, durSteps:s===0?2:1});
+    // dhol hoge kant (snel): 1,3,4,5,9,11,12,13
+    if([1,3,4,5,9,11,12,13].includes(s)) hits.push({slice:8, amp:0.45+([4,12].includes(s)?0.35:0), durSteps:1, rate:1.1});
+    return hits;
+  },
+
+  // 23) Taiko (Japanse trommel, krachtig en plechtig)
+  taiko(step, v){
+    const s = step % 16;
+    const hits = [];
+    // grote taiko: 0 en 8 (lang, zwaar)
+    if([0,8].includes(s)) hits.push({slice:0, amp:1.2, durSteps:4, rate:0.85});
+    // kleine taiko (shime): 4, 12
+    if([4,12].includes(s)) hits.push({slice:8, amp:0.9, durSteps:2, rate:1.1});
+    // accent slagen: 3, 7, 11, 15
+    if([3,7,11,15].includes(s)) hits.push({slice:8, amp:0.5, durSteps:1, rate:1.2});
+    return hits;
+  },
+
+  // 24) Clave 3-2 (Cubaans, gebruik als ritmische basis)
+  clave_32(step, v){
+    const s = step % 16;
+    // 3-2 clave: slagen op 0, 3, 6, 10, 12
+    if([0,3,6,10,12].includes(s)) return [{slice:12, amp:0.9, durSteps:1, rate:1.15}];
+    return [];
+  },
+
+  // 25) Clave 2-3 (omgekeerde Cubaanse clave)
+  clave_23(step, v){
+    const s = step % 16;
+    // 2-3 clave: slagen op 0, 4, 6, 9, 12 (retrograde van 3-2)
+    if([0,4,6,9,12].includes(s)) return [{slice:12, amp:0.9, durSteps:1, rate:1.15}];
+    return [];
+  },
+
+  // 26) Tresillo (3+3+2 feel, basis van veel Latijnse en Afro-Cubaanse muziek)
+  tresillo(step, v){
+    const s = step % 8; // 1 maat = 8 stappen voor het tresillo
+    if([0,3,6].includes(s)) return [{slice:0, amp:s===0?1.0:0.8, durSteps:1}];
+    return [];
+  },
+
+  // 27) Wals (3/4 maat — 12 stappen)
+  waltz(step, v){
+    const s = step % 12;
+    if(s===0) return [{slice:0, amp:1.1, durSteps:3}];       // slag 1 (zwaar)
+    if(s===4) return [{slice:8, amp:0.7, durSteps:2}];       // slag 2
+    if(s===8) return [{slice:8, amp:0.65, durSteps:2}];      // slag 3
+    if([2,6,10].includes(s)) return [{slice:12, amp:0.35, durSteps:1}]; // hats
+    return [];
+  },
+
+  // 28) 5/4 polyritmisch (20 stappen = 5 kwarten)
+  five_four(step, v){
+    const s = step % 20;
+    const hits = [];
+    // kick op elke kwart (iedere 4 stappen)
+    if(s%4===0) hits.push({slice:0, amp:s===0?1.1:0.85, durSteps:2});
+    // snare op slag 3 (stap 8) en slag 5 (stap 16)
+    if([8,16].includes(s)) hits.push({slice:8, amp:1.0, durSteps:1});
+    // hi-hat: alle stappen
+    hits.push({slice:12, amp:0.35, durSteps:1, rate:1.0});
+    return hits;
+  },
+
+  // 29) 7/8 odd meter (28 stappen = 7 kwarten × 2)
+  seven_eight(step, v){
+    const s = step % 14; // 7 kwarten = 14 16e-noten
+    const hits = [];
+    // kick: 0, 4, 8 (2+2+3 grouping)
+    if([0,4,8].includes(s)) hits.push({slice:0, amp:s===0?1.1:0.8, durSteps:s===8?3:2});
+    // snare: 3, 11
+    if([3,11].includes(s)) hits.push({slice:8, amp:1.0, durSteps:1});
+    // hi-hat
+    if(s%2===0) hits.push({slice:12, amp:0.4, durSteps:1});
+    return hits;
+  },
+
+  // ─── ALGORITMISCH / EXPERIMENTEEL ───────────────────────────────────
+
+  // 30) Euclidisch ritme E(3,8) — 3 slagen over 8 stappen
+  euclidean_3_8(step, v){
+    const s = step % 8;
+    // E(3,8) = [1,0,0,1,0,0,1,0] (Bjorklund)
+    if([0,3,6].includes(s)) return [{slice:0, amp:s===0?1.0:0.8, durSteps:1}];
+    return [];
+  },
+
+  // 31) Euclidisch ritme E(5,16)
+  euclidean_5_16(step, v){
+    const s = step % 16;
+    // E(5,16) = slagen op 0,3,6,10,13
+    if([0,3,6,10,13].includes(s)) return [{slice:8, amp:s===0?1.0:0.75, durSteps:1}];
+    return [];
+  },
+
+  // 32) Euclidisch ritme E(7,16)
+  euclidean_7_16(step, v){
+    const s = step % 16;
+    // E(7,16) = slagen op 0,2,4,6,9,11,13
+    if([0,2,4,6,9,11,13].includes(s)) return [{slice:12, amp:s%4===0?0.85:0.5, durSteps:1, rate:s%4===0?1.0:1.1}];
+    return [];
+  },
+
+  // 33) Polyritmisch: 3 tegen 4 (12-step cycle)
+  poly_3_4(step, v){
+    const s = step % 12;
+    const hits = [];
+    // 3-laag (elke 4 stappen): 0, 4, 8
+    if(s%4===0) hits.push({slice:0, amp:0.9, durSteps:2});
+    // 4-laag (elke 3 stappen): 0, 3, 6, 9
+    if(s%3===0) hits.push({slice:8, amp:0.75, durSteps:1, rate:1.05});
+    return hits;
+  },
+
+  // 34) Fibonacci pulse (tussenruimten zijn Fibonacci: 1,1,2,3,5...)
+  fibonacci_pulse(step, v){
+    const fibs = [0,1,2,4,7,12]; // cummulatieve Fibonacci posities mod 16
+    const s = step % 13; // som 1+1+2+3+5 = 13 → één cyclus
+    const triggers = [0,1,2,4,7,12].map(x=>x%13);
+    if(triggers.includes(s)) return [{slice:s%3, amp:s===0?1.0:0.7+s*0.02, durSteps:1, rate:0.9+s*0.05}];
+    return [];
+  },
+
+  // 35) Density wave (hoe later in de cyclus, hoe dichter de slagen)
+  density_wave(step, v){
+    const s = step % 32;
+    const hits = [];
+    const density = Math.floor(s / 4) + 1; // 1..8 slagen per 4 stappen
+    const interval = Math.max(1, Math.floor(4 / density));
+    if(s % interval === 0) hits.push({slice:s%16, amp:0.5 + s/64, durSteps:1, rate:1.0 + s/128});
+    return hits;
+  },
+
+  // 36) Sparse drone (minimalistisch: af en toe een lange slag)
+  sparse_drone(step, v){
+    const s = step % 64;
+    if(s===0) return [{slice:0, amp:1.2, durSteps:8, rate:0.7}];
+    if(s===32) return [{slice:8, amp:0.9, durSteps:4, rate:0.8}];
+    if([16,48].includes(s)) return [{slice:4, amp:0.6, durSteps:2, rate:0.9}];
+    return [];
+  },
+
+  // 37) Chaos map (logistisch: r=3.7, initieel x=0.4 — deterministisch per stap)
+  chaos_map(step, v){
+    // itereer de logistische map vanaf vaste seed zodat het deterministisch is
+    let x = 0.4;
+    const r = 3.72;
+    for(let i = 0; i < (step % 128) + 1; i++) x = r * x * (1 - x);
+    const slice = Math.floor(x * 16);
+    const amp = 0.3 + x * 0.9;
+    if(x > 0.55) return [{slice, amp, durSteps:1, rate:0.7 + x * 0.8}];
+    return [];
+  },
+
+  // 38) Pitch ladder (rate klimt stap voor stap omhoog)
+  pitch_ladder(step, v){
+    const s = step % 16;
+    const rate = 0.5 + (s / 15) * 1.5; // 0.5 → 2.0
+    return [{slice:s, amp:0.7, durSteps:1, rate}];
+  },
+
+  // 39) Inverse shuffle (swing op de verkeerde plekken)
+  inverse_shuffle(step, v){
+    const s = step % 16;
+    const hits = [];
+    // kick op oneven kwarten: 2, 6, 10, 14
+    if([2,6,10,14].includes(s)) hits.push({slice:0, amp:0.9, durSteps:2});
+    // snare op de downbeats: 0, 8
+    if([0,8].includes(s)) hits.push({slice:8, amp:0.75, durSteps:1});
+    // hats op de "verkeerde" beats: 1,5,9,13
+    if([1,5,9,13].includes(s)) hits.push({slice:12, amp:0.5, durSteps:1, rate:0.95});
+    return hits;
+  },
+
+  // 40) Bjorklund met rotatie — E(5,8) verschoven met 2
+  bjorklund_rotate(step, v){
+    const s = step % 8;
+    // E(5,8) = [1,0,1,1,0,1,1,0], geroteerd met +2 → [1,1,0,1,1,0,1,0]
+    const pat = [1,1,0,1,1,0,1,0];
+    if(!pat[s]) return [];
+    const amp = s===0||s===1 ? 0.95 : 0.7;
+    return [{slice:s*2, amp, durSteps:1, rate:0.9+s*0.04}];
+  },
+
+  // 41) Binary counter (binaire teller bepaalt welke slagen klinken)
+  binary_count(step, v){
+    const s = step % 16;
+    const hits = [];
+    // stap s in binair: bit 0 = kick, bit 1 = snare, bit 2 = hat
+    if(s & 1) hits.push({slice:0, amp:0.8, durSteps:1});
+    if(s & 2) hits.push({slice:8, amp:0.75, durSteps:1});
+    if(s & 4) hits.push({slice:12, amp:0.5, durSteps:1, rate:1.1});
+    if(s & 8) hits.push({slice:4, amp:0.4, durSteps:1, rate:0.85});
+    return hits;
+  },
+
+  // 42) Gray code ritme (Gray-code volgorde: opeenvolgende waarden verschillen 1 bit)
+  gray_code(step, v){
+    const s = step % 16;
+    const gray = s ^ (s >> 1); // Gray code van s
+    const hits = [];
+    if(gray & 1) hits.push({slice:0, amp:0.9, durSteps:1});
+    if(gray & 2) hits.push({slice:8, amp:0.7, durSteps:1});
+    if(gray & 4) hits.push({slice:12, amp:0.5, durSteps:1, rate:1.1});
+    return hits;
+  },
+
+  // 43) Kanonisch ritme (dezelfde lijn start op 3 verschillende offsets)
+  canons(step, v){
+    const s = step % 16;
+    const base = [0,3,6,10,12]; // basispatroon
+    const hits = [];
+    if(base.includes(s))     hits.push({slice:0, amp:0.8, durSteps:1});           // stem 1
+    if(base.includes((s+4)%16)) hits.push({slice:4, amp:0.55, durSteps:1, rate:1.05}); // stem 2
+    if(base.includes((s+8)%16)) hits.push({slice:8, amp:0.4, durSteps:1, rate:0.95}); // stem 3
+    return hits;
+  },
+
+  // 44) Micro-ritme (nanogrid: 32 stappen, kleine afwijkingen in amplitude)
+  microrhythm(step, v){
+    const s = step % 32;
+    const hits = [];
+    // basispatroon op 32e-noot grid
+    if(s%8===0) hits.push({slice:0, amp:1.0, durSteps:2});     // kick
+    if(s%8===4) hits.push({slice:8, amp:0.95, durSteps:1});    // snare
+    // micro-aanpassingen: kleine slag iets te vroeg of laat
+    if(s===3||s===11||s===19||s===27) hits.push({slice:12, amp:0.3, durSteps:1, rate:1.05}); // anticipatie
+    if(s===5||s===13||s===21||s===29) hits.push({slice:12, amp:0.25, durSteps:1, rate:0.95}); // vertraging
+    // hi-hat op even stappen
+    if(s%2===0) hits.push({slice:12, amp:0.35, durSteps:1});
     return hits;
   }
 };
