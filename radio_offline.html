@@ -2082,13 +2082,14 @@ this.active = new Set();
   }
 
   stop(){
-    // instant mute to avoid any tail
+    // instant mute
     try{ this.master.gain.cancelScheduledValues(this.ctx.currentTime); }catch{}
     try{ this.master.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
     this.running = false;
     if(this.timer) clearInterval(this.timer);
     this.timer = null;
 
+    // Stop and disconnect all active voices
     for(const rec of this.active){
       try { rec.src.onended = null; } catch {}
       try { rec.src.stop(0); } catch {}
@@ -2096,7 +2097,34 @@ this.active = new Set();
       try { rec.g.disconnect(); } catch {}
     }
     this.active.clear();
+
+    // Silence drum layer
     try{ this.drumGain.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
+
+    // Kill ScriptProcessor (bitcrusher) — crucial: zonder dit lekt
+    // onaudioprocess en blijft de oude engine de CPU belasten
+    try{ this.drumCrush.onaudioprocess = null; }catch{}
+    try{ this.drumCrush.disconnect(); }catch{}
+
+    // Disconnect de volledige interne grafiek zodat de GC de engine
+    // kan opruimen. Zonder dit stapelen AudioNodes op in de context.
+    const nodes = [
+      this.mix, this.master, this.drumGain, this.drumFX_in,
+      this.drumHPF, this.drumLPF, this.drumDriveGain, this.drumShaper,
+      this.drumDelay, this.drumDelayFB, this.drumDelayMix, this.drumDry,
+      this.drumConvolver, this.drumRevMix, this.drumPan,
+      this.compressor, this.analyser, this.out,
+    ];
+    for(const n of nodes){
+      try{ if(n) n.disconnect(); }catch{}
+    }
+    try{ this.postFx?.input?.disconnect(); }catch{}
+    try{ this.postFx?.output?.disconnect(); }catch{}
+
+    // Laat buffer referenties los zodat GC ze kan vrijgeven
+    this.buffer    = null;
+    this.revBuffer = null;
+    this.drumBuffer= null;
   }
 
   _tick(){
@@ -4219,55 +4247,68 @@ const CONTROVERSIAL_ALGOS = {
     return {main, drum};
   }
 
-  // ── Laad een File-object in een <input type="file"> ────────
-  // Dit zet het bestand in het input-veld en vuurt het change-event,
-  // zodat de bestaande event-handlers het precies zo verwerken
-  // als wanneer de gebruiker zelf een bestand kiest.
-  function injectFile(inputEl, file){
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    inputEl.files = dt.files;
-    inputEl.dispatchEvent(new Event('change', {bubbles:true}));
-  }
-
   // ── Speel het volgende paar ────────────────────────────────
+  // Beide buffers worden hier zelf gedecodeerd zodat drumBuffer
+  // globaal gezet is VOORDAT de hoofd-change-handler vuurt.
+  // Zo pakt de nieuwe engine altijd het juiste drum-bestand.
   async function playNextPair(){
     const pair = nextPair();
     if(!pair) return;
 
     setDot('loading');
     rpStatus.textContent = 'Laden...';
-    rpTrack1.textContent = 'Spoor 1 (hoofd): ⏳ '+pair.main.name;
-    rpTrack2.textContent = 'Spoor 2 (drum):  ⏳ '+pair.drum.name;
+    rpTrack1.textContent = 'Spoor 1: ⏳ '+pair.main.name;
+    rpTrack2.textContent = 'Spoor 2: ⏳ '+pair.drum.name;
     rplog('Laden: '+pair.main.name+' | drum: '+pair.drum.name);
 
     try{
-      // Haal File-objecten op
-      const [f1, f2] = await Promise.all([
-        pair.main.getFile(),
-        pair.drum.getFile()
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      await audioCtx.resume();
+
+      // Haal beide File-objecten en decode parallel
+      const [f1, f2] = await Promise.all([pair.main.getFile(), pair.drum.getFile()]);
+      const [arr1, arr2] = await Promise.all([f1.arrayBuffer(), f2.arrayBuffer()]);
+      const [mainBuf, drumBuf] = await Promise.all([
+        audioCtx.decodeAudioData(arr1),
+        audioCtx.decodeAudioData(arr2)
       ]);
 
-      // Zet drum-sample eerst zodat hij klaar is als hoofd laadt
-      injectFile(ui.drumFile, f2);
+      // Zet drumBuffer globaal VOOR de hoofd-change-handler vuurt —
+      // dan gebruikt newEngine.setDrumBuffer(drumBuffer) het juiste bestand
+      drumBuffer = drumBuf;
+      if(ui.drumInfo) ui.drumInfo.textContent =
+        'Drum sample: '+pair.drum.name+' ('+drumBuf.duration.toFixed(2)+'s)';
 
-      // Wacht kort zodat drumBuffer geladen is voor de engine start
-      await new Promise(r => setTimeout(r, 80));
+      // Geef drum ook direct door aan draaiende engine (als die er is)
+      if(engine) try{ engine.setDrumBuffer(drumBuf); }catch(e){}
 
-      // Zet hoofd-sample — de bestaande change-handler start
-      // automatisch playback als de pagina al speelde (crossfade)
-      injectFile(ui.file, f1);
+      // Update drumFile input visueel (geen change event — buffer al gezet)
+      try{ const dt=new DataTransfer(); dt.items.add(f2); ui.drumFile.files=dt.files; }catch(e){}
 
-      // Als we nog niet speelden: wacht op buffer laden dan Start
+      // Nu hoofd injecteren: de change-handler bouwt nieuwe engine
+      // met crossfade en gebruikt drumBuffer (net gezet hierboven)
+      const dt2 = new DataTransfer(); dt2.items.add(f1);
+      ui.file.files = dt2.files;
+      ui.file.dispatchEvent(new Event('change', {bubbles:true}));
+
+      // Wacht tot de change-handler klaar is: hij zet fileInfo op
+      // "Geladen: ..." als hij klaar is (async decode binnen handler)
+      await new Promise(resolve => {
+        const t0 = Date.now();
+        const id = setInterval(()=>{
+          const info = ui.fileInfo?.textContent || '';
+          const done = info.startsWith('Geladen:') && info.includes(pair.main.name.slice(0,8));
+          if(done || Date.now()-t0 > 6000){ clearInterval(id); resolve(); }
+        }, 40);
+      });
+
+      // Eerste keer nog niet aan het spelen: klik Start
       if(!playState){
-        await new Promise(r => setTimeout(r, 400));
-        if(buffer && ui.start && !ui.start.disabled){
-          ui.start.click();
-        }
+        if(ui.start && !ui.start.disabled) ui.start.click();
       }
 
-      rpTrack1.textContent = 'Spoor 1 (hoofd): ▶ '+pair.main.name;
-      rpTrack2.textContent = 'Spoor 2 (drum):  🥁 '+pair.drum.name;
+      rpTrack1.textContent = 'Spoor 1 ▶ '+pair.main.name+' ('+mainBuf.duration.toFixed(1)+'s)';
+      rpTrack2.textContent = 'Spoor 2 🥁 '+pair.drum.name+' ('+drumBuf.duration.toFixed(1)+'s)';
       rpStatus.textContent = 'On air: '+pair.main.name;
       setDot('on');
       rplog('On air ✓');
