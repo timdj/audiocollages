@@ -345,6 +345,38 @@
 
 
       <label>Algoritme (JS) — pas aan en druk op Start</label>
+      <select id="algoPreset" style="margin-bottom:4px">
+        <option value="">— kies een preset algoritme —</option>
+        <optgroup label="─── Willekeurig / Stochastisch ───">
+          <option value="random_walk">Random walk (dronende willekeur)</option>
+          <option value="drunk">Drunk walk (brownse beweging)</option>
+          <option value="markov">Markov keten (geheugen van 1 stap)</option>
+          <option value="weighted_rand">Gewogen willekeur (midden zwaarder)</option>
+          <option value="perlin">Perlin noise (vloeiende willekeur)</option>
+        </optgroup>
+        <optgroup label="─── Serieel / Rij-gebaseerd ───">
+          <option value="twelve_tone">Twaalftoonstechniek (pitch ladder)</option>
+          <option value="retrograde">Retrograde (achteruit)</option>
+          <option value="palindrome">Palindroom (heen en terug)</option>
+          <option value="rotation">Rotatie (schuivend venster)</option>
+          <option value="inversion">Inversie (spiegeling)</option>
+        </optgroup>
+        <optgroup label="─── Ritmisch / Metrisch ───">
+          <option value="isorhythm">Isoritmisch (talea × color)</option>
+          <option value="hocket">Hocket (afwisseling twee stemmen)</option>
+          <option value="euclidean_slice">Euclidisch slicen (E(5,13))</option>
+          <option value="polyrhythm_slice">Polyritmisch (3 tegen 4)</option>
+          <option value="aksak">Aksak (2+2+3 onregelmatig)</option>
+        </optgroup>
+        <optgroup label="─── Spectraal / Tijdsdomein ───">
+          <option value="spectral_freeze">Spectraal bevroren (lange slices)</option>
+          <option value="time_stretch">Tijdrekken (steeds langzamer)</option>
+          <option value="harmonic_series">Harmonische reeks (1/n)</option>
+          <option value="fibonacci_slice">Fibonacci slicen (gulden snede)</option>
+          <option value="cellular_automaton">Cellulaire automaat (regel 30)</option>
+          <option value="chaos_logistic">Chaos logistisch (r=3.9)</option>
+        </optgroup>
+      </select>
       <textarea id="algo" spellcheck="false"></textarea>
       <div class="small">
         Je schrijft <code>function algo(step, vars, helpers){...}</code> (step = 0,1,2,…) en je returnt:<br/>
@@ -3382,6 +3414,293 @@ function algo(step, vars, h){
   return { startNorm: s, finishNorm: f, amp, sleepBeats: d, rate: vars.rate };
 }`;
 
+// ── Algo presets ──────────────────────────────────────────────────────────────
+const ALGO_PRESETS = {
+
+  // ─── Willekeurig / Stochastisch ────────────────────────────────────────────
+
+  random_walk: `// Random walk — elke stap onafhankelijk willekeurig
+function algo(step, vars, h){
+  const d = 1 / vars.n;
+  const rng = h.mulberry32(vars.seed + step * 7919);
+  const s = h.clamp(rng(), 0, 1 - d);
+  return { startNorm: s, finishNorm: s + d, amp: 0.7 + rng()*0.4, sleepBeats: d, rate: vars.rate };
+}`,
+
+  drunk: `// Drunk walk (Brownse beweging) — positie dwaalt langzaam
+// Elke stap: kleine willekeurige stap vanuit vorige positie
+let _drunkPos = 0.5;
+function algo(step, vars, h){
+  const d = 1 / vars.n;
+  const rng = h.mulberry32(vars.seed + step * 3571);
+  if(step === 0) _drunkPos = 0.5;
+  _drunkPos += (rng() - 0.5) * d * 2.5;
+  _drunkPos = h.clamp(_drunkPos, 0, 1 - d);
+  return { startNorm: _drunkPos, finishNorm: _drunkPos + d, amp: 0.75, sleepBeats: d, rate: vars.rate };
+}`,
+
+  markov: `// Markov keten — volgende positie hangt af van huidige (geheugen=1)
+// Kans op grote sprong: 20%, anders kleine stap
+let _mPos = 0.0;
+function algo(step, vars, h){
+  const d = 1 / vars.n;
+  const rng = h.mulberry32(vars.seed + step * 6271);
+  if(step === 0) _mPos = 0.0;
+  const bigJump = rng() < 0.2;
+  if(bigJump) _mPos = rng();
+  else _mPos = h.clamp(_mPos + (rng() - 0.5) * d * 3, 0, 1 - d);
+  return { startNorm: _mPos, finishNorm: _mPos + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  weighted_rand: `// Gewogen willekeur — midden van het sample heeft meer kans
+function algo(step, vars, h){
+  const d = 1 / vars.n;
+  const rng = h.mulberry32(vars.seed + step * 4567);
+  // Beta-distributie benadering: gemiddelde van twee uniforme samples
+  const s = h.clamp((rng() + rng()) / 2 * (1 - d), 0, 1 - d);
+  const amp = 0.5 + (1 - Math.abs(s - 0.5) * 2) * 0.5;
+  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
+}`,
+
+  perlin: `// Perlin noise benadering — vloeiende willekeur via gefilterde rng
+// Geïnterpoleerd tussen random punten elke 8 stappen
+function algo(step, vars, h){
+  const d = 1 / vars.n;
+  const period = 8;
+  const phase = step % period;
+  const cycle = Math.floor(step / period);
+  const rng0 = h.mulberry32(vars.seed + cycle * 997);
+  const rng1 = h.mulberry32(vars.seed + (cycle+1) * 997);
+  const a = rng0(), b = rng1();
+  const t = phase / period;
+  const smooth = t*t*(3-2*t); // smoothstep
+  const s = h.clamp(a + (b - a) * smooth, 0, 1 - d);
+  return { startNorm: s, finishNorm: s + d, amp: 0.75, sleepBeats: d, rate: vars.rate };
+}`,
+
+  // ─── Serieel / Rij-gebaseerd ───────────────────────────────────────────────
+
+  twelve_tone: `// Twaalftoonstechniek — 12 posities gelijkmatig verdeeld, vaste volgorde
+// Rij: 0,7,11,3,8,2,6,10,1,5,9,4 (gebaseerd op Schoenberg op.25)
+function algo(step, vars, h){
+  const row = [0,7,11,3,8,2,6,10,1,5,9,4];
+  const d = 1 / 12;
+  const idx = row[step % 12];
+  const s = idx * d;
+  const octave = Math.floor(step / 12) % 3;
+  const rate = [0.5, 1.0, 2.0][octave];
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate };
+}`,
+
+  retrograde: `// Retrograde — speelt de posities achteruit (spiegeling in de tijd)
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const fwd = step % n;
+  const rev = (n - 1 - fwd); // achteruit
+  const s = rev * d;
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  palindrome: `// Palindroom — heen (0→n) dan terug (n→0)
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const cycle = step % (n * 2);
+  const idx = cycle < n ? cycle : (n*2 - 1 - cycle);
+  const s = idx * d;
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  rotation: `// Rotatie — schuivend venster over het sample
+// Elke 8 stappen schuift de startpositie op
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const windowSize = Math.max(1, Math.floor(n / 4));
+  const offset = (Math.floor(step / windowSize) % n) * d;
+  const local = (step % windowSize) * (d / windowSize * windowSize);
+  const s = h.clamp(offset + local, 0, 1 - d);
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  inversion: `// Inversie — spiegeling om het middelpunt (0.5)
+// Afgewisseld: origineel en gespiegeld
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const idx = step % n;
+  const s_fwd = idx * d;
+  const s_inv = h.clamp(1 - s_fwd - d, 0, 1 - d);
+  const s = step % 2 === 0 ? s_fwd : s_inv;
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  // ─── Ritmisch / Metrisch ───────────────────────────────────────────────────
+
+  isorhythm: `// Isoritmisch — talea (ritmische rij) × color (melodische rij)
+// Talea: duurpatroon [1,1,2,1,3] (in beats), Color: 7 posities
+function algo(step, vars, h){
+  const talea  = [1,1,2,1,3,1,2];          // ritmische rij
+  const color  = [0,3,1,6,2,5,4,7,1,6,3]; // positie-rij (in n-delen)
+  const n = vars.n;
+  const d = 1 / n;
+  const dur   = talea[step % talea.length];
+  const posIdx= color[step % color.length] % n;
+  const s = posIdx * d;
+  return { startNorm: s, finishNorm: s + d, amp: 0.85, sleepBeats: d * dur, rate: vars.rate };
+}`,
+
+  hocket: `// Hocket — twee stemmen wisselen elkaar af, nooit tegelijk
+// Stem A: even stappen (voor), Stem B: oneven stappen (achter)
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const isA = step % 2 === 0;
+  const half = Math.floor(n / 2);
+  const idx  = isA ? (step/2) % half : ((step-1)/2) % half + half;
+  const s = (idx % n) * d;
+  return { startNorm: s, finishNorm: s + d, amp: isA ? 0.9 : 0.6, sleepBeats: d, rate: vars.rate };
+}`,
+
+  euclidean_slice: `// Euclidisch slicen — E(5,13): 5 accenten over 13 stappen
+// Bjorklund: slagen op 0,3,5,8,10
+function algo(step, vars, h){
+  const hits = [0,3,5,8,10]; // E(5,13)
+  const cycle = 13;
+  const n = vars.n;
+  const d = 1 / n;
+  const pos = step % cycle;
+  const isHit = hits.includes(pos);
+  const idx = step % n;
+  const s = idx * d;
+  const amp = isHit ? 0.95 : 0.25;
+  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
+}`,
+
+  polyrhythm_slice: `// Polyritmisch — 3 tegen 4: twee lagen spelen door elkaar
+// Laag A (iedere 3 stappen): hoog in sample
+// Laag B (iedere 4 stappen): laag in sample
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const hitA = step % 3 === 0;
+  const hitB = step % 4 === 0;
+  const s = hitA ? h.clamp(0.5 + (step % n) * d * 0.5, 0, 1 - d)
+           : hitB ? h.clamp((step % n) * d * 0.5, 0, 0.5 - d)
+           : (step % n) * d;
+  const amp = hitA ? 0.9 : hitB ? 0.7 : 0.3;
+  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
+}`,
+
+  aksak: `// Aksak — Balkans onregelmatig metrum 2+2+3 (7/8 feel)
+function algo(step, vars, h){
+  const pattern = [2,2,3]; // aksak cel
+  const total   = 7;
+  const n = vars.n;
+  const d = 1 / n;
+  const pos = step % total;
+  // bepaal welke cel: zware slag of lichte slag
+  const cells = [0,2,4]; // startposities van elke cel
+  const isHeavy = cells.includes(pos);
+  const idx = step % n;
+  const s = idx * d;
+  const slp = pattern[cells.findIndex(c=> c <= pos && pos < c + pattern[cells.indexOf(c)]) % pattern.length] || 1;
+  return { startNorm: s, finishNorm: s + d, amp: isHeavy ? 0.95 : 0.5, sleepBeats: d * (slp/4), rate: vars.rate };
+}`,
+
+  // ─── Spectraal / Tijdsdomein ───────────────────────────────────────────────
+
+  spectral_freeze: `// Spectraal bevroren — lange overlappende slices (drone/pad effect)
+// Kleine stappen, grote overlapping, langzame beweging
+function algo(step, vars, h){
+  const d = 0.05; // groot venster
+  const rng = h.mulberry32(vars.seed + Math.floor(step/4) * 997);
+  const s = h.clamp(rng() * (1 - d), 0, 1 - d);
+  const rate = 0.5 + rng() * 0.3; // langzamer = meer stretch-gevoel
+  return { startNorm: s, finishNorm: s + d, amp: 0.6, sleepBeats: 0.25, rate };
+}`,
+
+  time_stretch: `// Tijdrekken — steeds langzamere playback rate, dan reset
+// Simuleert een vertragende plaat
+function algo(step, vars, h){
+  const n = vars.n;
+  const d = 1 / n;
+  const cycle = 32;
+  const phase = step % cycle;
+  const rate = h.clamp(1.5 - (phase / cycle) * 1.2, 0.3, 1.5);
+  const idx = step % n;
+  const s = idx * d;
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate };
+}`,
+
+  harmonic_series: `// Harmonische reeks — duur en positie volgen 1/n verhouding
+// Stap 1: 1/1, stap 2: 1/2, stap 3: 1/3 ... (harmonische partials)
+function algo(step, vars, h){
+  const n = vars.n;
+  const harmonic = (step % 8) + 1; // 1..8
+  const d = 1 / harmonic;          // duur verkleint per partial
+  const s = h.clamp((step % n) / n, 0, 1 - d);
+  const rate = harmonic * 0.5;     // rate stijgt per partial
+  return { startNorm: s, finishNorm: s + d, amp: 1/harmonic * 1.2, sleepBeats: 1/harmonic, rate: h.clamp(rate, 0.25, 4) };
+}`,
+
+  fibonacci_slice: `// Fibonacci slicen — intervallen volgen de Fibonacci rij
+// Positie: 1,1,2,3,5,8,13,21... gedeeld door 34 (normalisatie)
+function algo(step, vars, h){
+  const fibs = [1,1,2,3,5,8,13,21,34,55,89];
+  const norm = 144; // som voor normalisatie
+  const idx  = step % fibs.length;
+  const s    = h.clamp(fibs.reduce((a,v,i)=> i < idx ? a+v : a, 0) / norm, 0, 0.95);
+  const d    = fibs[idx] / norm;
+  return { startNorm: s, finishNorm: h.clamp(s+d,0,1), amp: 0.8, sleepBeats: Math.max(0.1, d*2), rate: vars.rate };
+}`,
+
+  cellular_automaton: `// Cellulaire automaat — Regel 30 (chaotisch)
+// 8 cellen bepalen welke positie speelt
+let _ca = [0,0,0,0,1,0,0,0]; // beginpatroon
+function algo(step, vars, h){
+  if(step === 0) _ca = [0,0,0,0,1,0,0,0];
+  const n = 8;
+  const next = _ca.map((_,i)=>{
+    const l = _ca[(i-1+n)%n], c = _ca[i], r = _ca[(i+1)%n];
+    return [0,1,1,1,1,0,0,0][l*4+c*2+r]; // Regel 30
+  });
+  _ca = next;
+  const idx = _ca.reduce((a,v,i)=> v ? i : a, 0);
+  const d = 1 / n;
+  const s = idx * d;
+  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
+}`,
+
+  chaos_logistic: `// Chaos logistisch — r=3.9, deterministisch chaotisch
+// x(n+1) = r * x(n) * (1 - x(n))
+let _cx = 0.4;
+function algo(step, vars, h){
+  if(step === 0) _cx = 0.4;
+  _cx = 3.9 * _cx * (1 - _cx);
+  const d = 1 / vars.n;
+  const s = h.clamp(_cx * (1 - d), 0, 1 - d);
+  const amp = 0.4 + _cx * 0.7;
+  const rate = 0.5 + _cx * 1.5;
+  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: h.clamp(rate, 0.25, 4) };
+}`,
+
+};
+
+// ── Preset select handler ─────────────────────────────────────────────────────
+document.getElementById('algoPreset').addEventListener('change', function(){
+  const key = this.value;
+  if(!key || !ALGO_PRESETS[key]) return;
+  ui.algo.value = ALGO_PRESETS[key];
+  // Reset stateful algo variabelen door een dummy-stap te triggeren
+  // Update live als engine draait
+  if(engine && playState){
+    try{ engine.setAlgoFn(compileAlgo()); }catch(e){ console.warn(e); }
+  }
+  // Selectie blijft staan zodat gebruiker ziet wat actief is
+});
+
 
 function setExportBusy(b){
   exportBusy = !!b;
@@ -4265,7 +4584,7 @@ const CONTROVERSIAL_ALGOS = {
       if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
       await audioCtx.resume();
 
-      // Haal beide File-objecten en decode parallel
+      // Decode beide buffers parallel — één keer, geen dubbel werk
       const [f1, f2] = await Promise.all([pair.main.getFile(), pair.drum.getFile()]);
       const [arr1, arr2] = await Promise.all([f1.arrayBuffer(), f2.arrayBuffer()]);
       const [mainBuf, drumBuf] = await Promise.all([
@@ -4273,39 +4592,60 @@ const CONTROVERSIAL_ALGOS = {
         audioCtx.decodeAudioData(arr2)
       ]);
 
-      // Zet drumBuffer globaal VOOR de hoofd-change-handler vuurt —
-      // dan gebruikt newEngine.setDrumBuffer(drumBuffer) het juiste bestand
+      // Sla buffers globaal op
+      buffer     = mainBuf;
       drumBuffer = drumBuf;
+
+      // Update labels
+      if(ui.fileInfo) ui.fileInfo.textContent =
+        'Geladen: '+pair.main.name+' — '+mainBuf.duration.toFixed(2)+'s';
       if(ui.drumInfo) ui.drumInfo.textContent =
         'Drum sample: '+pair.drum.name+' ('+drumBuf.duration.toFixed(2)+'s)';
 
-      // Geef drum ook direct door aan draaiende engine (als die er is)
-      if(engine) try{ engine.setDrumBuffer(drumBuf); }catch(e){}
+      // Bouw nieuwe engine rechtstreeks — geen file change event nodig
+      // zodat we niet dubbel decoderen en geen race conditions hebben
+      const oldEngine = currentEngine;
+      const wasPlaying = !!playState;
+      const xfadeSec = ui.xfade ? +ui.xfade.value : 1.5;
+      const targetMaster = +ui.master.value;
 
-      // Update drumFile input visueel (geen change event — buffer al gezet)
-      try{ const dt=new DataTransfer(); dt.items.add(f2); ui.drumFile.files=dt.files; }catch(e){}
+      const revBuf = makeReversedBuffer(audioCtx, mainBuf);
+      const newEngine = new SliceEngine(audioCtx, mainBuf, revBuf);
+      newEngine.setFade(+ui.fade.value);
+      newEngine.setFFT(+ui.fftSize.value, +ui.smooth.value);
+      newEngine.setLimiter(ui.limiter.value === 'on');
+      newEngine.getVarsFn = getVars;
+      try{ newEngine.setDrumBuffer(drumBuf); }catch(e){}
 
-      // Nu hoofd injecteren: de change-handler bouwt nieuwe engine
-      // met crossfade en gebruikt drumBuffer (net gezet hierboven)
-      const dt2 = new DataTransfer(); dt2.items.add(f1);
-      ui.file.files = dt2.files;
-      ui.file.dispatchEvent(new Event('change', {bubbles:true}));
+      engine = newEngine;
+      currentEngine = newEngine;
 
-      // Wacht tot de change-handler klaar is: hij zet fileInfo op
-      // "Geladen: ..." als hij klaar is (async decode binnen handler)
-      await new Promise(resolve => {
-        const t0 = Date.now();
-        const id = setInterval(()=>{
-          const info = ui.fileInfo?.textContent || '';
-          const done = info.startsWith('Geladen:') && info.includes(pair.main.name.slice(0,8));
-          if(done || Date.now()-t0 > 6000){ clearInterval(id); resolve(); }
-        }, 40);
-      });
+      const algoFn = compileAlgo();
+      const vars   = getVars();
+      newEngine.setAlgoFn(algoFn);
+      newEngine.setMaster(0);
+      newEngine.start(algoFn, vars);
+      newEngine.rampMaster(targetMaster, xfadeSec);
 
-      // Eerste keer nog niet aan het spelen: klik Start
-      if(!playState){
-        if(ui.start && !ui.start.disabled) ui.start.click();
+      // Fade out en stop oude engine
+      if(oldEngine){
+        try{ oldEngine.rampMaster(0, xfadeSec); }catch(e){}
+        setTimeout(()=>{ try{ oldEngine.stop(); }catch(e){} }, xfadeSec*1000 + 100);
       }
+
+      // Visualiser
+      try{ viz?.stop(); }catch(e){}
+      viz = makeVisualizer(newEngine, ui.cv);
+      viz.start();
+      wireLiveControls();
+
+      // Knoppen bijwerken
+      playState = true;
+      playStartTime = audioCtx.currentTime;
+      startRandStartTimer();
+      if(ui.start) ui.start.disabled = true;
+      if(ui.stop)  ui.stop.disabled  = false;
+      setExportBusy(false);
 
       rpTrack1.textContent = 'Spoor 1 ▶ '+pair.main.name+' ('+mainBuf.duration.toFixed(1)+'s)';
       rpTrack2.textContent = 'Spoor 2 🥁 '+pair.drum.name+' ('+drumBuf.duration.toFixed(1)+'s)';
@@ -4317,6 +4657,7 @@ const CONTROVERSIAL_ALGOS = {
       setDot('off');
       rpStatus.textContent = 'Fout: '+e.message;
       rplog('FOUT: '+e.message);
+      console.error(e);
     }
   }
 
