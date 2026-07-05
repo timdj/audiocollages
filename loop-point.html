@@ -548,11 +548,12 @@
       const url = URL.createObjectURL(wavBlob);
 
       exportStatus.textContent = `klaar — ${lenSec}s gerenderd (${(wavBlob.size/1024/1024).toFixed(2)} MB)`;
+      const filename = buildExportFilename();
       const a = document.createElement('a');
       a.className = 'download';
       a.href = url;
-      a.download = 'loop-export.wav';
-      a.textContent = '⇩ download loop-export.wav';
+      a.download = filename;
+      a.textContent = '⇩ download ' + filename;
       downloadArea.appendChild(a);
     }catch(err){
       exportStatus.textContent = 'export mislukt: ' + err.message;
@@ -603,6 +604,17 @@
       }
     }
     return new Blob([arrBuf], { type: 'audio/wav' });
+  }
+
+  function buildExportFilename(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth()+1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const min = pad(d.getMinutes());
+    return `GK${yyyy}${mm}${dd}-${hh}${min}.wav`;
   }
 
   function writeString(view, offset, str){
