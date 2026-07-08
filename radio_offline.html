@@ -22,71 +22,107 @@
     canvas{width:512px;max-width:100%;height:auto;border-radius:12px;border:1px solid #24243a;background:#000;image-rendering:pixelated}
 
     /* ── RADIO PORTAL ── */
-    #radioPortal{background:#0d0d1a;border:2px solid #3a1a6a;border-radius:16px;padding:14px;margin-bottom:18px}
-    #radioPortal h2{font-size:14px;margin:0 0 10px;color:#c084fc;letter-spacing:.06em}
-    .rp-row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
-    .rp-row label{font-size:11px;opacity:.8;white-space:nowrap;margin:0;width:auto}
-    .rp-dot{width:11px;height:11px;border-radius:50%;background:#333;flex-shrink:0;transition:background .3s}
-    .rp-dot.on{background:#a855f7;box-shadow:0 0 7px #a855f7}
-    .rp-dot.loading{background:#f59e0b;animation:rpulse .6s infinite alternate}
-    @keyframes rpulse{to{opacity:.25}}
-    .rp-track{background:#10101e;border:1px solid #2a1a4a;border-radius:8px;padding:8px 10px;font-size:12px;margin-top:6px;min-height:36px}
-    .rp-track span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d4d4f0}
-    .rp-track span+span{color:#9370db;margin-top:2px;font-size:11px}
-    .rp-countdown{font-size:11px;color:#6060a0;margin-top:3px}
-    .rp-badge{font-size:11px;color:#7c6a9e;margin-top:4px}
-    .rp-btn{cursor:pointer;border-radius:9px;padding:8px 12px;font-size:12px;border:1px solid #6b21a8;background:#3b0764;color:#e9d5ff;margin-top:6px}
-    .rp-btn:hover{background:#4c0a8e}
-    .rp-btn:disabled{opacity:.4;cursor:not-allowed}
-    .rp-btn.sec{background:#1e1230;border-color:#4a2080;color:#c4b5fd}
-    .rp-btn.sec:hover{background:#2a1a50}
-    .rp-log{background:#080810;border:1px solid #1a1a28;border-radius:7px;padding:6px 8px;font-size:10px;font-family:monospace;color:#5858a0;max-height:60px;overflow-y:auto;margin-top:8px}
-    .rp-sep{border:none;border-top:1px solid #1e1e30;margin:10px 0}
+    #radioPortal{background:#0d0d1a;border:2px solid #3a1a6a;border-radius:16px;padding:16px;margin-bottom:18px}
+    #radioPortal h2{font-size:15px;margin:0 0 10px;color:#c084fc;letter-spacing:.08em}
+    .radio-status{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .radio-dot{width:12px;height:12px;border-radius:50%;background:#333;flex-shrink:0;transition:background .3s}
+    .radio-dot.on{background:#a855f7;box-shadow:0 0 8px #a855f7}
+    .radio-dot.loading{background:#f59e0b;animation:pulse .6s infinite alternate}
+    @keyframes pulse{to{opacity:.3}}
+    #radioStatusText{font-size:13px;color:#d4d4e8}
+    .radio-track-info{background:#10101e;border:1px solid #2a1a4a;border-radius:10px;padding:10px;margin-bottom:10px;min-height:44px}
+    .radio-track-title{font-size:13px;color:#e0d4fc;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .radio-track-drum{font-size:11px;color:#9370db;opacity:.85}
+    .radio-countdown{font-size:11px;color:#6b6b8a;margin-top:4px}
+    .radio-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .radio-btn-big{background:#3b0764;border:1px solid #6b21a8;color:#e9d5ff;font-size:13px;border-radius:10px;padding:10px;cursor:pointer;transition:background .15s}
+    .radio-btn-big:hover{background:#4c0a8e}
+    .radio-btn-big:disabled{opacity:.4;cursor:not-allowed}
+    .radio-btn-skip{background:#1e1230;border:1px solid #4a2080;color:#c4b5fd;font-size:12px}
+    .radio-btn-skip:hover{background:#2a1a50}
+    #radioFolder{display:none}
+    .radio-files-badge{font-size:11px;color:#7c6a9e;margin-top:4px}
+    .radio-interval-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .radio-interval-row label{margin:0;font-size:11px;white-space:nowrap;opacity:.8;flex-shrink:0}
+    .radio-interval-row input{flex:1;margin:0}
+    .radio-sep{border:none;border-top:1px solid #1e1e30;margin:10px 0}
+    .radio-log{background:#080810;border:1px solid #1a1a28;border-radius:8px;padding:8px;font-size:10px;font-family:monospace;color:#6868a0;max-height:80px;overflow-y:auto;margin-top:6px}
   </style>
 </head>
 <body>
   <h1>Sonic Pi-achtig sample slicing — BPM + sleep/wait + FFT video (stopt altijd, geen gekraak)</h1>
 
-  <!-- ══════════════ RADIO PORTAL ══════════════ -->
+<body>
+  <h1>📻 Webradio Portal — Offline (lokale map)</h1>
+
   <div id="radioPortal">
-    <h2>📻 RADIO PORTAL — map → spoor 1 + spoor 2 → bestaande instellingen</h2>
+    <h2>📻 WEBRADIO PORTAL — LOKALE MAP</h2>
 
-    <div class="rp-row">
-      <div class="rp-dot" id="rpDot"></div>
-      <span id="rpStatus" style="font-size:12px">Inactief — kies een map of bestanden</span>
+    <div class="radio-status">
+      <div class="radio-dot" id="radioDot"></div>
+      <span id="radioStatusText">Inactief — kies een map om te starten</span>
     </div>
 
-    <div class="rp-track">
-      <span id="rpTrack1">Spoor 1 (hoofd): —</span>
-      <span id="rpTrack2">Spoor 2 (drum): —</span>
+    <div class="radio-track-info">
+      <div class="radio-track-title" id="radioTrackMain">— spoor 1: —</div>
+      <div class="radio-track-drum" id="radioTrackDrum">— spoor 2: —</div>
+      <div class="radio-track-drum" id="radioTrack3" style="color:#7ec8a0">— spoor 3: —</div>
+      <div class="radio-track-drum" id="radioTrack4" style="color:#c8a07e">— spoor 4: —</div>
+      <div class="radio-countdown" id="radioCountdown"></div>
     </div>
-    <div class="rp-countdown" id="rpCountdown"></div>
-    <div class="rp-badge" id="rpBadge">Geen bestanden geladen.</div>
 
-    <!-- Mapkiezer (File System Access, Chrome/Edge) -->
-    <button id="rpBtnFolder" class="rp-btn" style="width:100%;margin-top:8px">📁 Kies map (Chrome/Edge — File System Access)</button>
-    <!-- Fallback: meerdere losse bestanden -->
-    <input id="rpFallback" type="file" accept="audio/*" multiple style="margin-top:6px"/>
-    <div class="small" style="margin-top:3px">↑ Fallback voor andere browsers: selecteer meerdere bestanden.</div>
+    <div class="radio-files-badge" id="radioFilesBadge">Geen bestanden geladen.</div>
 
-    <hr class="rp-sep"/>
+    <button id="radioBtnFolder" class="radio-btn-big" style="margin-top:8px">📁 Kies map met audiobestanden (Chrome/Edge)</button>
+    <input id="radioFolderFallback" type="file" accept="audio/*" multiple style="margin-top:6px"/>
+    <div class="small" style="margin-top:4px">↑ Fallback: selecteer meerdere bestanden als mapkiezer niet werkt.</div>
 
-    <div class="rp-row">
+    <hr class="radio-sep"/>
+
+    <div class="radio-interval-row" style="margin-top:8px">
       <label>Interval (sec)</label>
-      <input id="rpIntervalSl" type="range" min="10" max="300" step="5" value="60" style="flex:1;margin:0"/>
-      <input id="rpIntervalNum" type="number" min="10" max="300" step="5" value="60" style="width:58px;margin:0"/>
-      <span id="rpIntervalVal" style="font-size:11px;color:#7c6a9e">60s</span>
+      <input id="radioInterval" type="range" min="10" max="300" step="5" value="60" style="flex:1;margin:0"/>
+      <input id="radioIntervalNum" type="number" min="10" max="300" step="5" value="60" style="width:60px;flex:none;margin:0"/>
+      <span id="radioIntervalVal" style="font-size:11px;color:#7c6a9e;white-space:nowrap">60s</span>
     </div>
 
-    <div class="rp-row" style="gap:6px;margin-top:8px">
-      <button id="rpBtnStart" class="rp-btn" disabled>▶ Start radio</button>
-      <button id="rpBtnStop"  class="rp-btn" disabled>■ Stop</button>
-      <button id="rpBtnSkip"  class="rp-btn sec" disabled>⏭ Volgende</button>
+    <div class="small" style="margin-top:8px;color:#9370db">Per spoor: drum-algoritme + staptijd in ms (0 = BPM+n)</div>
+    <div class="radio-interval-row" style="margin-top:4px">
+      <label style="width:32px;flex-shrink:0">S1</label>
+      <select id="rpAlgo1" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
+      <input id="rpMs1" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
+    </div>
+    <div class="radio-interval-row" style="margin-top:3px">
+      <label style="width:32px;flex-shrink:0">S2</label>
+      <select id="rpAlgo2" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
+      <input id="rpMs2" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
+    </div>
+    <div class="radio-interval-row" style="margin-top:3px">
+      <label style="width:32px;flex-shrink:0">S3</label>
+      <select id="rpAlgo3" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
+      <input id="rpMs3" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
+    </div>
+    <div class="radio-interval-row" style="margin-top:3px">
+      <label style="width:32px;flex-shrink:0">S4</label>
+      <select id="rpAlgo4" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
+      <input id="rpMs4" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
     </div>
 
-    <div class="rp-log" id="rpLog">—</div>
+    <div class="radio-grid" style="margin-top:10px">
+      <button id="radioBtnStart" class="radio-btn-big" disabled>▶ START RADIO</button>
+      <button id="radioBtnStop"  class="radio-btn-big" disabled>■ STOP</button>
+      <button id="radioBtnSkip"  class="radio-btn-big radio-btn-skip" disabled>⏭ Sla over</button>
+      <button id="radioBtnShuffle" class="radio-btn-big radio-btn-skip" disabled>🔀 Shuffle nu</button>
+    </div>
+
+    <div class="radio-log" id="radioLog">log…</div>
   </div>
 
+  <div class="row">
   <div class="row">
     <div class="card">
       <label>Audio upload</label>
@@ -345,38 +381,6 @@
 
 
       <label>Algoritme (JS) — pas aan en druk op Start</label>
-      <select id="algoPreset" style="margin-bottom:4px">
-        <option value="">— kies een preset algoritme —</option>
-        <optgroup label="─── Willekeurig / Stochastisch ───">
-          <option value="random_walk">Random walk (dronende willekeur)</option>
-          <option value="drunk">Drunk walk (brownse beweging)</option>
-          <option value="markov">Markov keten (geheugen van 1 stap)</option>
-          <option value="weighted_rand">Gewogen willekeur (midden zwaarder)</option>
-          <option value="perlin">Perlin noise (vloeiende willekeur)</option>
-        </optgroup>
-        <optgroup label="─── Serieel / Rij-gebaseerd ───">
-          <option value="twelve_tone">Twaalftoonstechniek (pitch ladder)</option>
-          <option value="retrograde">Retrograde (achteruit)</option>
-          <option value="palindrome">Palindroom (heen en terug)</option>
-          <option value="rotation">Rotatie (schuivend venster)</option>
-          <option value="inversion">Inversie (spiegeling)</option>
-        </optgroup>
-        <optgroup label="─── Ritmisch / Metrisch ───">
-          <option value="isorhythm">Isoritmisch (talea × color)</option>
-          <option value="hocket">Hocket (afwisseling twee stemmen)</option>
-          <option value="euclidean_slice">Euclidisch slicen (E(5,13))</option>
-          <option value="polyrhythm_slice">Polyritmisch (3 tegen 4)</option>
-          <option value="aksak">Aksak (2+2+3 onregelmatig)</option>
-        </optgroup>
-        <optgroup label="─── Spectraal / Tijdsdomein ───">
-          <option value="spectral_freeze">Spectraal bevroren (lange slices)</option>
-          <option value="time_stretch">Tijdrekken (steeds langzamer)</option>
-          <option value="harmonic_series">Harmonische reeks (1/n)</option>
-          <option value="fibonacci_slice">Fibonacci slicen (gulden snede)</option>
-          <option value="cellular_automaton">Cellulaire automaat (regel 30)</option>
-          <option value="chaos_logistic">Chaos logistisch (r=3.9)</option>
-        </optgroup>
-      </select>
       <textarea id="algo" spellcheck="false"></textarea>
       <div class="small">
         Je schrijft <code>function algo(step, vars, helpers){...}</code> (step = 0,1,2,…) en je returnt:<br/>
@@ -497,6 +501,12 @@
           <label>BPM</label>
           <input id="bpm" type="range" min="20" max="240" step="1" value="20"/>
           <div class="small" id="bpmVal">60</div>
+        </div>
+
+        <div class="var">
+          <label>Sleep override (ms)</label>
+          <input id="sleepMs" type="number" min="0" max="10000" step="1" value="0"/>
+          <div class="small">0 = BPM+n bepaalt staptijd. Groter dan 0 = vaste ms-stap (bypast BPM). Min ~6ms.</div>
         </div>
 
         <div class="var">
@@ -2114,49 +2124,37 @@ this.active = new Set();
   }
 
   stop(){
-    // instant mute
+    if(!this.running && !this.timer) return; // al gestopt
     try{ this.master.gain.cancelScheduledValues(this.ctx.currentTime); }catch{}
     try{ this.master.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
     this.running = false;
-    if(this.timer) clearInterval(this.timer);
-    this.timer = null;
+    if(this.timer){ clearInterval(this.timer); this.timer = null; }
 
-    // Stop and disconnect all active voices
+    // Stop alle actieve voices
     for(const rec of this.active){
-      try { rec.src.onended = null; } catch {}
-      try { rec.src.stop(0); } catch {}
-      try { rec.src.disconnect(); } catch {}
-      try { rec.g.disconnect(); } catch {}
+      try{ rec.src.onended = null; }catch{}
+      try{ rec.src.stop(0); }catch{}
+      try{ rec.src.disconnect(); }catch{}
+      try{ rec.g.disconnect(); }catch{}
     }
     this.active.clear();
 
-    // Silence drum layer
+    // Stop en disconnect tremolo oscillator
+    try{ this._tremOsc.stop(); }catch{}
+    try{ this._tremOsc.disconnect(); }catch{}
+    try{ this._tremDepth.disconnect(); }catch{}
+
+    // Disconnect drum gain en overige nodes
     try{ this.drumGain.gain.setValueAtTime(0, this.ctx.currentTime); }catch{}
+    try{ this.drumGain.disconnect(); }catch{}
+    try{ this.mix.disconnect(); }catch{}
+    try{ this.master.disconnect(); }catch{}
 
-    // Kill ScriptProcessor (bitcrusher) — crucial: zonder dit lekt
-    // onaudioprocess en blijft de oude engine de CPU belasten
-    try{ this.drumCrush.onaudioprocess = null; }catch{}
-    try{ this.drumCrush.disconnect(); }catch{}
-
-    // Disconnect de volledige interne grafiek zodat de GC de engine
-    // kan opruimen. Zonder dit stapelen AudioNodes op in de context.
-    const nodes = [
-      this.mix, this.master, this.drumGain, this.drumFX_in,
-      this.drumHPF, this.drumLPF, this.drumDriveGain, this.drumShaper,
-      this.drumDelay, this.drumDelayFB, this.drumDelayMix, this.drumDry,
-      this.drumConvolver, this.drumRevMix, this.drumPan,
-      this.compressor, this.analyser, this.out,
-    ];
-    for(const n of nodes){
-      try{ if(n) n.disconnect(); }catch{}
-    }
-    try{ this.postFx?.input?.disconnect(); }catch{}
-    try{ this.postFx?.output?.disconnect(); }catch{}
-
-    // Laat buffer referenties los zodat GC ze kan vrijgeven
-    this.buffer    = null;
-    this.revBuffer = null;
-    this.drumBuffer= null;
+    // Null alle referenties zodat GC kan opruimen
+    this.buffer = null;
+    this.drumBuffer = null;
+    this.algoFn = null;
+    this.getVarsFn = null;
   }
 
   _tick(){
@@ -2166,7 +2164,9 @@ this.active = new Set();
     }
     const now = this.ctx.currentTime;
 
-    while(this.nextTime < now + this.ahead){
+    const _ahead = this.vars && this.vars.sleepMs > 0 ? Math.max(this.vars.sleepMs/1000*3, 0.05) : this.ahead;
+    let _iters = 0;
+    while(this.nextTime < now + _ahead && _iters++ < 64){
       let ev;
       try{
         ev = this.algoFn(this.step, this.vars, {mulberry32, line, choose, clamp});
@@ -2178,7 +2178,10 @@ this.active = new Set();
       }
 
       const sleepBeats = Math.max(0.0001, ev?.sleepBeats ?? this.vars.dBeats);
-      const stepSec = sleepBeats * this.vars.beatSec;
+      const sleepMsOverride = this.vars.sleepMs || 0;
+      const stepSec = sleepMsOverride > 0
+        ? Math.max(0.006, sleepMsOverride / 1000)
+        : sleepBeats * this.vars.beatSec;
       this.lastStepSec = stepSec;
 
       if(ev && ev.amp > 1e-5){
@@ -2199,7 +2202,8 @@ this.active = new Set();
     try{ this.drumGain.gain.setValueAtTime(drumOn ? dg : 0, now); }catch{}
 
     if(drumOn){
-      while(this.nextDrumTime < now + this.ahead){
+      let _drumIters = 0;
+      while(this.nextDrumTime < now + _ahead && _drumIters++ < 128){
         this._scheduleDrumsAtStep(this.drumStep, this.nextDrumTime, v);
         this.nextDrumTime += drumStepSec;
         this.drumStep += 1;
@@ -2534,6 +2538,7 @@ const ui = {
   drumTremRate: document.getElementById('drumTremRate'),
   drumTremRateVal: document.getElementById('drumTremRateVal'),
   algo: document.getElementById('algo'),
+  xfade: document.getElementById('xfade'),
   start: document.getElementById('start'),
   stop: document.getElementById('stop'),
   exportWav: document.getElementById('exportWav'),
@@ -2547,6 +2552,7 @@ const ui = {
   d: document.getElementById('d'),
   bpm: document.getElementById('bpm'),
   bpmVal: document.getElementById('bpmVal'),
+  sleepMs: document.getElementById('sleepMs'),
   seed: document.getElementById('seed'),
   sliceMode: document.getElementById('sliceMode'),
 
@@ -3252,9 +3258,10 @@ function getVars(){
   const dBeats = 1 / n;
   const bpm = +ui.bpm.value;
   const beatSec = 60 / bpm;
+  const sleepMsVal = +(ui.sleepMs && ui.sleepMs.value) || 0;
 
   const base = {
-    n, dBeats, bpm, beatSec,
+    n, dBeats, bpm, beatSec, sleepMs: sleepMsVal,
     seed: (parseInt(ui.seed.value,10)||0) >>> 0,
 
     drumEnable: !!(ui.drumEnable && ui.drumEnable.checked),
@@ -3413,293 +3420,6 @@ function algo(step, vars, h){
   // Tip: durClamp='sleep' beperkt slice-lengte tot sleep → minder overlap/kraak
   return { startNorm: s, finishNorm: f, amp, sleepBeats: d, rate: vars.rate };
 }`;
-
-// ── Algo presets ──────────────────────────────────────────────────────────────
-const ALGO_PRESETS = {
-
-  // ─── Willekeurig / Stochastisch ────────────────────────────────────────────
-
-  random_walk: `// Random walk — elke stap onafhankelijk willekeurig
-function algo(step, vars, h){
-  const d = 1 / vars.n;
-  const rng = h.mulberry32(vars.seed + step * 7919);
-  const s = h.clamp(rng(), 0, 1 - d);
-  return { startNorm: s, finishNorm: s + d, amp: 0.7 + rng()*0.4, sleepBeats: d, rate: vars.rate };
-}`,
-
-  drunk: `// Drunk walk (Brownse beweging) — positie dwaalt langzaam
-// Elke stap: kleine willekeurige stap vanuit vorige positie
-let _drunkPos = 0.5;
-function algo(step, vars, h){
-  const d = 1 / vars.n;
-  const rng = h.mulberry32(vars.seed + step * 3571);
-  if(step === 0) _drunkPos = 0.5;
-  _drunkPos += (rng() - 0.5) * d * 2.5;
-  _drunkPos = h.clamp(_drunkPos, 0, 1 - d);
-  return { startNorm: _drunkPos, finishNorm: _drunkPos + d, amp: 0.75, sleepBeats: d, rate: vars.rate };
-}`,
-
-  markov: `// Markov keten — volgende positie hangt af van huidige (geheugen=1)
-// Kans op grote sprong: 20%, anders kleine stap
-let _mPos = 0.0;
-function algo(step, vars, h){
-  const d = 1 / vars.n;
-  const rng = h.mulberry32(vars.seed + step * 6271);
-  if(step === 0) _mPos = 0.0;
-  const bigJump = rng() < 0.2;
-  if(bigJump) _mPos = rng();
-  else _mPos = h.clamp(_mPos + (rng() - 0.5) * d * 3, 0, 1 - d);
-  return { startNorm: _mPos, finishNorm: _mPos + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  weighted_rand: `// Gewogen willekeur — midden van het sample heeft meer kans
-function algo(step, vars, h){
-  const d = 1 / vars.n;
-  const rng = h.mulberry32(vars.seed + step * 4567);
-  // Beta-distributie benadering: gemiddelde van twee uniforme samples
-  const s = h.clamp((rng() + rng()) / 2 * (1 - d), 0, 1 - d);
-  const amp = 0.5 + (1 - Math.abs(s - 0.5) * 2) * 0.5;
-  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
-}`,
-
-  perlin: `// Perlin noise benadering — vloeiende willekeur via gefilterde rng
-// Geïnterpoleerd tussen random punten elke 8 stappen
-function algo(step, vars, h){
-  const d = 1 / vars.n;
-  const period = 8;
-  const phase = step % period;
-  const cycle = Math.floor(step / period);
-  const rng0 = h.mulberry32(vars.seed + cycle * 997);
-  const rng1 = h.mulberry32(vars.seed + (cycle+1) * 997);
-  const a = rng0(), b = rng1();
-  const t = phase / period;
-  const smooth = t*t*(3-2*t); // smoothstep
-  const s = h.clamp(a + (b - a) * smooth, 0, 1 - d);
-  return { startNorm: s, finishNorm: s + d, amp: 0.75, sleepBeats: d, rate: vars.rate };
-}`,
-
-  // ─── Serieel / Rij-gebaseerd ───────────────────────────────────────────────
-
-  twelve_tone: `// Twaalftoonstechniek — 12 posities gelijkmatig verdeeld, vaste volgorde
-// Rij: 0,7,11,3,8,2,6,10,1,5,9,4 (gebaseerd op Schoenberg op.25)
-function algo(step, vars, h){
-  const row = [0,7,11,3,8,2,6,10,1,5,9,4];
-  const d = 1 / 12;
-  const idx = row[step % 12];
-  const s = idx * d;
-  const octave = Math.floor(step / 12) % 3;
-  const rate = [0.5, 1.0, 2.0][octave];
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate };
-}`,
-
-  retrograde: `// Retrograde — speelt de posities achteruit (spiegeling in de tijd)
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const fwd = step % n;
-  const rev = (n - 1 - fwd); // achteruit
-  const s = rev * d;
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  palindrome: `// Palindroom — heen (0→n) dan terug (n→0)
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const cycle = step % (n * 2);
-  const idx = cycle < n ? cycle : (n*2 - 1 - cycle);
-  const s = idx * d;
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  rotation: `// Rotatie — schuivend venster over het sample
-// Elke 8 stappen schuift de startpositie op
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const windowSize = Math.max(1, Math.floor(n / 4));
-  const offset = (Math.floor(step / windowSize) % n) * d;
-  const local = (step % windowSize) * (d / windowSize * windowSize);
-  const s = h.clamp(offset + local, 0, 1 - d);
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  inversion: `// Inversie — spiegeling om het middelpunt (0.5)
-// Afgewisseld: origineel en gespiegeld
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const idx = step % n;
-  const s_fwd = idx * d;
-  const s_inv = h.clamp(1 - s_fwd - d, 0, 1 - d);
-  const s = step % 2 === 0 ? s_fwd : s_inv;
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  // ─── Ritmisch / Metrisch ───────────────────────────────────────────────────
-
-  isorhythm: `// Isoritmisch — talea (ritmische rij) × color (melodische rij)
-// Talea: duurpatroon [1,1,2,1,3] (in beats), Color: 7 posities
-function algo(step, vars, h){
-  const talea  = [1,1,2,1,3,1,2];          // ritmische rij
-  const color  = [0,3,1,6,2,5,4,7,1,6,3]; // positie-rij (in n-delen)
-  const n = vars.n;
-  const d = 1 / n;
-  const dur   = talea[step % talea.length];
-  const posIdx= color[step % color.length] % n;
-  const s = posIdx * d;
-  return { startNorm: s, finishNorm: s + d, amp: 0.85, sleepBeats: d * dur, rate: vars.rate };
-}`,
-
-  hocket: `// Hocket — twee stemmen wisselen elkaar af, nooit tegelijk
-// Stem A: even stappen (voor), Stem B: oneven stappen (achter)
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const isA = step % 2 === 0;
-  const half = Math.floor(n / 2);
-  const idx  = isA ? (step/2) % half : ((step-1)/2) % half + half;
-  const s = (idx % n) * d;
-  return { startNorm: s, finishNorm: s + d, amp: isA ? 0.9 : 0.6, sleepBeats: d, rate: vars.rate };
-}`,
-
-  euclidean_slice: `// Euclidisch slicen — E(5,13): 5 accenten over 13 stappen
-// Bjorklund: slagen op 0,3,5,8,10
-function algo(step, vars, h){
-  const hits = [0,3,5,8,10]; // E(5,13)
-  const cycle = 13;
-  const n = vars.n;
-  const d = 1 / n;
-  const pos = step % cycle;
-  const isHit = hits.includes(pos);
-  const idx = step % n;
-  const s = idx * d;
-  const amp = isHit ? 0.95 : 0.25;
-  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
-}`,
-
-  polyrhythm_slice: `// Polyritmisch — 3 tegen 4: twee lagen spelen door elkaar
-// Laag A (iedere 3 stappen): hoog in sample
-// Laag B (iedere 4 stappen): laag in sample
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const hitA = step % 3 === 0;
-  const hitB = step % 4 === 0;
-  const s = hitA ? h.clamp(0.5 + (step % n) * d * 0.5, 0, 1 - d)
-           : hitB ? h.clamp((step % n) * d * 0.5, 0, 0.5 - d)
-           : (step % n) * d;
-  const amp = hitA ? 0.9 : hitB ? 0.7 : 0.3;
-  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: vars.rate };
-}`,
-
-  aksak: `// Aksak — Balkans onregelmatig metrum 2+2+3 (7/8 feel)
-function algo(step, vars, h){
-  const pattern = [2,2,3]; // aksak cel
-  const total   = 7;
-  const n = vars.n;
-  const d = 1 / n;
-  const pos = step % total;
-  // bepaal welke cel: zware slag of lichte slag
-  const cells = [0,2,4]; // startposities van elke cel
-  const isHeavy = cells.includes(pos);
-  const idx = step % n;
-  const s = idx * d;
-  const slp = pattern[cells.findIndex(c=> c <= pos && pos < c + pattern[cells.indexOf(c)]) % pattern.length] || 1;
-  return { startNorm: s, finishNorm: s + d, amp: isHeavy ? 0.95 : 0.5, sleepBeats: d * (slp/4), rate: vars.rate };
-}`,
-
-  // ─── Spectraal / Tijdsdomein ───────────────────────────────────────────────
-
-  spectral_freeze: `// Spectraal bevroren — lange overlappende slices (drone/pad effect)
-// Kleine stappen, grote overlapping, langzame beweging
-function algo(step, vars, h){
-  const d = 0.05; // groot venster
-  const rng = h.mulberry32(vars.seed + Math.floor(step/4) * 997);
-  const s = h.clamp(rng() * (1 - d), 0, 1 - d);
-  const rate = 0.5 + rng() * 0.3; // langzamer = meer stretch-gevoel
-  return { startNorm: s, finishNorm: s + d, amp: 0.6, sleepBeats: 0.25, rate };
-}`,
-
-  time_stretch: `// Tijdrekken — steeds langzamere playback rate, dan reset
-// Simuleert een vertragende plaat
-function algo(step, vars, h){
-  const n = vars.n;
-  const d = 1 / n;
-  const cycle = 32;
-  const phase = step % cycle;
-  const rate = h.clamp(1.5 - (phase / cycle) * 1.2, 0.3, 1.5);
-  const idx = step % n;
-  const s = idx * d;
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate };
-}`,
-
-  harmonic_series: `// Harmonische reeks — duur en positie volgen 1/n verhouding
-// Stap 1: 1/1, stap 2: 1/2, stap 3: 1/3 ... (harmonische partials)
-function algo(step, vars, h){
-  const n = vars.n;
-  const harmonic = (step % 8) + 1; // 1..8
-  const d = 1 / harmonic;          // duur verkleint per partial
-  const s = h.clamp((step % n) / n, 0, 1 - d);
-  const rate = harmonic * 0.5;     // rate stijgt per partial
-  return { startNorm: s, finishNorm: s + d, amp: 1/harmonic * 1.2, sleepBeats: 1/harmonic, rate: h.clamp(rate, 0.25, 4) };
-}`,
-
-  fibonacci_slice: `// Fibonacci slicen — intervallen volgen de Fibonacci rij
-// Positie: 1,1,2,3,5,8,13,21... gedeeld door 34 (normalisatie)
-function algo(step, vars, h){
-  const fibs = [1,1,2,3,5,8,13,21,34,55,89];
-  const norm = 144; // som voor normalisatie
-  const idx  = step % fibs.length;
-  const s    = h.clamp(fibs.reduce((a,v,i)=> i < idx ? a+v : a, 0) / norm, 0, 0.95);
-  const d    = fibs[idx] / norm;
-  return { startNorm: s, finishNorm: h.clamp(s+d,0,1), amp: 0.8, sleepBeats: Math.max(0.1, d*2), rate: vars.rate };
-}`,
-
-  cellular_automaton: `// Cellulaire automaat — Regel 30 (chaotisch)
-// 8 cellen bepalen welke positie speelt
-let _ca = [0,0,0,0,1,0,0,0]; // beginpatroon
-function algo(step, vars, h){
-  if(step === 0) _ca = [0,0,0,0,1,0,0,0];
-  const n = 8;
-  const next = _ca.map((_,i)=>{
-    const l = _ca[(i-1+n)%n], c = _ca[i], r = _ca[(i+1)%n];
-    return [0,1,1,1,1,0,0,0][l*4+c*2+r]; // Regel 30
-  });
-  _ca = next;
-  const idx = _ca.reduce((a,v,i)=> v ? i : a, 0);
-  const d = 1 / n;
-  const s = idx * d;
-  return { startNorm: s, finishNorm: s + d, amp: 0.8, sleepBeats: d, rate: vars.rate };
-}`,
-
-  chaos_logistic: `// Chaos logistisch — r=3.9, deterministisch chaotisch
-// x(n+1) = r * x(n) * (1 - x(n))
-let _cx = 0.4;
-function algo(step, vars, h){
-  if(step === 0) _cx = 0.4;
-  _cx = 3.9 * _cx * (1 - _cx);
-  const d = 1 / vars.n;
-  const s = h.clamp(_cx * (1 - d), 0, 1 - d);
-  const amp = 0.4 + _cx * 0.7;
-  const rate = 0.5 + _cx * 1.5;
-  return { startNorm: s, finishNorm: s + d, amp, sleepBeats: d, rate: h.clamp(rate, 0.25, 4) };
-}`,
-
-};
-
-// ── Preset select handler ─────────────────────────────────────────────────────
-document.getElementById('algoPreset').addEventListener('change', function(){
-  const key = this.value;
-  if(!key || !ALGO_PRESETS[key]) return;
-  ui.algo.value = ALGO_PRESETS[key];
-  // Reset stateful algo variabelen door een dummy-stap te triggeren
-  // Update live als engine draait
-  if(engine && playState){
-    try{ engine.setAlgoFn(compileAlgo()); }catch(e){ console.warn(e); }
-  }
-  // Selectie blijft staan zodat gebruiker ziet wat actief is
-});
 
 
 function setExportBusy(b){
@@ -3903,7 +3623,10 @@ async function renderOfflineAudio(lenSec){
     }
     const ev = algoFn(step, varsStep, {mulberry32, line, choose, clamp});
     const sleepBeats = Math.max(0.0001, ev?.sleepBeats ?? vars.dBeats);
-    const stepSec = sleepBeats * vars.beatSec;
+    const sleepMsOff = vars.sleepMs || 0;
+    const stepSec = sleepMsOff > 0
+      ? Math.max(0.006, sleepMsOff / 1000)
+      : sleepBeats * vars.beatSec;
 
     if(ev && ev.amp > 1e-5){
       const rate = clamp(ev.rate ?? vars.rate, 0.25, 4.0);
@@ -4003,10 +3726,85 @@ async function renderOfflineAudio(lenSec){
   return rendered;
 }
 
+// ── Render sporen 3 en 4 offline en mix ze bij ─────────────────────────────
+async function renderExtra34(lenSec, masterGain){
+  // Geeft een AudioBuffer terug met de mix van spoor 3+4, of null als niet beschikbaar
+  const buf3 = window._eng3 && window._eng3.buffer;
+  const buf4 = window._eng4 && window._eng4.buffer;
+  if(!buf3 && !buf4) return null;
+
+  const sampleRate = 48000;
+  const totalFrames = Math.floor(lenSec * sampleRate);
+  const offline = new OfflineAudioContext(2, totalFrames, sampleRate);
+
+  const master = offline.createGain();
+  master.gain.value = masterGain;
+  master.connect(offline.destination);
+
+  const vars    = getVars();
+  const algoFn  = compileAlgo();
+  const fade    = +vars.fade || 0.01;
+  const bpmVal  = +vars.bpm || 120;
+  const sleepMsOvr = vars.sleepMs || 0;
+  const stepSec = sleepMsOvr > 0
+    ? Math.max(0.006, sleepMsOvr / 1000)
+    : (60 / bpmVal) * (+vars.d || 0.125);
+
+  // Render elk extra spoor als een simpele lineaire afspeellus
+  for(const [buf, vol] of [[buf3, 0.7],[buf4, 0.7]]){
+    if(!buf) continue;
+    // Kopieer buffer naar offline context
+    const offBuf = offline.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let c = 0; c < buf.numberOfChannels; c++){
+      offBuf.getChannelData(c).set(buf.getChannelData(c));
+    }
+    let t = 0; let step = 0;
+    while(t < lenSec){
+      const result = (() => { try{ return algoFn(step, vars, helpers); }catch(e){ return null; } })();
+      if(!result){ t += stepSec; step++; continue; }
+      const { startNorm=0, finishNorm=1, amp=0.7, sleepBeats=0.125, rate=1 } = result;
+      const slpSec = sleepMsOvr > 0
+        ? Math.max(0.006, sleepMsOvr / 1000)
+        : Math.max(0.006, sleepBeats * 60 / bpmVal);
+      const outDur = Math.max(0.01, (finishNorm - startNorm) * buf.duration / Math.max(rate, 0.1));
+      const offset = clamp(startNorm * buf.duration, 0, buf.duration - 0.001);
+      const src = offline.createBufferSource();
+      src.buffer = offBuf;
+      src.playbackRate.value = clamp(rate, 0.1, 4);
+      const g = offline.createGain();
+      const fsec = clamp(fade, 0.001, Math.min(0.03, outDur * 0.25));
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(amp * vol, t + fsec);
+      g.gain.setValueAtTime(amp * vol, Math.max(t + fsec, t + outDur - fsec));
+      g.gain.linearRampToValueAtTime(0, t + outDur);
+      src.connect(g); g.connect(master);
+      try{ src.start(t, offset, outDur * rate); src.stop(t + outDur + 0.02); }catch(e){}
+      t += slpSec; step++;
+    }
+  }
+  return await offline.startRendering();
+}
+
+// ── Mix twee AudioBuffers samen ─────────────────────────────────────────────
+function mixBuffers(a, b){
+  if(!b) return a;
+  if(!a) return b;
+  const len = Math.max(a.length, b.length);
+  const out = new AudioBuffer({ numberOfChannels: 2, length: len, sampleRate: a.sampleRate });
+  for(let c = 0; c < 2; c++){
+    const outCh = out.getChannelData(c);
+    if(a.numberOfChannels > c) outCh.set(a.getChannelData(Math.min(c, a.numberOfChannels-1)));
+    if(b.numberOfChannels > c){
+      const bCh = b.getChannelData(Math.min(c, b.numberOfChannels-1));
+      for(let i = 0; i < bCh.length; i++) outCh[i] = (outCh[i] || 0) + bCh[i];
+    }
+  }
+  return out;
+}
+
 async function exportWav(){
   if(!buffer) return;
   setExportBusy(true);
-  // Prevent double-audio: if live engine is running, stop it during export
   const wasPlaying = !!playState;
   if(wasPlaying){
     try{ stopRandStartTimer(); }catch{}
@@ -4016,12 +3814,27 @@ async function exportWav(){
     try{ ui.start.disabled = !buffer; ui.stop.disabled = true; }catch{}
   }
   const lenSec = Math.max(1, Math.min(1800, +(ui.expLen?.value||60)));
-  if(ui.exportNote) ui.exportNote.textContent = "Render WAV…";
-  const rendered = await renderOfflineAudio(lenSec);
-  const wav = audioBufferToWavBlob(rendered);
+  const masterGain = +(ui.master?.value||1);
+
+  if(ui.exportNote) ui.exportNote.textContent = "Render spoor 1+2…";
+  const rendered12 = await renderOfflineAudio(lenSec);
+
+  // Render spoor 3 en 4 als die geladen zijn
+  let finalBuf = rendered12;
+  const has34 = (window._eng3 && window._eng3.buffer) || (window._eng4 && window._eng4.buffer);
+  if(has34){
+    if(ui.exportNote) ui.exportNote.textContent = "Render spoor 3+4…";
+    const rendered34 = await renderExtra34(lenSec, masterGain);
+    if(rendered34){
+      if(ui.exportNote) ui.exportNote.textContent = "Mixen…";
+      finalBuf = mixBuffers(rendered12, rendered34);
+    }
+  }
+
+  const wav = audioBufferToWavBlob(finalBuf);
   const ts = new Date().toISOString().replace('T','_').replace(/:/g,'-').split('.')[0];
   downloadBlob(wav, `GK_${ts}.wav`);
-  if(ui.exportNote) ui.exportNote.textContent = "WAV klaar.";
+  if(ui.exportNote) ui.exportNote.textContent = has34 ? "WAV klaar (4 sporen)." : "WAV klaar.";
   setExportBusy(false);
 }
 
@@ -4476,302 +4289,440 @@ const CONTROVERSIAL_ALGOS = {
   final_insult(step){ return [{slice:15, amp:step%32===0?2.0:0.1, durSteps:step%32===0?8:1}]; }
 };
 
-// ══════════════════════════════════════════════════════════════
-//  RADIO PORTAL
-//  Voedt de bestaande twee file-inputs met willekeurige bestanden
-//  uit een map. Alle overige instellingen van de pagina blijven
-//  ongewijzigd — BPM, algoritme, FX, alles.
-// ══════════════════════════════════════════════════════════════
-(function(){
 
-  // ── DOM ────────────────────────────────────────────────────
-  const rpDot        = document.getElementById('rpDot');
-  const rpStatus     = document.getElementById('rpStatus');
-  const rpTrack1     = document.getElementById('rpTrack1');
-  const rpTrack2     = document.getElementById('rpTrack2');
-  const rpCountdown  = document.getElementById('rpCountdown');
-  const rpBadge      = document.getElementById('rpBadge');
-  const rpBtnFolder  = document.getElementById('rpBtnFolder');
-  const rpFallback   = document.getElementById('rpFallback');
-  const rpIntervalSl = document.getElementById('rpIntervalSl');
-  const rpIntervalNum= document.getElementById('rpIntervalNum');
-  const rpIntervalVal= document.getElementById('rpIntervalVal');
-  const rpBtnStart   = document.getElementById('rpBtnStart');
-  const rpBtnStop    = document.getElementById('rpBtnStop');
-  const rpBtnSkip    = document.getElementById('rpBtnSkip');
-  const rpLog        = document.getElementById('rpLog');
 
-  // ── State ──────────────────────────────────────────────────
-  let rpFiles   = [];   // [{name, getFile()}]
-  let rpActive  = false;
-  let rpTimer   = null;
-  let rpCdTimer = null;
-  let rpSecsLeft= 0;
-  let rpMainQ   = [];
-  let rpDrumQ   = [];
+// ── Gedeelde radio helpers ─────────────────────────────────
+// Dynamisch: alle keys uit DRUM_ALGOS + CONTROVERSIAL_ALGOS
+const ALL_ALGO_NAMES = [
+  ...Object.keys(DRUM_ALGOS).filter(k => k !== '_hit'),
+  ...Object.keys(CONTROVERSIAL_ALGOS)
+];
 
-  // ── Log ────────────────────────────────────────────────────
-  function rplog(msg){
+// ── Vul drum algo select vanuit de bestaande algo-objecten ──
+function populateDrumAlgoSelect(){
+  const mainstream   = Object.keys(DRUM_ALGOS).filter(k => k !== '_hit');
+  const controversial = Object.keys(CONTROVERSIAL_ALGOS);
+
+  function fillSelect(sel, defaultVal){
+    if(!sel) return;
+    const grp1 = document.createElement('optgroup');
+    grp1.label = '─── Genre / Stijl ───';
+    for(const key of mainstream){
+      const existingOpt = document.querySelector('#drumAlgo option[value="'+key+'"]');
+      const label = existingOpt ? existingOpt.textContent : key.replace(/_/g,' ');
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = label;
+      if(key === defaultVal) opt.selected = true;
+      grp1.appendChild(opt);
+    }
+    const grp2 = document.createElement('optgroup');
+    grp2.label = '─── Controversieel / Glitch ───';
+    for(const key of controversial){
+      const existingOpt = document.querySelector('#drumAlgo option[value="'+key+'"]');
+      const label = existingOpt ? existingOpt.textContent : key.replace(/_/g,' ');
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = label;
+      grp2.appendChild(opt);
+    }
+    sel.appendChild(grp1);
+    sel.appendChild(grp2);
+  }
+
+  const defaults = ['chaos_map','amen','random_authority','euclidean_5_16'];
+  [1,2,3,4].forEach((n,i) => fillSelect(document.getElementById('rpAlgo'+n), defaults[i]));
+}
+
+function radioSharedInit(){
+  'use strict';
+
+  // ── Vul de select met alle beschikbare algoritmes ──────────
+  populateDrumAlgoSelect();
+
+  // ── State ────────────────────────────────────────────────
+  let radioFiles  = [];
+  let radioActive = false;
+  let radioTimer  = null;
+  let radioCountdownTimer = null;
+  let radioSecondsLeft = 0;
+  let queues = [[],[],[],[]]; // 4 onafhankelijke shuffled queues
+
+  // ── DOM ──────────────────────────────────────────────────
+  const dot         = document.getElementById('radioDot');
+  const statusTxt   = document.getElementById('radioStatusText');
+  const trackMain   = document.getElementById('radioTrackMain');
+  const trackDrum   = document.getElementById('radioTrackDrum');
+  const track3      = document.getElementById('radioTrack3');
+  const track4      = document.getElementById('radioTrack4');
+  const countdown   = document.getElementById('radioCountdown');
+  const filesBadge  = document.getElementById('radioFilesBadge');
+  const intervalSl  = document.getElementById('radioInterval');
+  const intervalNum = document.getElementById('radioIntervalNum');
+  const intervalVal = document.getElementById('radioIntervalVal');
+  // algo selects are now rpAlgo1..rpAlgo4
+  const btnStart    = document.getElementById('radioBtnStart');
+  const btnStop     = document.getElementById('radioBtnStop');
+  const btnSkip     = document.getElementById('radioBtnSkip');
+  const btnShuffle  = document.getElementById('radioBtnShuffle');
+  const logEl       = document.getElementById('radioLog');
+
+  // ── Log ──────────────────────────────────────────────────
+  function radioLog(msg){
     const t = new Date().toLocaleTimeString('nl-NL');
-    rpLog.textContent = '['+t+'] '+msg+'\n'+rpLog.textContent.slice(0,1200);
+    logEl.textContent = '[' + t + '] ' + msg + '\n' + logEl.textContent.slice(0,1500);
   }
 
-  // ── Interval sync ──────────────────────────────────────────
-  function syncSec(v){
-    const x = Math.max(10, Math.min(300, +v||60));
-    rpIntervalSl.value = x; rpIntervalNum.value = x;
-    rpIntervalVal.textContent = x+'s';
-    return x;
+  // ── Interval sync ────────────────────────────────────────
+  function syncInterval(v){
+    const x = Math.max(10, Math.min(300, +v || 60));
+    intervalSl.value = x; intervalNum.value = x;
+    intervalVal.textContent = x + 's';
   }
-  rpIntervalSl.addEventListener('input',  ()=> syncSec(rpIntervalSl.value));
-  rpIntervalNum.addEventListener('input', ()=> syncSec(rpIntervalNum.value));
-  syncSec(60);
+  intervalSl.addEventListener('input',  ()=> syncInterval(intervalSl.value));
+  intervalNum.addEventListener('input', ()=> syncInterval(intervalNum.value));
+  syncInterval(60);
 
-  // ── Dot ────────────────────────────────────────────────────
-  function setDot(s){
-    rpDot.className = 'rp-dot'+(s==='on'?' on':s==='loading'?' loading':'');
-  }
-
-  // ── Shuffled queue ─────────────────────────────────────────
-  function shuffle(arr){
+  // ── Shuffled playlist queue ───────────────────────────────
+  function fisherYates(arr){
     const a = arr.slice();
-    for(let i=a.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));
-      [a[i],a[j]]=[a[j],a[i]];
+    for(let i = a.length-1; i > 0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
     }
     return a;
   }
 
-  function refill(){
-    rpMainQ = shuffle(rpFiles);
-    rpDrumQ = shuffle(rpFiles);
-    // Zorg dat positie 0 niet hetzelfde bestand is op beide sporen
-    if(rpDrumQ.length>1 && rpMainQ[0] && rpDrumQ[0] &&
-       rpDrumQ[0].name === rpMainQ[0].name){
-      [rpDrumQ[0],rpDrumQ[1]] = [rpDrumQ[1],rpDrumQ[0]];
+  function refillQueue(i){
+    queues[i] = fisherYates(radioFiles);
+    // Zorg dat queue[i][0] niet hetzelfde is als queue[(i-1+4)%4][0]
+    const prev = queues[(i-1+4)%4];
+    if(queues[i].length > 1 && prev[0] && queues[i][0] &&
+       queues[i][0].name === prev[0].name){
+      [queues[i][0], queues[i][1]] = [queues[i][1], queues[i][0]];
     }
-    rplog('Nieuwe ronde: '+rpFiles.length+' bestanden geshuffeld.');
   }
 
-  function nextPair(){
-    if(rpFiles.length < 2) return null;
-    if(!rpMainQ.length || !rpDrumQ.length) refill();
-    const main = rpMainQ.shift();
-    let   drum = rpDrumQ.shift();
-    // Nooit hetzelfde bestand op beide sporen
-    if(drum && main && drum.name===main.name && rpDrumQ.length>0){
-      rpDrumQ.unshift(drum);
-      drum = rpDrumQ.shift();
-    }
-    return {main, drum};
+  function nextFromQueue(i){
+    if(radioFiles.length < 1) return null;
+    if(queues[i].length === 0) refillQueue(i);
+    return queues[i].shift();
   }
 
-  // ── Speel het volgende paar ────────────────────────────────
-  // Beide buffers worden hier zelf gedecodeerd zodat drumBuffer
-  // globaal gezet is VOORDAT de hoofd-change-handler vuurt.
-  // Zo pakt de nieuwe engine altijd het juiste drum-bestand.
-  async function playNextPair(){
-    const pair = nextPair();
-    if(!pair) return;
+  // Pikt 4 bestanden — één per spoor
+  function nextFour(){
+    if(radioFiles.length < 2) return null;
+    return [0,1,2,3].map(i => nextFromQueue(i));
+  }
+
+  // ── Drum algo instellen per spoor ───────────────────────────
+  function getAlgoForSpoor(n){
+    const sel = document.getElementById('rpAlgo'+n);
+    const val = sel ? sel.value : 'random';
+    return val === 'random'
+      ? ALL_ALGO_NAMES[Math.floor(Math.random()*ALL_ALGO_NAMES.length)]
+      : val;
+  }
+
+  // ── Laad 4 bestanden — één per spoor ─────────────────────
+  async function loadPair(){
+    const four = nextFour();
+    if(!four) return;
+    const [f1,f2,f3,f4] = four;
 
     setDot('loading');
-    rpStatus.textContent = 'Laden...';
-    rpTrack1.textContent = 'Spoor 1: ⏳ '+pair.main.name;
-    rpTrack2.textContent = 'Spoor 2: ⏳ '+pair.drum.name;
-    rplog('Laden: '+pair.main.name+' | drum: '+pair.drum.name);
+    statusTxt.textContent = 'Laden (4 sporen)...';
+    trackMain.textContent = '\u23F3 ' + (f1&&f1.name||'—');
+    trackDrum.textContent = '\u23F3 ' + (f2&&f2.name||'—');
+    if(track3) track3.textContent = '\u23F3 ' + (f3&&f3.name||'—');
+    if(track4) track4.textContent = '\u23F3 ' + (f4&&f4.name||'—');
 
     try{
       if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
       await audioCtx.resume();
 
-      // Decode beide buffers parallel — één keer, geen dubbel werk
-      const [f1, f2] = await Promise.all([pair.main.getFile(), pair.drum.getFile()]);
-      const [arr1, arr2] = await Promise.all([f1.arrayBuffer(), f2.arrayBuffer()]);
-      const [mainBuf, drumBuf] = await Promise.all([
-        audioCtx.decodeAudioData(arr1),
-        audioCtx.decodeAudioData(arr2)
-      ]);
+      // Decode alle 4 bestanden parallel
+      const bufs = await Promise.all([f1,f2,f3,f4].map(async f => {
+        if(!f) return null;
+        const file = await f.getFile();
+        const arr  = await file.arrayBuffer();
+        return audioCtx.decodeAudioData(arr);
+      }));
+      const [buf1,buf2,buf3,buf4] = bufs;
 
-      // Sla buffers globaal op
-      buffer     = mainBuf;
-      drumBuffer = drumBuf;
+      // Spoor 1 = hoofd-sample (engine), Spoor 2 = drum-sample
+      // Spoor 3 en 4 worden ook als drum-buffer in aparte engines geladen
+      buffer     = buf1;
+      drumBuffer = buf2;
 
-      // Update labels
-      if(ui.fileInfo) ui.fileInfo.textContent =
-        'Geladen: '+pair.main.name+' — '+mainBuf.duration.toFixed(2)+'s';
-      if(ui.drumInfo) ui.drumInfo.textContent =
-        'Drum sample: '+pair.drum.name+' ('+drumBuf.duration.toFixed(2)+'s)';
+      const xfade  = ui.xfade ? +ui.xfade.value : 1.5;
+      const oldEng = currentEngine;
 
-      // Bouw nieuwe engine rechtstreeks — geen file change event nodig
-      // zodat we niet dubbel decoderen en geen race conditions hebben
-      const oldEngine = currentEngine;
-      const wasPlaying = !!playState;
-      const xfadeSec = ui.xfade ? +ui.xfade.value : 1.5;
-      const targetMaster = +ui.master.value;
+      // Engine voor spoor 1+2
+      const rev1   = makeReversedBuffer(audioCtx, buf1);
+      const newEng = new SliceEngine(audioCtx, buf1, rev1);
+      newEng.setMaster(0);
+      newEng.setFade(+ui.fade.value);
+      newEng.setFFT(+ui.fftSize.value, +ui.smooth.value);
+      newEng.setLimiter(ui.limiter.value === 'on');
+      newEng.getVarsFn = ()=>{ const v=getVars(); const ms=+(document.getElementById('rpMs1')&&document.getElementById('rpMs1').value)||0; return {...v,sleepMs:ms}; };
+      if(buf2) try{ newEng.setDrumBuffer(buf2); }catch(e){}
 
-      const revBuf = makeReversedBuffer(audioCtx, mainBuf);
-      const newEngine = new SliceEngine(audioCtx, mainBuf, revBuf);
-      newEngine.setFade(+ui.fade.value);
-      newEngine.setFFT(+ui.fftSize.value, +ui.smooth.value);
-      newEngine.setLimiter(ui.limiter.value === 'on');
-      newEngine.getVarsFn = getVars;
-      try{ newEngine.setDrumBuffer(drumBuf); }catch(e){}
+      // Drum algo spoor 1
+      const algo1 = getAlgoForSpoor(1);
+      if(ui.drumAlgo){ ui.drumAlgo.value = algo1; ui.drumAlgo.dispatchEvent(new Event('change')); }
+      if(ui.drumEnable && !ui.drumEnable.checked){ ui.drumEnable.checked=true; ui.drumEnable.dispatchEvent(new Event('change')); }
 
-      engine = newEngine;
-      currentEngine = newEngine;
-
+      engine = newEng; currentEngine = newEng;
       const algoFn = compileAlgo();
-      const vars   = getVars();
-      newEngine.setAlgoFn(algoFn);
-      newEngine.setMaster(0);
-      newEngine.start(algoFn, vars);
-      newEngine.rampMaster(targetMaster, xfadeSec);
+      newEng.setAlgoFn(algoFn);
+      newEng.start(algoFn, getVars());
+      newEng.rampMaster(+ui.master.value, xfade);
 
-      // Fade out en stop oude engine
-      if(oldEngine){
-        try{ oldEngine.rampMaster(0, xfadeSec); }catch(e){}
-        setTimeout(()=>{ try{ oldEngine.stop(); }catch(e){} }, xfadeSec*1000 + 100);
+      if(oldEng){ try{oldEng.rampMaster(0,xfade);}catch(e){} setTimeout(()=>{try{oldEng.stop();}catch(e){}},xfade*1000+100); }
+
+      // Engine voor spoor 3 (extra, eigen drum algo)
+      if(buf3 && !window._eng3){ window._eng3 = null; }
+      if(buf3){
+        if(window._eng3) try{window._eng3.stop();}catch(e){}
+        const rev3 = makeReversedBuffer(audioCtx, buf3);
+        const eng3 = new SliceEngine(audioCtx, buf3, rev3);
+        eng3.setMaster(0);
+        eng3.setFade(+ui.fade.value);
+        eng3.setFFT(+ui.fftSize.value, +ui.smooth.value);
+        eng3.setLimiter(ui.limiter.value==='on');
+        eng3.getVarsFn = ()=>{ const v=getVars(); const ms=+(document.getElementById('rpMs3')&&document.getElementById('rpMs3').value)||0; return {...v,sleepMs:ms}; };
+        if(buf4) try{eng3.setDrumBuffer(buf4);}catch(e){}
+        const algo3 = getAlgoForSpoor(3);
+        const drumFn3 = DRUM_ALGOS[algo3]||CONTROVERSIAL_ALGOS[algo3]||DRUM_ALGOS.amen;
+        eng3.drumAlgoFn = drumFn3.bind(drumFn3);
+        eng3.setAlgoFn(algoFn);
+        eng3.start(algoFn, getVars());
+        eng3.rampMaster(+ui.master.value * 0.7, xfade);
+        window._eng3 = eng3;
       }
 
-      // Visualiser
-      try{ viz?.stop(); }catch(e){}
-      viz = makeVisualizer(newEngine, ui.cv);
+      // Engine voor spoor 4
+      if(buf4){
+        if(window._eng4) try{window._eng4.stop();}catch(e){}
+        const rev4 = makeReversedBuffer(audioCtx, buf4);
+        const eng4 = new SliceEngine(audioCtx, buf4, rev4);
+        eng4.setMaster(0);
+        eng4.setFade(+ui.fade.value);
+        eng4.setFFT(+ui.fftSize.value, +ui.smooth.value);
+        eng4.setLimiter(ui.limiter.value==='on');
+        eng4.getVarsFn = ()=>{ const v=getVars(); const ms=+(document.getElementById('rpMs4')&&document.getElementById('rpMs4').value)||0; return {...v,sleepMs:ms}; };
+        const algo4 = getAlgoForSpoor(4);
+        const drumFn4 = DRUM_ALGOS[algo4]||CONTROVERSIAL_ALGOS[algo4]||DRUM_ALGOS.amen;
+        eng4.drumAlgoFn = drumFn4.bind(drumFn4);
+        eng4.setAlgoFn(algoFn);
+        eng4.start(algoFn, getVars());
+        eng4.rampMaster(+ui.master.value * 0.7, xfade);
+        window._eng4 = eng4;
+      }
+
+      playState=true; playStartTime=audioCtx.currentTime;
+      startRandStartTimer();
+      try{viz&&viz.stop();}catch(e){}
+      viz = makeVisualizer(newEng, ui.cv);
       viz.start();
       wireLiveControls();
-
-      // Knoppen bijwerken
-      playState = true;
-      playStartTime = audioCtx.currentTime;
-      startRandStartTimer();
-      if(ui.start) ui.start.disabled = true;
-      if(ui.stop)  ui.stop.disabled  = false;
+      if(ui.start) ui.start.disabled=true;
+      if(ui.stop)  ui.stop.disabled=false;
       setExportBusy(false);
 
-      rpTrack1.textContent = 'Spoor 1 ▶ '+pair.main.name+' ('+mainBuf.duration.toFixed(1)+'s)';
-      rpTrack2.textContent = 'Spoor 2 🥁 '+pair.drum.name+' ('+drumBuf.duration.toFixed(1)+'s)';
-      rpStatus.textContent = 'On air: '+pair.main.name;
+      trackMain.textContent = '\u25B6 S1: '+(f1&&f1.name||'—');
+      trackDrum.textContent = '\uD83E\uDD41 S2: '+(f2&&f2.name||'—');
+      if(track3) track3.textContent = '\u25B6 S3: '+(f3&&f3.name||'—');
+      if(track4) track4.textContent = '\u25B6 S4: '+(f4&&f4.name||'—');
+      statusTxt.textContent = 'On air (4 sporen)';
       setDot('on');
-      rplog('On air ✓');
-
+      radioLog('On air \u2713');
     }catch(e){
       setDot('off');
-      rpStatus.textContent = 'Fout: '+e.message;
-      rplog('FOUT: '+e.message);
+      statusTxt.textContent='Fout: '+e.message;
+      radioLog('FOUT: '+e.message);
       console.error(e);
     }
   }
 
-  // ── Countdown ──────────────────────────────────────────────
-  function startCd(sec){
-    if(rpCdTimer) clearInterval(rpCdTimer);
-    rpSecsLeft = sec;
-    showCd();
-    rpCdTimer = setInterval(()=>{
-      rpSecsLeft = Math.max(0, rpSecsLeft-1);
-      showCd();
-    },1000);
+  // ── Countdown ────────────────────────────────────────────
+  function startCountdown(sec){
+    if(radioCountdownTimer) clearInterval(radioCountdownTimer);
+    radioSecondsLeft = sec;
+    renderCountdown();
+    radioCountdownTimer = setInterval(()=>{
+      radioSecondsLeft = Math.max(0, radioSecondsLeft-1);
+      renderCountdown();
+    }, 1000);
   }
-  function showCd(){
-    const m=Math.floor(rpSecsLeft/60), s=rpSecsLeft%60;
-    rpCountdown.textContent = rpSecsLeft>0
-      ? 'Volgende wissel over: '+m+':'+String(s).padStart(2,'0')
+  function renderCountdown(){
+    const m = Math.floor(radioSecondsLeft/60);
+    const s = radioSecondsLeft%60;
+    countdown.textContent = radioSecondsLeft > 0
+      ? 'Volgende wissel over: ' + m + ':' + String(s).padStart(2,'0')
       : 'Wisselen...';
   }
 
-  // ── Herstart interval-timer ─────────────────────────────────
-  function restartTimer(){
-    if(rpTimer) clearInterval(rpTimer);
-    const sec = +rpIntervalSl.value||60;
-    startCd(sec);
-    rpTimer = setInterval(async()=>{
-      if(!rpActive) return;
-      await playNextPair();
-      startCd(+rpIntervalSl.value||60);
+  // ── Herstart interval timer ───────────────────────────────
+  function restartTimer(tickFn){
+    if(radioTimer) clearInterval(radioTimer);
+    const sec = +intervalSl.value || 60;
+    startCountdown(sec);
+    radioTimer = setInterval(async ()=>{
+      if(!radioActive) return;
+      await tickFn();
     }, sec*1000);
   }
 
-  // ── Update bestandenlijst ───────────────────────────────────
-  function setFiles(files){
-    rpFiles = files;
-    rpMainQ = []; rpDrumQ = [];
-    rpBadge.textContent = rpFiles.length>=2
-      ? '✓ '+rpFiles.length+' bestanden beschikbaar'
-      : rpFiles.length===1
-        ? '⚠ Minimaal 2 bestanden nodig.'
-        : '⚠ Geen bestanden geladen.';
-    rpBtnStart.disabled = rpFiles.length < 2;
-    rplog(rpFiles.length+' bestanden geladen.');
+  // ── Start/Stop/Skip/Shuffle ───────────────────────────────
+  function setupControls(tickFn, updateFiles){
+    btnStart.addEventListener('click', async ()=>{
+      radioActive = true;
+      btnStart.disabled   = true;
+      btnStop.disabled    = false;
+      btnSkip.disabled    = false;
+      btnShuffle.disabled = false;
+      radioLog('Radio gestart (4 sporen).');
+      if(updateFiles) await updateFiles();
+      await tickFn();
+      restartTimer(tickFn);
+    });
+
+    btnStop.addEventListener('click', ()=>{
+      radioActive = false;
+      if(radioTimer){ clearInterval(radioTimer); radioTimer = null; }
+      if(radioCountdownTimer){ clearInterval(radioCountdownTimer); radioCountdownTimer = null; }
+      setDot('off');
+      countdown.textContent = '';
+      statusTxt.textContent = 'Gestopt.';
+      btnStart.disabled   = false;
+      btnStop.disabled    = true;
+      btnSkip.disabled    = true;
+      btnShuffle.disabled = true;
+      radioLog('Radio gestopt.');
+      try{ stopRandStartTimer(); }catch(e){}
+      playState = false;
+      // Stop alle engines — gebruik Set om dubbele stop() te voorkomen
+      const _toStop = new Set([engine, currentEngine, window._eng3, window._eng4].filter(Boolean));
+      _toStop.forEach(e=>{ try{ e.stop(); }catch(ex){} });
+      engine = null; currentEngine = null;
+      window._eng3 = null; window._eng4 = null;
+      if(ui.start) ui.start.disabled = !buffer;
+      if(ui.stop)  ui.stop.disabled  = true;
+    });
+
+    btnSkip.addEventListener('click', async ()=>{
+      if(!radioActive) return;
+      if(radioTimer){ clearInterval(radioTimer); radioTimer = null; }
+      if(radioCountdownTimer){ clearInterval(radioCountdownTimer); radioCountdownTimer = null; }
+      radioLog('Overgeslagen.');
+      await tickFn();
+      restartTimer(tickFn);
+    });
+
+    btnShuffle.addEventListener('click', async ()=>{
+      if(!radioActive) return;
+      radioLog('Shuffle (4 sporen).');
+      await loadPair();
+    });
+
+    intervalSl.addEventListener('change',  ()=>{ if(radioActive) restartTimer(tickFn); });
+    intervalNum.addEventListener('change', ()=>{ if(radioActive) restartTimer(tickFn); });
   }
 
-  // ── Mapkiezer (File System Access API) ─────────────────────
-  rpBtnFolder.addEventListener('click', async ()=>{
+  // ── Dot helper ───────────────────────────────────────────
+  function setDot(state){
+    dot.className = 'radio-dot'
+      + (state==='on' ? ' on' : state==='loading' ? ' loading' : '');
+  }
+
+  // ── Publieke interface ────────────────────────────────────
+  return {
+    radioLog, setDot, statusTxt,
+    get radioFiles(){ return radioFiles; },
+    setFiles(f){
+      const prevCount = radioFiles.length;
+      radioFiles = f;
+      filesBadge.textContent = radioFiles.length >= 2
+        ? '\u2713 ' + radioFiles.length + ' bestanden beschikbaar (4 sporen)'
+        : radioFiles.length === 1
+          ? '\u26A0 Slechts 1 bestand \u2014 minimaal 2 nodig.'
+          : '\u26A0 Geen audiobestanden.';
+      if(radioFiles.length !== prevCount){
+        queues = [[],[],[],[]];
+        radioLog('Lijst veranderd \u2192 queues gereset.');
+      }
+    },
+    loadPair, startCountdown,
+    setupControls,
+    isActive(){ return radioActive; }
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RADIO PORTAL — OFFLINE (lokale map)
+// ══════════════════════════════════════════════════════════════
+(function(){
+  const R = radioSharedInit();
+
+  const btnFolder = document.getElementById('radioBtnFolder');
+  const fallback  = document.getElementById('radioFolderFallback');
+
+  // Bestand-entry: heeft getFile() zodat loadPair hem kan decoderen
+  function makeEntry(name, getFile){
+    return { name, getFile };
+  }
+
+  // ── File System Access API (Chrome/Edge) ──────────────────
+  if(btnFolder) btnFolder.addEventListener('click', async ()=>{
     if(!window.showDirectoryPicker){
-      rplog('File System Access niet beschikbaar. Gebruik de fallback.');
+      R.radioLog('File System Access niet beschikbaar. Gebruik de fallback.');
       return;
     }
     try{
       const dir = await window.showDirectoryPicker({mode:'read'});
       const entries = [];
-      for await(const [name, handle] of dir.entries()){
-        if(handle.kind!=='file') continue;
+      for await (const [name, handle] of dir.entries()){
+        if(handle.kind !== 'file') continue;
         if(!name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/)) continue;
-        entries.push({ name, getFile: ()=> handle.getFile() });
+        entries.push(makeEntry(name, ()=> handle.getFile()));
       }
-      setFiles(entries);
+      R.setFiles(entries);
+      R.radioLog('Map geladen: ' + entries.length + ' bestanden.');
+      document.getElementById('radioBtnStart').disabled = entries.length < 2;
     }catch(e){
-      if(e.name!=='AbortError') rplog('Fout map: '+e.message);
+      if(e.name !== 'AbortError') R.radioLog('Fout map: ' + e.message);
     }
   });
 
-  // ── Fallback: losse bestanden ───────────────────────────────
-  rpFallback.addEventListener('change', ()=>{
-    const files = Array.from(rpFallback.files||[])
+  // ── Fallback: meerdere bestanden ──────────────────────────
+  if(fallback) fallback.addEventListener('change', ()=>{
+    const files = Array.from(fallback.files||[])
       .filter(f=> f.name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/));
-    setFiles(files.map(f=>({ name:f.name, getFile:()=> Promise.resolve(f) })));
+    R.setFiles(files.map(f=> makeEntry(f.name, ()=> Promise.resolve(f))));
+    R.radioLog('Fallback: ' + files.length + ' bestanden geladen.');
+    document.getElementById('radioBtnStart').disabled = files.length < 2;
   });
 
-  // ── Start ───────────────────────────────────────────────────
-  rpBtnStart.addEventListener('click', async ()=>{
-    rpActive = true;
-    rpBtnStart.disabled = true;
-    rpBtnStop.disabled  = false;
-    rpBtnSkip.disabled  = false;
-    rplog('Radio gestart.');
-    await playNextPair();
-    restartTimer();
+  // ── Tick: laad 4 bestanden (loadPair pikt zelf uit de queues)
+  async function tick(){
+    await R.loadPair();
+    R.startCountdown(+document.getElementById('radioInterval').value || 60);
+  }
+
+  R.setupControls(tick, null);
+  // Live ms-update voor draaiende engines
+  [1,3,4].forEach(n => {
+    const el = document.getElementById('rpMs'+n);
+    if(!el) return;
+    el.addEventListener('input', ()=>{
+      const ms = +el.value || 0;
+      if(n===1){ if(engine) try{engine.vars.sleepMs=ms;}catch(e){} if(currentEngine) try{currentEngine.vars.sleepMs=ms;}catch(e){} }
+      if(n===3 && window._eng3) try{window._eng3.vars.sleepMs=ms;}catch(e){}
+      if(n===4 && window._eng4) try{window._eng4.vars.sleepMs=ms;}catch(e){}
+    });
   });
 
-  // ── Stop ────────────────────────────────────────────────────
-  rpBtnStop.addEventListener('click', ()=>{
-    rpActive = false;
-    if(rpTimer)  { clearInterval(rpTimer);  rpTimer=null; }
-    if(rpCdTimer){ clearInterval(rpCdTimer);rpCdTimer=null; }
-    setDot('off');
-    rpCountdown.textContent = '';
-    rpStatus.textContent    = 'Gestopt.';
-    rpBtnStart.disabled = rpFiles.length<2;
-    rpBtnStop.disabled  = true;
-    rpBtnSkip.disabled  = true;
-    rplog('Radio gestopt.');
-    // Stop de engine via de bestaande Stop-knop
-    if(ui.stop && !ui.stop.disabled) ui.stop.click();
-  });
-
-  // ── Volgende (skip) ─────────────────────────────────────────
-  rpBtnSkip.addEventListener('click', async ()=>{
-    if(!rpActive) return;
-    if(rpTimer)  { clearInterval(rpTimer);  rpTimer=null; }
-    if(rpCdTimer){ clearInterval(rpCdTimer);rpCdTimer=null; }
-    rplog('Overgeslagen.');
-    await playNextPair();
-    restartTimer();
-  });
-
-  // Interval aanpassen terwijl radio loopt
-  rpIntervalSl.addEventListener('change',  ()=>{ if(rpActive) restartTimer(); });
-  rpIntervalNum.addEventListener('change', ()=>{ if(rpActive) restartTimer(); });
-
-  rplog('Radio portal gereed.');
+  R.radioLog('Gereed. Kies een map of bestanden, dan START RADIO.');
 })();
 
 </script>
