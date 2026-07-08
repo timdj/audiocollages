@@ -90,25 +90,25 @@
     <div class="radio-interval-row" style="margin-top:4px">
       <label style="width:32px;flex-shrink:0">S1</label>
       <select id="rpAlgo1" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
-      <input id="rpMs1" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <input id="rpMs1" type="number" min="0" max="10000" step="1" value="100" style="width:58px;margin:0 0 0 4px"/>
       <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
     </div>
     <div class="radio-interval-row" style="margin-top:3px">
       <label style="width:32px;flex-shrink:0">S2</label>
       <select id="rpAlgo2" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
-      <input id="rpMs2" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <input id="rpMs2" type="number" min="0" max="10000" step="1" value="100" style="width:58px;margin:0 0 0 4px"/>
       <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
     </div>
     <div class="radio-interval-row" style="margin-top:3px">
       <label style="width:32px;flex-shrink:0">S3</label>
       <select id="rpAlgo3" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
-      <input id="rpMs3" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <input id="rpMs3" type="number" min="0" max="10000" step="1" value="100" style="width:58px;margin:0 0 0 4px"/>
       <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
     </div>
     <div class="radio-interval-row" style="margin-top:3px">
       <label style="width:32px;flex-shrink:0">S4</label>
       <select id="rpAlgo4" style="margin:0;flex:1;font-size:11px"><option value="random">🎲</option></select>
-      <input id="rpMs4" type="number" min="0" max="10000" step="1" value="0" style="width:58px;margin:0 0 0 4px"/>
+      <input id="rpMs4" type="number" min="0" max="10000" step="1" value="100" style="width:58px;margin:0 0 0 4px"/>
       <span style="font-size:10px;color:#6060a0;margin-left:2px">ms</span>
     </div>
 
@@ -140,7 +140,7 @@
       <div class="vars">
         <div class="var">
           <label>Drum BPM (bron)</label>
-          <input id="drumBpm" type="number" min="20" max="300" step="1" value="1"/>
+          <input id="drumBpm" type="number" min="20" max="300" step="1" value="120"/>
           <div class="small">Wordt gebruikt voor het drum-grid (16e-noten). Los van je hoofd-BPM.</div>
         </div>
         <div class="var">
@@ -360,8 +360,8 @@
 
         <div class="var">
           <label>Drum interval (sec) 0..10</label>
-          <input id="drumRandStartIntSl" type="range" min="0" max="10" step="0.1" value="1"/>
-          <input id="drumRandStartIntNum" type="number" min="0" max="10" step="0.1" value="1"/>
+          <input id="drumRandStartIntSl" type="range" min="0" max="10" step="0.1" value="0.1"/>
+          <input id="drumRandStartIntNum" type="number" min="0" max="10" step="0.1" value="0.1"/>
           <div class="small" id="drumRandStartIntVal">0.0</div>
         </div>
 
@@ -505,7 +505,7 @@
 
         <div class="var">
           <label>Sleep override (ms)</label>
-          <input id="sleepMs" type="number" min="0" max="10000" step="1" value="0"/>
+          <input id="sleepMs" type="number" min="0" max="10000" step="1" value="100"/>
           <div class="small">0 = BPM+n bepaalt staptijd. Groter dan 0 = vaste ms-stap (bypast BPM). Min ~6ms.</div>
         </div>
 
@@ -545,8 +545,8 @@
 
         <div class="var">
           <label>Interval (sec) 0..10</label>
-          <input id="randStartIntSl" type="range" min="0" max="10" step="0.1" value="1"/>
-          <input id="randStartIntNum" type="number" min="0" max="10" step="0.1" value="1"/>
+          <input id="randStartIntSl" type="range" min="0" max="10" step="0.1" value="0.1"/>
+          <input id="randStartIntNum" type="number" min="0" max="10" step="0.1" value="0.1"/>
           <div class="small" id="randStartIntVal">0.0</div>
         </div>
 
