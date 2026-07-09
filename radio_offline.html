@@ -359,9 +359,9 @@
         </div>
 
         <div class="var">
-          <label>Drum interval (sec) 0..10</label>
-          <input id="drumRandStartIntSl" type="range" min="0" max="10" step="0.1" value="0.1"/>
-          <input id="drumRandStartIntNum" type="number" min="0" max="10" step="0.1" value="0.1"/>
+          <label>Drum interval (ms)</label>
+          <input id="drumRandStartIntSl" type="range" min="0" max="10000" step="1" value="100"/>
+          <input id="drumRandStartIntNum" type="number" min="0" max="10000" step="1" value="100"/>
           <div class="small" id="drumRandStartIntVal">0.0</div>
         </div>
 
@@ -545,8 +545,8 @@
 
         <div class="var">
           <label>Interval (sec) 0..10</label>
-          <input id="randStartIntSl" type="range" min="0" max="10" step="0.1" value="0.1"/>
-          <input id="randStartIntNum" type="number" min="0" max="10" step="0.1" value="0.1"/>
+          <input id="randStartIntSl" type="range" min="0" max="10000" step="1" value="100"/>
+          <input id="randStartIntNum" type="number" min="0" max="10000" step="1" value="100"/>
           <div class="small" id="randStartIntVal">0.0</div>
         </div>
 
@@ -989,7 +989,7 @@ function mulberry32(seed){
 
   // Deterministic start-line randomizer (so exports match what you hear)
   if(ui.randStartEnable && ui.randStartEnable.checked){
-    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value / 1000) : 0;
     const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
     const tRel = (audioCtx && playState) ? (audioCtx.currentTime - playStartTime) : 0;
     const rs = randStartAtTime(base.seed, tRel, intervalSec, allowRev);
@@ -2724,20 +2724,20 @@ try{ if(ui.drumStartFrom) syncDrumStartFrom(ui.drumStartFrom.value); }catch{}
 try{ if(ui.drumStartTo) syncDrumStartTo(ui.drumStartTo.value); }catch{}
 
 function syncRandStartInterval(v){
-  const x = Math.max(0, Math.min(10, +v));
+  const x = Math.max(0, Math.min(10000, +v));
   if(ui.randStartIntSl) ui.randStartIntSl.value = x;
-  if(ui.randStartIntNum) ui.randStartIntNum.value = x.toFixed(1);
-  if(ui.randStartIntVal) ui.randStartIntVal.textContent = x.toFixed(1);
+  if(ui.randStartIntNum) ui.randStartIntNum.value = x;
+  if(ui.randStartIntVal) ui.randStartIntVal.textContent = x+'ms';
 }
 if(ui.randStartIntSl) ui.randStartIntSl.addEventListener('input', ()=>{ syncRandStartInterval(ui.randStartIntSl.value); startRandStartTimer(); });
 if(ui.randStartIntNum) ui.randStartIntNum.addEventListener('input', ()=>{ syncRandStartInterval(ui.randStartIntNum.value); startRandStartTimer(); });
 syncRandStartInterval(ui.randStartIntSl ? ui.randStartIntSl.value : 0);
 
 function syncDrumRandStartInterval(v){
-  const x = Math.max(0, Math.min(10, +v));
+  const x = Math.max(0, Math.min(10000, +v));
   if(ui.drumRandStartIntSl) ui.drumRandStartIntSl.value = x;
-  if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.value = x.toFixed(1);
-  if(ui.drumRandStartIntVal) ui.drumRandStartIntVal.textContent = x.toFixed(1);
+  if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.value = x;
+  if(ui.drumRandStartIntVal) ui.drumRandStartIntVal.textContent = x+'ms';
 }
 if(ui.drumRandStartIntSl) ui.drumRandStartIntSl.addEventListener('input', ()=>{ syncDrumRandStartInterval(ui.drumRandStartIntSl.value); startRandStartTimer(); });
 if(ui.drumRandStartIntNum) ui.drumRandStartIntNum.addEventListener('input', ()=>{ syncDrumRandStartInterval(ui.drumRandStartIntNum.value); startRandStartTimer(); });
@@ -3278,7 +3278,7 @@ function getVars(){
     drumStartTo: +(ui.drumStartTo ? ui.drumStartTo.value : 1),
     drumStartSteps: Math.max(2, parseInt(ui.drumStartSteps ? ui.drumStartSteps.value : 16,10)||16),
     drumRandStartEnable: !!(ui.drumRandStartEnable && ui.drumRandStartEnable.checked),
-    drumRandStartInterval: +(ui.drumRandStartIntSl ? ui.drumRandStartIntSl.value : 0),
+    drumRandStartInterval: +(ui.drumRandStartIntSl ? ui.drumRandStartIntSl.value / 1000 : 0),
     drumAllowReverse: !!(ui.drumAllowReverse && ui.drumAllowReverse.checked),
     // Drum FX
     drumFxEnable: !!(ui.drumFxEnable && ui.drumFxEnable.checked),
@@ -3331,7 +3331,7 @@ function getVars(){
 
   // main randomizer (deterministisch)
   if(ui.randStartEnable && ui.randStartEnable.checked){
-    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value / 1000) : 0;
     const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
     const tRel = (audioCtx && playState) ? (audioCtx.currentTime - playStartTime) : 0;
     const w = Math.abs(base.startTo - base.startFrom);
@@ -3451,13 +3451,13 @@ async function renderOfflineAudio(lenSec){
   // NOTE: during offline rendering there is no realtime timer updating UI values.
   // We therefore reproduce the live randomizers deterministically as a function of time.
   const randEnabled = ui.randStartEnable && ui.randStartEnable.checked;
-  const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+  const intervalSec = ui.randStartIntSl ? (+ui.randStartIntSl.value / 1000) : 0;
   const allowRev = !!(ui.allowReverse && ui.allowReverse.checked);
   const mainRandSeed = (((vars.seed>>>0) ^ 0xA3C59AC3 ^ exportNonce)>>>0);
   const mainWindow0 = Math.abs((vars.startTo ?? 1) - (vars.startFrom ?? 0));
 
   const drumRandEnabled = !!(ui.drumRandStartEnable && ui.drumRandStartEnable.checked);
-  const drumIntervalSec = ui.drumRandStartIntSl ? (+ui.drumRandStartIntSl.value) : 0;
+  const drumIntervalSec = ui.drumRandStartIntSl ? (+ui.drumRandStartIntSl.value / 1000) : 0;
   const drumAllowRev = !!(ui.drumAllowReverse && ui.drumAllowReverse.checked);
   const drumRandSeed = (((vars.seed>>>0) ^ 0x5B8D2A4F ^ exportNonce)>>>0);
   const drumWindow0 = Math.abs((+((ui.drumStartTo && ui.drumStartTo.value) || 1)) - (+((ui.drumStartFrom && ui.drumStartFrom.value) || 0)));
@@ -4184,7 +4184,7 @@ function startRandStartTimer(){
 
     // --- MAIN ---
     const mainOn = !!(ui.randStartEnable && ui.randStartEnable.checked);
-    const mainSec = mainOn && ui.randStartIntSl ? (+ui.randStartIntSl.value) : 0;
+    const mainSec = mainOn && ui.randStartIntSl ? (+ui.randStartIntSl.value / 1000) : 0;
     if(mainOn && mainSec > 0){
       const wMain = (+(ui.startTo?.value || 1)) - (+(ui.startFrom?.value || 0));
       const rs = randStartAtTime(((parseInt(ui.seed.value,10)||0)>>>0) ^ 0xA3C59AC3, tRel, mainSec, wMain, !!(ui.allowReverse && ui.allowReverse.checked));
