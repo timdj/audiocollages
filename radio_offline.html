@@ -74,7 +74,7 @@
     <div class="radio-files-badge" id="radioFilesBadge">Geen bestanden geladen.</div>
 
     <button id="radioBtnFolder" class="radio-btn-big" style="margin-top:8px">📁 Kies map met audiobestanden (Chrome/Edge)</button>
-    <input id="radioFolderFallback" type="file" accept="audio/*" multiple style="margin-top:6px"/>
+    <input id="radioFolderFallback" type="file" accept="audio/*,video/*" multiple style="margin-top:6px"/>
     <div class="small" style="margin-top:4px">↑ Fallback: selecteer meerdere bestanden als mapkiezer niet werkt.</div>
 
     <hr class="radio-sep"/>
@@ -507,6 +507,18 @@
           <label>Sleep override (ms)</label>
           <input id="sleepMs" type="number" min="0" max="10000" step="1" value="100"/>
           <div class="small">0 = BPM+n bepaalt staptijd. Groter dan 0 = vaste ms-stap (bypast BPM). Min ~6ms.</div>
+        </div>
+
+        <div class="var" style="grid-column:1/-1;background:#0d0d1a;border:1px solid #2a1a4a;border-radius:8px;padding:10px">
+          <label style="color:#c084fc;font-weight:700">⚡ Tempo — drumritme + hoofd-sample gelinkt</label>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <span style="font-size:11px;color:#6060a0;white-space:nowrap">×⅛</span>
+            <input id="tempoSl" type="range" min="-3" max="3" step="0.01" value="0" style="flex:1;margin:0"/>
+            <span style="font-size:11px;color:#6060a0;white-space:nowrap">×8</span>
+            <input id="tempoNum" type="number" min="0.125" max="8" step="0.01" value="1" style="width:65px;margin:0"/>
+            <span id="tempoVal" style="font-size:12px;color:#c084fc;min-width:50px">×1.00</span>
+          </div>
+          <div style="font-size:10px;color:#5050a0;margin-top:4px">Schaalt drumBpm en sleepMs samen. Midden = basistempo.</div>
         </div>
 
         <div class="var">
@@ -2159,10 +2171,17 @@ this.active = new Set();
 
   _tick(){
     if(!this.running) return;
+    const prevSleepMs = this.vars && this.vars.sleepMs;
     if(this.getVarsFn){
       try{ this.vars = this.getVarsFn(); }catch{}
     }
+    // Als sleepMs veranderd is: reset nextTime naar nu zodat
+    // de nieuwe staptijd direct ingaat ipv wachten op geplande events
     const now = this.ctx.currentTime;
+    if(this.vars && this.vars.sleepMs !== prevSleepMs){
+      this.nextTime     = Math.max(this.nextTime, now);
+      this.nextDrumTime = Math.max(this.nextDrumTime, now);
+    }
 
     const _ahead = this.vars && this.vars.sleepMs > 0 ? Math.max(this.vars.sleepMs/1000*3, 0.05) : this.ahead;
     let _iters = 0;
@@ -2553,6 +2572,9 @@ const ui = {
   bpm: document.getElementById('bpm'),
   bpmVal: document.getElementById('bpmVal'),
   sleepMs: document.getElementById('sleepMs'),
+  tempoSl:  document.getElementById('tempoSl'),
+  tempoNum: document.getElementById('tempoNum'),
+  tempoVal: document.getElementById('tempoVal'),
   seed: document.getElementById('seed'),
   sliceMode: document.getElementById('sliceMode'),
 
@@ -2722,6 +2744,49 @@ if(ui.drumStartToSl) ui.drumStartToSl.addEventListener('input', ()=> syncDrumSta
 if(ui.drumStartTo) ui.drumStartTo.addEventListener('input', ()=> syncDrumStartTo(ui.drumStartTo.value));
 try{ if(ui.drumStartFrom) syncDrumStartFrom(ui.drumStartFrom.value); }catch{}
 try{ if(ui.drumStartTo) syncDrumStartTo(ui.drumStartTo.value); }catch{}
+
+// ── Tempo slider — schaalt drumBpm én sleepMs gelinkt ──────────────────────
+// Slider waarde is log2(multiplier): -3=×⅛, 0=×1, 3=×8
+function applyTempo(mult){
+  // drumBpm: basis is de huidige ui.drumBpm waarde × multiplier
+  const baseBpm = +(ui.drumBpm && ui.drumBpm.value) || 120;
+  const newBpm  = Math.max(20, Math.min(300, Math.round(baseBpm * mult)));
+  // sleepMs: basis is de huidige ui.sleepMs waarde ÷ multiplier
+  // (sneller tempo = kortere sleep)
+  const baseMs  = +(ui.sleepMs && ui.sleepMs.value) || 100;
+  const newMs   = Math.max(6, Math.round(baseMs / mult));
+  // Update draaiende engines direct
+  const engines = [engine, currentEngine, window._eng3, window._eng4].filter(Boolean);
+  const seen = new Set();
+  engines.forEach(e => {
+    if(seen.has(e)) return; seen.add(e);
+    try{ e.vars.sleepMs = newMs; e.vars.drumBpm = newBpm; }catch(ex){}
+  });
+}
+
+function syncTempo(logVal){
+  const log = Math.max(-3, Math.min(3, +logVal));
+  const mult = Math.pow(2, log);
+  if(ui.tempoSl)  ui.tempoSl.value  = log;
+  if(ui.tempoNum) ui.tempoNum.value  = mult.toFixed(2);
+  if(ui.tempoVal) ui.tempoVal.textContent = '×' + mult.toFixed(2);
+  applyTempo(mult);
+}
+
+function syncTempoFromMult(multVal){
+  const mult = Math.max(0.125, Math.min(8, +multVal));
+  syncTempo(Math.log2(mult));
+}
+
+if(ui.tempoSl)  ui.tempoSl.addEventListener('input',  ()=> syncTempo(ui.tempoSl.value));
+if(ui.tempoNum) ui.tempoNum.addEventListener('input',  ()=> syncTempoFromMult(ui.tempoNum.value));
+// Sla basistempo op bij Start zodat ratio correct is
+document.addEventListener('click', e => {
+  if(e.target && e.target.id === 'start'){
+    // Reset slider naar midden bij nieuwe Start
+    syncTempo(0);
+  }
+});
 
 function syncRandStartInterval(v){
   const x = Math.max(0, Math.min(10000, +v));
@@ -4457,8 +4522,8 @@ function radioSharedInit(){
       const oldEng = currentEngine;
 
       // Engine voor spoor 1+2
-      const rev1   = makeReversedBuffer(audioCtx, buf1);
-      const newEng = new SliceEngine(audioCtx, buf1, rev1);
+      const rev1   = null; // lazy: alleen aanmaken als reverse gebruikt wordt
+      const newEng = new SliceEngine(audioCtx, buf1, null);
       newEng.setMaster(0);
       newEng.setFade(+ui.fade.value);
       newEng.setFFT(+ui.fftSize.value, +ui.smooth.value);
@@ -4477,14 +4542,17 @@ function radioSharedInit(){
       newEng.start(algoFn, getVars());
       newEng.rampMaster(+ui.master.value, xfade);
 
-      if(oldEng){ try{oldEng.rampMaster(0,xfade);}catch(e){} setTimeout(()=>{try{oldEng.stop();}catch(e){}},xfade*1000+100); }
+      if(oldEng && oldEng !== newEng){
+        try{ oldEng.rampMaster(0, xfade); }catch(e){}
+        setTimeout(()=>{ try{ oldEng.stop(); }catch(e){} }, xfade*1000+200);
+      }
 
       // Engine voor spoor 3 (extra, eigen drum algo)
       if(buf3 && !window._eng3){ window._eng3 = null; }
       if(buf3){
         if(window._eng3) try{window._eng3.stop();}catch(e){}
-        const rev3 = makeReversedBuffer(audioCtx, buf3);
-        const eng3 = new SliceEngine(audioCtx, buf3, rev3);
+        const rev3 = null;
+        const eng3 = new SliceEngine(audioCtx, buf3, null);
         eng3.setMaster(0);
         eng3.setFade(+ui.fade.value);
         eng3.setFFT(+ui.fftSize.value, +ui.smooth.value);
@@ -4503,8 +4571,8 @@ function radioSharedInit(){
       // Engine voor spoor 4
       if(buf4){
         if(window._eng4) try{window._eng4.stop();}catch(e){}
-        const rev4 = makeReversedBuffer(audioCtx, buf4);
-        const eng4 = new SliceEngine(audioCtx, buf4, rev4);
+        const rev4 = null;
+        const eng4 = new SliceEngine(audioCtx, buf4, null);
         eng4.setMaster(0);
         eng4.setFade(+ui.fade.value);
         eng4.setFFT(+ui.fftSize.value, +ui.smooth.value);
@@ -4683,7 +4751,7 @@ function radioSharedInit(){
       const entries = [];
       for await (const [name, handle] of dir.entries()){
         if(handle.kind !== 'file') continue;
-        if(!name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/)) continue;
+        if(!name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm|mp4|mov|avi|mkv)$/)) continue;
         entries.push(makeEntry(name, ()=> handle.getFile()));
       }
       R.setFiles(entries);
@@ -4697,7 +4765,7 @@ function radioSharedInit(){
   // ── Fallback: meerdere bestanden ──────────────────────────
   if(fallback) fallback.addEventListener('change', ()=>{
     const files = Array.from(fallback.files||[])
-      .filter(f=> f.name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm)$/));
+      .filter(f=> f.name.toLowerCase().match(/\.(mp3|wav|ogg|flac|aac|m4a|opus|webm|mp4|mov|avi|mkv)$/));
     R.setFiles(files.map(f=> makeEntry(f.name, ()=> Promise.resolve(f))));
     R.radioLog('Fallback: ' + files.length + ' bestanden geladen.');
     document.getElementById('radioBtnStart').disabled = files.length < 2;
