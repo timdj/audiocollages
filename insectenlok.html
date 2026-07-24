@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INSECT//LOKGELUID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --panel:#0f0f0f;
+    --cyan:#00ffe1;
+    --orange:#ff6b35;
+    --dim:#4a4a4a;
+    --text:#c8c8c8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Share Tech Mono', monospace;
+    margin:0;
+    padding:20px;
+    line-height:1.5;
+  }
+  .wrap{max-width:900px;margin:0 auto;}
+  .banner{border:1px solid var(--cyan);padding:16px 20px;margin-bottom:20px;}
+  .banner h1{margin:0;color:var(--cyan);font-size:1.4em;letter-spacing:3px;font-weight:normal;}
+  .banner .sub{color:var(--dim);font-size:0.85em;margin-top:6px;letter-spacing:1px;}
+  .panel{border:1px solid var(--dim);padding:16px 20px;margin-bottom:16px;}
+  .panel h2{
+    color:var(--orange);font-size:0.9em;letter-spacing:2px;margin:0 0 12px 0;
+    font-weight:normal;border-bottom:1px solid var(--dim);padding-bottom:8px;
+  }
+  .species-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+  .species-btn{
+    background:var(--panel);border:1px solid var(--dim);color:var(--text);
+    padding:12px 10px;font-family:inherit;font-size:0.8em;cursor:pointer;
+    text-align:left;letter-spacing:0.5px;
+  }
+  .species-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+  .species-btn.active{border-color:var(--orange);color:var(--orange);background:#150e0a;}
+  .desc-box{
+    margin-top:14px;padding:12px;background:var(--panel);border-left:2px solid var(--cyan);
+    font-size:0.85em;color:var(--text);
+  }
+  .desc-box .evidence{color:var(--orange);font-size:0.8em;margin-top:8px;display:block;}
+  .desc-box .keytag{color:var(--cyan);font-size:0.75em;margin-top:6px;display:block;}
+  .controls-row{display:flex;flex-wrap:wrap;gap:20px;margin-bottom:10px;}
+  .ctrl{flex:1;min-width:160px;}
+  .ctrl label{display:block;font-size:0.75em;color:var(--dim);letter-spacing:1px;margin-bottom:4px;}
+  .ctrl .val{color:var(--cyan);}
+  input[type=range]{width:100%;accent-color:var(--cyan);}
+  input[type=number], input[type=text]{
+    width:100%;background:var(--panel);color:var(--text);border:1px solid var(--dim);
+    padding:8px;font-family:inherit;
+  }
+  select{width:100%;background:var(--panel);color:var(--text);border:1px solid var(--dim);padding:8px;font-family:inherit;}
+  .wave-controls{display:none;}
+  .wave-controls.show{display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  button.action{
+    background:transparent;border:1px solid var(--cyan);color:var(--cyan);
+    padding:10px 18px;font-family:inherit;font-size:0.85em;letter-spacing:1px;cursor:pointer;
+  }
+  button.action:hover{background:var(--cyan);color:#000;}
+  button.action.stop{border-color:var(--orange);color:var(--orange);}
+  button.action.stop:hover{background:var(--orange);color:#000;}
+  button.action:disabled{opacity:0.3;cursor:not-allowed;}
+  button.action:disabled:hover{background:transparent;color:var(--cyan);}
+  button.action.stop:disabled:hover{background:transparent;color:var(--orange);}
+  .log{
+    background:#000;border:1px solid var(--dim);padding:10px 14px;font-size:0.78em;
+    height:120px;overflow-y:auto;color:#5a5a5a;
+  }
+  .log .line{margin-bottom:2px;}
+  .log .line.hl{color:var(--cyan);}
+  .log .line.err{color:var(--orange);}
+  textarea#compScript{
+    width:100%;min-height:180px;background:#000;color:var(--cyan);border:1px solid var(--dim);
+    padding:12px;font-family:inherit;font-size:0.85em;line-height:1.6;resize:vertical;
+  }
+  .syntax-help{
+    font-size:0.75em;color:var(--dim);margin-top:10px;line-height:1.7;
+    background:var(--panel);padding:10px 12px;border-left:2px solid var(--orange);
+  }
+  .syntax-help b{color:var(--text);}
+  .syntax-help .keys{color:var(--cyan);}
+  .footer-note{font-size:0.75em;color:var(--dim);margin-top:20px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner">
+    <h1>INSECT // LOKGELUID</h1>
+    <div class="sub">bioakoestische synthese &mdash; per soort &mdash; live coding &mdash; export naar WAV</div>
+  </div>
+
+  <div class="panel">
+    <h2>01 — SELECTEER SOORT</h2>
+    <div class="species-grid" id="speciesGrid"></div>
+    <div class="desc-box" id="descBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>02 — PARAMETERS</h2>
+    <div class="controls-row">
+      <div class="ctrl">
+        <label>DUUR <span class="val" id="durVal">10</span> s</label>
+        <input type="range" id="durSlider" min="1" max="60" value="10" step="0.5">
+      </div>
+      <div class="ctrl">
+        <label>VOLUME <span class="val" id="volVal">60</span>%</label>
+        <input type="range" id="volSlider" min="5" max="100" value="60">
+      </div>
+    </div>
+    <div class="controls-row">
+      <div class="ctrl">
+        <label>FREQUENTIE <span class="val" id="freqVal">600</span> Hz</label>
+        <input type="range" id="freqSlider" min="80" max="12000" value="600" step="1">
+      </div>
+      <div class="ctrl">
+        <label>PULSSNELHEID <span class="val" id="pulseVal">1</span></label>
+        <input type="range" id="pulseSlider" min="0" max="60" value="1" step="0.1">
+      </div>
+    </div>
+    <div class="wave-controls" id="waveControls">
+      <div class="ctrl">
+        <label>GOLFVORM</label>
+        <select id="waveSelect">
+          <option value="sine">sine</option>
+          <option value="square">square</option>
+          <option value="sawtooth">sawtooth</option>
+          <option value="triangle">triangle</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="action" id="playBtn">▶ PREVIEW</button>
+      <button class="action stop" id="stopBtn" disabled>■ STOP</button>
+      <button class="action" id="exportBtn">⇩ EXPORTEER WAV</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>03 — LIVE CODING COMPOSITIE</h2>
+    <textarea id="compScript" spellcheck="false"></textarea>
+    <div class="syntax-help">
+      <b>syntax:</b> <span class="keys">&lt;tijd&gt; &lt;soortkey&gt; f=&lt;freq&gt; p=&lt;puls&gt; d=&lt;duur&gt; v=&lt;volume&gt;</span><br>
+      tijd = starttijd in seconden vanaf begin compositie. f/p/d/v optioneel, vallen terug op soort-defaults.
+      regels met <b>#</b> zijn commentaar.<br>
+      <b>soortkeys:</b> <span class="keys" id="keyList"></span>
+    </div>
+    <div class="controls-row" style="margin-top:14px;">
+      <div class="ctrl">
+        <label>EXPORT LENGTE (0 = auto, tot laatste event)</label>
+        <input type="number" id="compExportLen" min="0" step="0.5" value="0">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="action" id="compPlayBtn">▶ COMPOSITIE AFSPELEN</button>
+      <button class="action stop" id="compStopBtn" disabled>■ STOP</button>
+      <button class="action" id="compExportBtn">⇩ EXPORTEER COMPOSITIE WAV</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>04 — LOG</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="footer-note">
+    Let op: akoestische aantrekking is bij insecten ongelijk onderzocht en werkt sterk situatie-afhankelijk
+    (labo vs. veld, achtergrondgeluid, afstand, seizoen, soortspecifieke populatie). Dit is een experimenteel
+    / artistiek synthese-instrument gebaseerd op gepubliceerde geluidskarakteristieken, geen gegarandeerd
+    lokmiddel of bestrijdingsmiddel.
+  </div>
+
+</div>
+
+<script>
+// ---------- Species presets ----------
+// Elk preset heeft generate(ctx, dest, duration, opts) dat nodes plant op een
+// live AudioContext of een OfflineAudioContext. opts.startTime schuift de
+// planning op (nodig voor composities), opts.freq/opts.pulseRate sturen klank.
+
+const SPECIES = {
+  mug: {
+    label: 'Steekmug ♂ vluchttoon',
+    desc: 'Synthese van de vleugelslagtoon van een mannetjessteekmug (~600 Hz + boventonen). ' +
+          'Bij Aedes aegypti is aangetoond dat mannetjes en vrouwtjes hun vleugelslagfrequenties ' +
+          'tijdens paringsvlucht naar elkaar toe bewegen ("harmonic convergence").',
+    evidence: 'Bron: Cator et al. 2009, Science — akoestische convergentie bij Aedes aegypti.',
+    defaultFreq: 600, freqRange: [200, 1500],
+    defaultPulse: 1, pulseRange: [0, 5],
+    generate(ctx, dest, duration, {volume=0.6, freq=600, pulseRate=1, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      [1,2,3].forEach((h,i)=>{
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq*h, now);
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = Math.max(0.05, pulseRate*(0.6+i*0.25));
+        const lfoGain = ctx.createGain(); lfoGain.gain.value = 6 + i*2;
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+        const g = ctx.createGain(); g.gain.value = 0.55/(i+1);
+        osc.connect(g); g.connect(master);
+        osc.start(now); lfo.start(now);
+        osc.stop(now+duration); lfo.stop(now+duration);
+      });
+    }
+  },
+  mug_culex_m: {
+    label: 'Culex pipiens ♂',
+    desc: 'Vleugelslagtoon van het mannetje van de gewone huissteekmug (Culex pipiens), ' +
+          'ca. 550–750 Hz, hoger dan het vrouwtje.',
+    evidence: 'Bron: akoestisch gedragsonderzoek naar sekseverschil in vleugelslag bij Culex spp.',
+    defaultFreq: 680, freqRange: [400, 1000],
+    defaultPulse: 0.5, pulseRange: [0, 4],
+    generate(ctx, dest, duration, {volume=0.6, freq=680, pulseRate=0.5, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      [1,2].forEach((h,i)=>{
+        const osc = ctx.createOscillator(); osc.type='sine';
+        osc.frequency.setValueAtTime(freq*h, now);
+        const lfo = ctx.createOscillator(); lfo.frequency.value = Math.max(0.05, pulseRate+i*0.2);
+        const lfoGain = ctx.createGain(); lfoGain.gain.value = 5;
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+        const g = ctx.createGain(); g.gain.value = 0.6/(i+1);
+        osc.connect(g); g.connect(master);
+        osc.start(now); lfo.start(now);
+        osc.stop(now+duration); lfo.stop(now+duration);
+      });
+    }
+  },
+  mug_culex_v: {
+    label: 'Culex pipiens ♀',
+    desc: 'Vleugelslagtoon van het vrouwtje van de gewone huissteekmug, ca. 350–400 Hz, ' +
+          'lager en voller van klank dan het mannetje.',
+    evidence: 'Bron: akoestisch gedragsonderzoek naar sekseverschil in vleugelslag bij Culex spp.',
+    defaultFreq: 380, freqRange: [200, 700],
+    defaultPulse: 0.4, pulseRange: [0, 4],
+    generate(ctx, dest, duration, {volume=0.6, freq=380, pulseRate=0.4, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      [1,2].forEach((h,i)=>{
+        const osc = ctx.createOscillator(); osc.type='sine';
+        osc.frequency.setValueAtTime(freq*h, now);
+        const lfo = ctx.createOscillator(); lfo.frequency.value = Math.max(0.05, pulseRate+i*0.15);
+        const lfoGain = ctx.createGain(); lfoGain.gain.value = 4;
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+        const g = ctx.createGain(); g.gain.value = 0.6/(i+1);
+        osc.connect(g); g.connect(master);
+        osc.start(now); lfo.start(now);
+        osc.stop(now+duration); lfo.stop(now+duration);
+      });
+    }
+  },
+  mug_aedes_duet: {
+    label: 'Aedes aegypti duet',
+    desc: 'Twee tonen (mannetje, vrouwtje) die tijdens de synthese geleidelijk naar een gedeelde ' +
+          'boventoon toe bewegen — de "harmonic convergence" die bij paringsvlucht is waargenomen. ' +
+          'FREQUENTIE stuurt de starttoon van het mannetje, PULSSNELHEID de convergentiesnelheid.',
+    evidence: 'Bron: Cator et al. 2009, Science — akoestische convergentie bij Aedes aegypti.',
+    defaultFreq: 600, freqRange: [300, 1000],
+    defaultPulse: 0.43, pulseRange: [0.1, 3],
+    generate(ctx, dest, duration, {volume=0.6, freq=600, pulseRate=0.43, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const target = freq*2;
+      const glideEnd = now + Math.min(duration, duration/(1+pulseRate));
+      const male = ctx.createOscillator(); male.type='sine';
+      male.frequency.setValueAtTime(freq, now);
+      male.frequency.linearRampToValueAtTime(target, glideEnd);
+      const female = ctx.createOscillator(); female.type='sine';
+      female.frequency.setValueAtTime(freq*0.67, now);
+      female.frequency.linearRampToValueAtTime(target, glideEnd);
+      const gm = ctx.createGain(); gm.gain.value = 0.5;
+      const gf = ctx.createGain(); gf.gain.value = 0.5;
+      male.connect(gm); gm.connect(master);
+      female.connect(gf); gf.connect(master);
+      male.start(now); female.start(now);
+      male.stop(now+duration); female.stop(now+duration);
+    }
+  },
+  mug_anopheles: {
+    label: 'Anopheles gambiae',
+    desc: 'Vleugelslagtoon van de malariamug: ♂ hoger, ♀ lager (verhouding ~650:450 Hz). Ook bij dit ' +
+          'geslacht is akoestische convergentie tussen de seksen aangetoond.',
+    evidence: 'Bron: Pennetier et al. 2010, Curr. Biol. — acoustic interactions in Anopheles gambiae.',
+    defaultFreq: 650, freqRange: [300, 1000],
+    defaultPulse: 0.3, pulseRange: [0, 3],
+    generate(ctx, dest, duration, {volume=0.6, freq=650, pulseRate=0.3, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const male = ctx.createOscillator(); male.type='sine'; male.frequency.value = freq;
+      const female = ctx.createOscillator(); female.type='sine'; female.frequency.value = freq*0.69;
+      const gm = ctx.createGain(); gm.gain.value = 0.45;
+      const gf = ctx.createGain(); gf.gain.value = 0.45;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = Math.max(0.05, pulseRate);
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = 5;
+      lfo.connect(lfoGain); lfoGain.connect(male.frequency); lfoGain.connect(female.frequency);
+      male.connect(gm); gm.connect(master);
+      female.connect(gf); gf.connect(master);
+      male.start(now); female.start(now); lfo.start(now);
+      male.stop(now+duration); female.stop(now+duration); lfo.stop(now+duration);
+    }
+  },
+  krekel: {
+    label: 'Veldkrekel roeplied',
+    desc: 'Nabootsing van het soortspecifieke roeplied van de veldkrekel (Gryllus campestris): ' +
+          'korte pulsen gegroepeerd in chirps. FREQUENTIE stuurt de draagtoon, PULSSNELHEID het aantal ' +
+          'pulsen per seconde.',
+    evidence: 'Bron: klassiek fonotaxis-onderzoek bij Gryllidae (o.a. Doherty 1985).',
+    defaultFreq: 4700, freqRange: [2000, 8000],
+    defaultPulse: 25, pulseRange: [4, 60],
+    generate(ctx, dest, duration, {volume=0.6, freq=4700, pulseRate=25, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const period = 1/Math.max(1,pulseRate);
+      const pulseLen = Math.min(0.02, period*0.5);
+      const pulseGap = Math.max(0.002, period-pulseLen);
+      const pulsesPerChirp = 4, chirpGap = 0.15;
+      let t = now;
+      while(t < now+duration-0.3){
+        for(let p=0;p<pulsesPerChirp;p++){
+          const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq;
+          const g = ctx.createGain();
+          const ramp = Math.min(0.003, pulseLen*0.3);
+          g.gain.setValueAtTime(0,t);
+          g.gain.linearRampToValueAtTime(1,t+ramp);
+          g.gain.setValueAtTime(1,t+pulseLen-ramp);
+          g.gain.linearRampToValueAtTime(0,t+pulseLen);
+          osc.connect(g); g.connect(master);
+          osc.start(t); osc.stop(t+pulseLen);
+          t += pulseLen+pulseGap;
+        }
+        t += chirpGap;
+      }
+    }
+  },
+  cicade: {
+    label: 'Cicade zangbeurt',
+    desc: 'Amplitude-gemoduleerde zaagtandtoon die de "buzz"-textuur van cicade-tymbaalgeluid benadert, ' +
+          'opgebouwd in zangbeurten (bouts). FREQUENTIE stuurt de draagtoon, PULSSNELHEID de AM-buzzsnelheid.',
+    evidence: 'Bron: algemene bioakoestiek Cicadidae; playback wordt o.a. gebruikt in cicadamonitoring.',
+    defaultFreq: 1000, freqRange: [400, 3000],
+    defaultPulse: 100, pulseRange: [10, 300],
+    generate(ctx, dest, duration, {volume=0.6, freq=1000, pulseRate=100, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const carrier = ctx.createOscillator();
+      carrier.type='sawtooth';
+      carrier.frequency.setValueAtTime(freq, now);
+      carrier.frequency.linearRampToValueAtTime(freq*1.44, now+duration);
+      const amGainNode = ctx.createGain(); amGainNode.gain.value = 0;
+      carrier.connect(amGainNode);
+      const amOsc = ctx.createOscillator(); amOsc.frequency.value = pulseRate;
+      const amDepth = ctx.createGain(); amDepth.gain.value = 0.5;
+      const amOffset = ctx.createConstantSource(); amOffset.offset.value = 0.5;
+      amOsc.connect(amDepth); amDepth.connect(amGainNode.gain); amOffset.connect(amGainNode.gain);
+      const boutGain = ctx.createGain(); boutGain.gain.value = 0;
+      amGainNode.connect(boutGain); boutGain.connect(master);
+      let t = now; const bout=1.2, gap=0.4;
+      while(t < now+duration){
+        const end = Math.min(t+bout, now+duration);
+        boutGain.gain.setValueAtTime(0,t);
+        boutGain.gain.linearRampToValueAtTime(1,t+0.15);
+        boutGain.gain.setValueAtTime(1, Math.max(t+0.15,end-0.15));
+        boutGain.gain.linearRampToValueAtTime(0,end);
+        t = end+gap;
+      }
+      carrier.start(now); carrier.stop(now+duration);
+      amOsc.start(now); amOsc.stop(now+duration);
+      amOffset.start(now); amOffset.stop(now+duration);
+    }
+  },
+  doodskloppertje: {
+    label: 'Doodskloppertje (klopseries)',
+    desc: 'Xestobium rufovillosum communiceert door met de kop tegen houtwanden te tikken. ' +
+          'FREQUENTIE stuurt de klankkleur van de tik (filterfrequentie), PULSSNELHEID het tempo binnen een serie.',
+    evidence: 'Bron: klassiek gedragsonderzoek naar tap-respons bij Xestobium rufovillosum (Anobiidae).',
+    defaultFreq: 3000, freqRange: [800, 6000],
+    defaultPulse: 14, pulseRange: [2, 30],
+    generate(ctx, dest, duration, {volume=0.6, freq=3000, pulseRate=14, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const tapInterval = 1/Math.max(1,pulseRate);
+      let t = now;
+      while(t < now+duration-1){
+        const tapsInSeries = 6+Math.floor(Math.random()*3);
+        for(let i=0;i<tapsInSeries;i++){
+          const bufferSize = Math.floor(ctx.sampleRate*0.01);
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for(let j=0;j<bufferSize;j++){ data[j] = (Math.random()*2-1)*Math.exp(-j/(bufferSize*0.2)); }
+          const src = ctx.createBufferSource(); src.buffer = buffer;
+          const filt = ctx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=freq; filt.Q.value=1.2;
+          const g = ctx.createGain(); g.gain.value = 1;
+          src.connect(filt); filt.connect(g); g.connect(master);
+          src.start(t);
+          t += tapInterval;
+        }
+        t += 1.5+Math.random();
+      }
+    }
+  },
+  sprinkhaan: {
+    label: 'Sprinkhaan stridulatie',
+    desc: 'Onregelmatige pulstrein die de rasperende stridulatie van veel sprinkhaansoorten (Acrididae) ' +
+          'benadert. FREQUENTIE stuurt het middenbereik van de pulsen, PULSSNELHEID de dichtheid.',
+    evidence: 'Bron: algemene bioakoestiek Orthoptera-stridulatie.',
+    defaultFreq: 7000, freqRange: [3000, 12000],
+    defaultPulse: 20, pulseRange: [4, 60],
+    generate(ctx, dest, duration, {volume=0.6, freq=7000, pulseRate=20, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      const avgPeriod = 1/Math.max(1,pulseRate);
+      let t = now;
+      while(t < now+duration-0.05){
+        const len = Math.min(0.03, avgPeriod*(0.3+Math.random()*0.3));
+        const osc = ctx.createOscillator(); osc.type='square';
+        osc.frequency.value = freq-1000+Math.random()*2000;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(0.8,t+0.002);
+        g.gain.linearRampToValueAtTime(0,t+len);
+        osc.connect(g); g.connect(master);
+        osc.start(t); osc.stop(t+len);
+        t += len+avgPeriod*(0.5+Math.random()*0.5);
+      }
+    }
+  },
+  custom: {
+    label: 'Vrije synthese',
+    desc: 'Handmatige controle over frequentie, golfvorm en pulssnelheid — voor eigen experimenten ' +
+          'buiten de vooraf ingestelde soortprofielen.',
+    evidence: 'Geen wetenschappelijke claim — vrij experimenteel instrument.',
+    defaultFreq: 1000, freqRange: [80, 12000],
+    defaultPulse: 0, pulseRange: [0, 40],
+    generate(ctx, dest, duration, {volume=0.6, freq=1000, wave='sine', pulseRate=0, startTime=0}={}){
+      const now = ctx.currentTime + startTime;
+      const master = ctx.createGain(); master.gain.value = volume; master.connect(dest);
+      if(pulseRate <= 0){
+        const osc = ctx.createOscillator(); osc.type=wave; osc.frequency.value=freq;
+        osc.connect(master); osc.start(now); osc.stop(now+duration);
+      } else {
+        const period = 1/pulseRate;
+        let t = now;
+        while(t < now+duration){
+          const osc = ctx.createOscillator(); osc.type=wave; osc.frequency.value=freq;
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0,t);
+          g.gain.linearRampToValueAtTime(1,t+period*0.1);
+          g.gain.setValueAtTime(1,t+period*0.6);
+          g.gain.linearRampToValueAtTime(0,t+period*0.8);
+          osc.connect(g); g.connect(master);
+          osc.start(t); osc.stop(t+period*0.8);
+          t += period;
+        }
+      }
+    }
+  }
+};
+
+// ---------- filename helper ----------
+function gkFilename(tag){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  return `GK_${tag}_${stamp}.wav`;
+}
+
+// ---------- UI wiring ----------
+let currentSpecies = 'mug';
+let liveCtx = null;
+let liveTimer = null;
+let compCtx = null;
+let compTimers = [];
+let compTimeout = null;
+
+const grid = document.getElementById('speciesGrid');
+const descBox = document.getElementById('descBox');
+const waveControls = document.getElementById('waveControls');
+const logEl = document.getElementById('log');
+const freqSlider = document.getElementById('freqSlider');
+const pulseSlider = document.getElementById('pulseSlider');
+
+function log(msg, hl=false, err=false){
+  const line = document.createElement('div');
+  line.className = 'line'+(hl?' hl':'')+(err?' err':'');
+  const t = new Date().toLocaleTimeString('nl-NL');
+  line.textContent = `[${t}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function buildGrid(){
+  Object.keys(SPECIES).forEach(key=>{
+    const btn = document.createElement('button');
+    btn.className = 'species-btn'+(key===currentSpecies?' active':'');
+    btn.textContent = SPECIES[key].label;
+    btn.dataset.key = key;
+    btn.addEventListener('click', ()=> selectSpecies(key));
+    grid.appendChild(btn);
+  });
+  document.getElementById('keyList').textContent = Object.keys(SPECIES).join(', ');
+}
+
+function selectSpecies(key){
+  currentSpecies = key;
+  [...grid.children].forEach(b=> b.classList.toggle('active', b.dataset.key===key));
+  const sp = SPECIES[key];
+  descBox.innerHTML = `${sp.desc}<span class="evidence">${sp.evidence}</span><span class="keytag">soortkey: ${key}</span>`;
+  waveControls.classList.toggle('show', key==='custom');
+
+  freqSlider.min = sp.freqRange[0]; freqSlider.max = sp.freqRange[1];
+  freqSlider.value = sp.defaultFreq;
+  document.getElementById('freqVal').textContent = sp.defaultFreq;
+
+  pulseSlider.min = sp.pulseRange[0]; pulseSlider.max = sp.pulseRange[1];
+  pulseSlider.value = sp.defaultPulse;
+  document.getElementById('pulseVal').textContent = sp.defaultPulse;
+
+  log(`soort geselecteerd: ${sp.label}`);
+}
+
+document.getElementById('durSlider').addEventListener('input', e=>{
+  document.getElementById('durVal').textContent = e.target.value;
+});
+document.getElementById('volSlider').addEventListener('input', e=>{
+  document.getElementById('volVal').textContent = e.target.value;
+});
+freqSlider.addEventListener('input', e=>{
+  document.getElementById('freqVal').textContent = e.target.value;
+});
+pulseSlider.addEventListener('input', e=>{
+  document.getElementById('pulseVal').textContent = e.target.value;
+});
+
+function getOpts(){
+  return {
+    volume: document.getElementById('volSlider').value/100,
+    freq: parseFloat(freqSlider.value),
+    wave: document.getElementById('waveSelect').value,
+    pulseRate: parseFloat(pulseSlider.value)
+  };
+}
+function getDuration(){
+  return parseFloat(document.getElementById('durSlider').value);
+}
+
+// ---------- Single-species playback ----------
+const playBtn = document.getElementById('playBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+playBtn.addEventListener('click', ()=>{
+  stopPlayback();
+  liveCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const duration = getDuration();
+  const opts = getOpts();
+  SPECIES[currentSpecies].generate(liveCtx, liveCtx.destination, duration, opts);
+  log(`preview gestart: ${SPECIES[currentSpecies].label} (${duration}s)`, true);
+  playBtn.disabled = true;
+  stopBtn.disabled = false;
+  liveTimer = setTimeout(()=>{ stopPlayback(); }, duration*1000);
+});
+
+stopBtn.addEventListener('click', stopPlayback);
+
+function stopPlayback(){
+  if(liveCtx){
+    liveCtx.close();
+    liveCtx = null;
+    log('preview gestopt');
+  }
+  if(liveTimer){ clearTimeout(liveTimer); liveTimer=null; }
+  playBtn.disabled = false;
+  stopBtn.disabled = true;
+}
+
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  const duration = getDuration();
+  const opts = getOpts();
+  const sampleRate = 44100;
+  log(`export gestart: ${SPECIES[currentSpecies].label} (${duration}s @ ${sampleRate}Hz)...`, true);
+  try{
+    const offlineCtx = new OfflineAudioContext(1, Math.ceil(sampleRate*duration), sampleRate);
+    SPECIES[currentSpecies].generate(offlineCtx, offlineCtx.destination, duration, opts);
+    const rendered = await offlineCtx.startRendering();
+    const wavBlob = bufferToWav(rendered);
+    const url = URL.createObjectURL(wavBlob);
+    const a = document.createElement('a');
+    const fname = gkFilename(currentSpecies);
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 3000);
+    log(`export voltooid: ${fname}`, true);
+  }catch(err){
+    log(`FOUT bij export: ${err.message}`, false, true);
+  }
+});
+
+// ---------- Live coding compositie ----------
+const compScriptEl = document.getElementById('compScript');
+compScriptEl.value =
+`# compositie voorbeeld — tijd soortkey f=freq p=puls d=duur v=volume
+0.0   mug              f=600  p=1    d=4   v=0.6
+1.5   krekel           f=4700 p=25   d=3   v=0.5
+4.0   cicade           f=1000 p=100  d=6   v=0.6
+6.5   mug_aedes_duet   f=600  p=0.4  d=5   v=0.5
+9.0   doodskloppertje  f=3000 p=14   d=3   v=0.5`;
+
+function parseScript(text){
+  const events = [];
+  const lines = text.split('\n');
+  lines.forEach((raw, idx)=>{
+    const line = raw.trim();
+    if(!line || line.startsWith('#')) return;
+    const parts = line.split(/\s+/);
+    if(parts.length < 2){
+      log(`regel ${idx+1}: kan niet lezen — "${line}"`, false, true);
+      return;
+    }
+    const time = parseFloat(parts[0]);
+    const key = parts[1];
+    if(isNaN(time)){
+      log(`regel ${idx+1}: ongeldige tijd — "${parts[0]}"`, false, true);
+      return;
+    }
+    if(!SPECIES[key]){
+      log(`regel ${idx+1}: onbekende soortkey — "${key}"`, false, true);
+      return;
+    }
+    const sp = SPECIES[key];
+    const ev = { time, key, freq: sp.defaultFreq, pulseRate: sp.defaultPulse, duration: 2, volume: 0.6 };
+    parts.slice(2).forEach(tok=>{
+      const m = tok.match(/^([fpdv])=([\d.]+)$/i);
+      if(!m){ log(`regel ${idx+1}: onbekend token — "${tok}"`, false, true); return; }
+      const val = parseFloat(m[2]);
+      if(m[1].toLowerCase()==='f') ev.freq = val;
+      if(m[1].toLowerCase()==='p') ev.pulseRate = val;
+      if(m[1].toLowerCase()==='d') ev.duration = val;
+      if(m[1].toLowerCase()==='v') ev.volume = val > 1 ? val/100 : val;
+    });
+    events.push(ev);
+  });
+  return events;
+}
+
+const compPlayBtn = document.getElementById('compPlayBtn');
+const compStopBtn = document.getElementById('compStopBtn');
+
+compPlayBtn.addEventListener('click', ()=>{
+  stopComposition();
+  const events = parseScript(compScriptEl.value);
+  if(events.length === 0){
+    log('compositie bevat geen geldige events', false, true);
+    return;
+  }
+  compCtx = new (window.AudioContext || window.webkitAudioContext)();
+  events.forEach(ev=>{
+    const tId = setTimeout(()=>{
+      if(!compCtx) return;
+      SPECIES[ev.key].generate(compCtx, compCtx.destination, ev.duration, {
+        volume: ev.volume, freq: ev.freq, pulseRate: ev.pulseRate
+      });
+    }, ev.time*1000);
+    compTimers.push(tId);
+  });
+  const autoLen = Math.max(...events.map(e=>e.time+e.duration));
+  log(`compositie gestart: ${events.length} events, ~${autoLen.toFixed(1)}s`, true);
+  compPlayBtn.disabled = true;
+  compStopBtn.disabled = false;
+  compTimeout = setTimeout(()=> stopComposition(), autoLen*1000+300);
+});
+
+compStopBtn.addEventListener('click', stopComposition);
+
+function stopComposition(){
+  compTimers.forEach(id=>clearTimeout(id));
+  compTimers = [];
+  if(compTimeout){ clearTimeout(compTimeout); compTimeout=null; }
+  if(compCtx){
+    compCtx.close();
+    compCtx = null;
+    log('compositie gestopt');
+  }
+  compPlayBtn.disabled = false;
+  compStopBtn.disabled = true;
+}
+
+document.getElementById('compExportBtn').addEventListener('click', async ()=>{
+  const events = parseScript(compScriptEl.value);
+  if(events.length === 0){
+    log('compositie bevat geen geldige events', false, true);
+    return;
+  }
+  const autoLen = Math.max(...events.map(e=>e.time+e.duration));
+  const manualLen = parseFloat(document.getElementById('compExportLen').value);
+  const totalLen = (manualLen && manualLen > 0) ? manualLen : autoLen;
+  const sampleRate = 44100;
+  log(`compositie-export gestart: ${events.length} events, lengte ${totalLen.toFixed(1)}s...`, true);
+  try{
+    const offlineCtx = new OfflineAudioContext(1, Math.ceil(sampleRate*totalLen), sampleRate);
+    events.forEach(ev=>{
+      SPECIES[ev.key].generate(offlineCtx, offlineCtx.destination, ev.duration, {
+        volume: ev.volume, freq: ev.freq, pulseRate: ev.pulseRate, startTime: ev.time
+      });
+    });
+    const rendered = await offlineCtx.startRendering();
+    const wavBlob = bufferToWav(rendered);
+    const url = URL.createObjectURL(wavBlob);
+    const a = document.createElement('a');
+    const fname = gkFilename('compositie');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 3000);
+    log(`compositie-export voltooid: ${fname}`, true);
+  }catch(err){
+    log(`FOUT bij compositie-export: ${err.message}`, false, true);
+  }
+});
+
+// ---------- WAV encoder ----------
+function bufferToWav(abuffer){
+  const numChannels = abuffer.numberOfChannels;
+  const sampleRate = abuffer.sampleRate;
+  const format = 1;
+  const bitDepth = 16;
+  const numFrames = abuffer.length;
+  const bytesPerSample = bitDepth/8;
+  const blockAlign = numChannels*bytesPerSample;
+  const dataSize = numFrames*blockAlign;
+  const buffer = new ArrayBuffer(44+dataSize);
+  const view = new DataView(buffer);
+
+  function writeStr(offset, str){ for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+
+  writeStr(0,'RIFF');
+  view.setUint32(4, 36+dataSize, true);
+  writeStr(8,'WAVE');
+  writeStr(12,'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate*blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeStr(36,'data');
+  view.setUint32(40, dataSize, true);
+
+  const channelData = [];
+  for(let c=0;c<numChannels;c++) channelData.push(abuffer.getChannelData(c));
+
+  let offset = 44;
+  for(let i=0;i<numFrames;i++){
+    for(let c=0;c<numChannels;c++){
+      let sample = Math.max(-1, Math.min(1, channelData[c][i]));
+      sample = sample < 0 ? sample*0x8000 : sample*0x7FFF;
+      view.setInt16(offset, sample, true);
+      offset += 2;
+    }
+  }
+  return new Blob([view], {type:'audio/wav'});
+}
+
+// ---------- init ----------
+buildGrid();
+selectSpecies(currentSpecies);
+log('systeem gereed. selecteer een soort, of schrijf een compositie in het live coding paneel.');
+</script>
+</body>
+</html>
