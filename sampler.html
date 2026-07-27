@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>HOMEOSTAT // SAMPLER</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;600&display=swap');
+  :root{
+    --bg:#07090c;--panel:#0c1018;--border:#17222f;
+    --accent:#00ffe1;--warn:#ff6b35;--dim:#1e3040;
+    --text:#7aa0bc;--bright:#c8e4ff;--green:#39ff8a;
+  }
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'Share Tech Mono',monospace;font-size:11px;
+    height:100dvh;
+    display:grid;
+    grid-template-rows: 32px 40px 34px 1fr 48px;
+    overflow:hidden;user-select:none;-webkit-user-select:none;
+  }
+
+  /* ── HEADER ── */
+  header{
+    display:flex;align-items:center;gap:8px;
+    padding:0 12px;border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--dim);flex-shrink:0;
+    transition:background .3s,box-shadow .3s;
+  }
+  #dot.on  {background:var(--accent);box-shadow:0 0 6px var(--accent);}
+  #dot.warn{background:var(--warn);  box-shadow:0 0 6px var(--warn);}
+  h1{
+    font-family:'Rajdhani',sans-serif;font-weight:600;
+    font-size:14px;letter-spacing:4px;color:var(--accent);
+  }
+  #file-count{font-size:9px;color:var(--green);letter-spacing:1px;flex:1;text-align:right;}
+
+  /* ── STATUS BAR ── */
+  #statusbar{
+    display:grid;grid-template-columns:repeat(5,1fr);
+    border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  .sb-item{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:3px 0;
+    border-right:1px solid var(--border);
+  }
+  .sb-item:last-child{border-right:none;}
+  .sb-k{font-size:7px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+  .sb-v{
+    font-family:'Rajdhani',sans-serif;font-weight:600;
+    font-size:13px;color:var(--bright);letter-spacing:1px;
+  }
+  .sb-v.accent{color:var(--accent);}
+  .sb-v.warn  {color:var(--warn);}
+  .sb-v.green {color:var(--green);}
+
+  /* ── LAYER LIST ── */
+  #layers{
+    overflow:hidden;display:flex;flex-direction:column;
+    background:var(--border);gap:1px;
+  }
+  .lr{
+    flex:1;background:var(--panel);
+    display:grid;
+    grid-template-columns:18px 1fr 56px 52px;
+    align-items:center;gap:6px;
+    padding:0 10px;
+    min-height:0;position:relative;overflow:hidden;
+  }
+  /* volume fill achtergrond */
+  .lr::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;
+    width:var(--vol,0%);
+    background:rgba(0,255,225,0.05);
+    transition:width .4s ease;
+    pointer-events:none;
+  }
+  .lr.playing::before{background:rgba(0,255,225,0.08);}
+  .lr.loading::before{background:rgba(255,107,53,0.06);}
+
+  .lr-num{font-size:9px;color:var(--dim);text-align:right;flex-shrink:0;}
+  .lr-name{
+    font-size:10px;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .lr.playing .lr-name{color:var(--bright);}
+  .lr.loading .lr-name{color:var(--warn);font-style:italic;}
+
+  .lr-bar{position:relative;height:4px;background:var(--border);border-radius:1px;overflow:hidden;}
+  .lr-bar-fill{
+    position:absolute;left:0;top:0;height:100%;
+    background:var(--accent);border-radius:1px;
+    transition:width .35s ease;
+  }
+  .lr-bar-fill.hi {background:var(--green);}
+  .lr-bar-fill.lo {background:var(--warn);}
+
+  .lr-vol{
+    font-size:9px;color:var(--dim);text-align:right;
+    font-family:'Rajdhani',sans-serif;font-weight:600;
+  }
+  .lr.playing .lr-vol{color:var(--text);}
+
+  /* ── FOOTER ── */
+  footer{
+    border-top:1px solid var(--border);
+    display:grid;grid-template-columns:repeat(5,1fr);
+    gap:1px;background:var(--border);
+  }
+  .fb{
+    background:var(--panel);border:none;color:var(--text);
+    font-family:'Share Tech Mono',monospace;
+    font-size:8px;letter-spacing:1px;
+    cursor:pointer;text-align:center;text-transform:uppercase;
+    transition:background .12s,color .12s;
+    -webkit-tap-highlight-color:transparent;
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:2px;padding:4px 2px;
+  }
+  .fb .ic{font-size:16px;line-height:1;}
+  .fb:active,.fb.on{background:var(--accent);color:var(--bg);}
+  .fb.danger:active{background:var(--warn);color:var(--bg);}
+
+  /* ── INTERVAL BAR ── */
+  #interval-bar{
+    display:flex;align-items:center;gap:8px;
+    padding:0 12px;border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  #interval-bar label{font-size:9px;color:var(--dim);letter-spacing:2px;white-space:nowrap;}
+  #interval-slider{
+    flex:1;-webkit-appearance:none;appearance:none;
+    height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer;
+  }
+  #interval-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);cursor:pointer;box-shadow:0 0 4px var(--accent);
+  }
+  #interval-slider::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;border:none;
+    background:var(--accent);cursor:pointer;
+  }
+  #interval-num{
+    width:46px;background:var(--bg);border:1px solid var(--border);
+    color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:11px;
+    text-align:center;padding:2px 4px;border-radius:2px;
+    -moz-appearance:textfield;
+  }
+  #interval-num::-webkit-inner-spin-button,
+  #interval-num::-webkit-outer-spin-button{-webkit-appearance:none;}
+  #interval-unit{font-size:9px;color:var(--dim);}
+
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+    background:repeating-linear-gradient(
+      0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px
+    );
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div id="dot"></div>
+  <h1>HOMEOSTAT</h1>
+  <span id="file-count">0 FILES</span>
+</header>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="sb-item">
+    <span class="sb-k">ACTIEF</span>
+    <span class="sb-v accent" id="sb-active">0</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-k">ENERGIE</span>
+    <span class="sb-v" id="sb-energy">0.0</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-k">BALANS</span>
+    <span class="sb-v green" id="sb-balance">○○○○○</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-k">ROTATIE</span>
+    <span class="sb-v" id="sb-cycle">0</span>
+  </div>
+  <div class="sb-item">
+    <span class="sb-k">VOLGEND</span>
+    <span class="sb-v" id="sb-next" style="font-size:9px">--</span>
+  </div>
+</div>
+
+<!-- INTERVAL CONTROL -->
+<div id="interval-bar">
+  <label>ROTATIE INTERVAL</label>
+  <input type="range" id="interval-slider" min="1" max="120" step="1" value="1">
+  <input type="number" id="interval-num" min="1" max="120" step="1" value="1">
+  <span id="interval-unit">SEC</span>
+</div>
+
+<!-- 7 LAYER RIJEN -->
+<div id="layers">
+  <!-- JS bouwt deze -->
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <button class="fb" onclick="loadFolder()"><span class="ic">◫</span>MAP</button>
+  <button class="fb" id="btn-start" onclick="toggleSystem()"><span class="ic">▶</span>START</button>
+  <button class="fb" id="btn-sensor" onclick="requestSensor()"><span class="ic">◈</span>SENSOR</button>
+  <button class="fb" onclick="forceRotate()"><span class="ic">⇄</span>ROTEER</button>
+  <button class="fb danger" onclick="injectChaos()"><span class="ic">⚡</span>CHAOS</button>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  HOMEOSTAT SAMPLER v3
+//  Schuivend venster van 7 buffers — smartphone layout
+// ═══════════════════════════════════════════════════════════════
+
+const MAX   = 7;
+const AUDIO = /\.(mp3|wav|ogg|flac|aac|m4a|opus|webm|mp4|mov|avi|mkv|m4v|3gp)$/i;
+const VIDEO = /\.(mp4|mov|avi|mkv|m4v|3gp)$/i;
+const AC    = new (window.AudioContext || window.webkitAudioContext)();
+
+const masterGain     = AC.createGain();
+const masterAnalyser = AC.createAnalyser();
+masterAnalyser.fftSize = 256;
+masterGain.connect(masterAnalyser);
+masterAnalyser.connect(AC.destination);
+
+const TARGET = { density:.55, energy:.50, tol:.12 };
+const SYS    = { running:false, cycle:0, balance:1, gyro:{x:0,y:0,z:0} };
+
+let rotateInterval = 1000; // ms, default 1 seconde
+
+let allFiles = [], qPtr = 0;
+const slots  = [];
+
+// ── HELPERS ──
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+const delay   = ms => new Promise(r=>setTimeout(r,ms));
+const ts      = () => new Date().toTimeString().slice(3,8);
+
+// ── MAP LADEN ──
+async function loadFolder() {
+  if (!('showDirectoryPicker' in window)) { fallback(); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ mode:'read' });
+    await scanDir(dir);
+  } catch(e) { if(e.name!=='AbortError') showStatus('FOUT: '+e.message,'w'); }
+}
+
+async function scanDir(dir) {
+  resetAll();
+  const found=[];
+  for await (const [name,handle] of dir.entries())
+    if (handle.kind==='file' && AUDIO.test(name)) found.push({handle,name});
+  if (!found.length) { showStatus('GEEN AUDIOBESTANDEN'); return; }
+  allFiles = shuffle(found);
+  qPtr = 0;
+  document.getElementById('file-count').textContent = allFiles.length+' FILES';
+  showStatus(`${allFiles.length} FILES GELADEN`,'g');
+  await fillSlots();
+}
+
+// ── WACHTRIJ ──
+function nextFile() {
+  if (!allFiles.length) return null;
+  const f = allFiles[qPtr];
+  qPtr = (qPtr+1) % allFiles.length;
+  const nxt = allFiles[qPtr]?.name.replace(/\.[^.]+$/,'').slice(0,8) || '--';
+  document.getElementById('sb-next').textContent = nxt;
+  return f;
+}
+
+// ── SLOTS VULLEN ──
+async function fillSlots() {
+  while (slots.length < MAX) {
+    const f = nextFile();
+    if (!f) break;
+    const slot = makeSlot(f.name);
+    slots.push(slot);
+    loadBuffer(slots.length-1, f);
+  }
+  buildUI();
+}
+
+function makeSlot(name) {
+  const gainNode = AC.createGain();
+  gainNode.gain.value = 0;
+  gainNode.connect(masterGain);
+  return { name:name.replace(/\.[^.]+$/,''), buffer:null, source:null,
+           gainNode, volume:0, playing:false, loading:true };
+}
+
+async function loadBuffer(idx, fileRef) {
+  try {
+    const file = await fileRef.handle.getFile();
+    const slot = slots[idx];
+    if (!slot) return;
+
+    if (VIDEO.test(fileRef.name)) {
+      // Video: MediaElementSource — audio uit video extraheren
+      const url = URL.createObjectURL(file);
+      const el  = document.createElement('video');
+      el.src = url; el.loop = true; el.muted = false; el.playsInline = true;
+      el.style.display = 'none';
+      document.body.appendChild(el);
+      await new Promise((res,rej) => { el.onloadedmetadata=res; el.onerror=rej; setTimeout(res,4000); });
+      const node = AC.createMediaElementSource(el);
+      node.connect(slot.gainNode);
+      slot.buffer   = true;   // sentinel: geladen maar geen AudioBuffer
+      slot.videoEl  = el;
+      slot.isVideo  = true;
+      slot.loading  = false;
+    } else {
+      // Audio: klassieke decodeAudioData
+      const ab  = await file.arrayBuffer();
+      slot.buffer  = await AC.decodeAudioData(ab);
+      slot.loading = false;
+    }
+
+    updateRowUI(idx);
+    if (SYS.running) { playSlot(idx); fadeSlot(idx, .25+Math.random()*.5, 2.5); }
+  } catch(e) {
+    if (slots[idx]) { slots[idx].loading=false; updateRowUI(idx); }
+  }
+}
+
+// ── ROTATIE ──
+let rotating = false;
+async function rotateSlot(idx) {
+  if (rotating) return;
+  rotating = true;
+  const old = slots[idx];
+  if (!old) { rotating=false; return; }
+  const f = nextFile();
+  if (!f) { rotating=false; return; }
+
+  fadeSlot(idx, 0, 1.2);
+  await delay(1300);
+  stopSlot(idx);
+  // video-element opruimen
+  if (old.isVideo && old.videoEl) {
+    old.videoEl.src='';
+    old.videoEl.remove();
+  }
+  old.gainNode.disconnect();
+  old.buffer = null;
+
+  const slot = makeSlot(f.name);
+  slots[idx] = slot;
+  updateRowUI(idx);
+  document.getElementById('sb-cycle').textContent = ++SYS.cycle;
+  await loadBuffer(idx, f);
+  rotating = false;
+}
+
+// ── PLAYBACK ──
+function playSlot(i) {
+  const s = slots[i];
+  if (!s||s.playing||!s.buffer||s.loading) return;
+  if (s.isVideo) {
+    s.videoEl.play().catch(()=>{});
+    s.playing = true;
+  } else {
+    const src = AC.createBufferSource();
+    src.buffer = s.buffer; src.loop = true;
+    src.connect(s.gainNode); src.start(0);
+    s.source = src; s.playing = true;
+    src.onended = ()=>{ s.playing=false; };
+  }
+}
+
+function stopSlot(i) {
+  const s = slots[i]; if (!s) return;
+  if (s.isVideo && s.videoEl) {
+    s.videoEl.pause(); s.videoEl.currentTime=0;
+  }
+  if (s.source) { try{s.source.stop();}catch(_){} }
+  s.source=null; s.playing=false; s.volume=0;
+  if (s.gainNode) s.gainNode.gain.value=0;
+  updateRowUI(i);
+}
+
+function fadeSlot(i, to, dur=1) {
+  const s = slots[i]; if (!s||!s.gainNode) return;
+  const now=AC.currentTime;
+  s.gainNode.gain.cancelScheduledValues(now);
+  s.gainNode.gain.setValueAtTime(s.gainNode.gain.value,now);
+  s.gainNode.gain.linearRampToValueAtTime(Math.max(0,to),now+dur);
+  s.volume=to;
+}
+
+// ── START/STOP ──
+async function toggleSystem() {
+  await AC.resume();
+  if (!SYS.running) {
+    if (!slots.length) return;
+    SYS.running=true;
+    document.getElementById('btn-start').classList.add('on');
+    document.getElementById('btn-start').querySelector('.ic').textContent='■';
+    document.getElementById('dot').className='on';
+    slots.forEach((_,i)=>{ playSlot(i); fadeSlot(i,.2+Math.random()*.55,2+Math.random()*2); });
+    evalTimer   = setInterval(evaluate, 2500);
+    rotateTimer = setInterval(()=>{ if(!rotating) rotateSlot(Math.floor(Math.random()*slots.length)); }, rotateInterval);
+  } else {
+    SYS.running=false;
+    clearInterval(evalTimer); clearInterval(rotateTimer);
+    slots.forEach((_,i)=>{ fadeSlot(i,0,2); setTimeout(()=>stopSlot(i),2100); });
+    document.getElementById('btn-start').classList.remove('on');
+    document.getElementById('btn-start').querySelector('.ic').textContent='▶';
+    document.getElementById('dot').className='';
+    setBalance(0);
+  }
+}
+
+// ── EVALUATOR ──
+let evalTimer, rotateTimer;
+
+function evaluate() {
+  if (!SYS.running||!slots.length) return;
+  const active  = slots.filter(s=>s.playing);
+  const density = active.length/MAX;
+  const energy  = active.length ? active.reduce((s,l)=>s+l.volume,0)/active.length : 0;
+  SYS.balance   = 1-Math.min((Math.abs(density-TARGET.density)+Math.abs(energy-TARGET.energy))/2,1);
+
+  const dErr = density-TARGET.density;
+  if (dErr>TARGET.tol && active.length>1) {
+    const i=slots.indexOf(active[Math.floor(Math.random()*active.length)]);
+    fadeSlot(i,0,1.5); setTimeout(()=>stopSlot(i),1600);
+  } else if (dErr<-TARGET.tol) {
+    const idle=slots.map((s,i)=>({s,i})).filter(({s})=>!s.playing&&!s.loading&&s.buffer);
+    if (idle.length) { const {i}=idle[Math.floor(Math.random()*idle.length)]; playSlot(i); fadeSlot(i,.3+Math.random()*.4,1.5); }
+  }
+
+  const eErr=energy-TARGET.energy;
+  if (Math.abs(eErr)>TARGET.tol)
+    active.forEach(s=>{ const i=slots.indexOf(s); fadeSlot(i,Math.max(.05,Math.min(1,s.volume-eErr*.25)),1.2); });
+
+  // sensor
+  const mot=Math.min((Math.abs(SYS.gyro.x)+Math.abs(SYS.gyro.y)+Math.abs(SYS.gyro.z))/30,1);
+  if (mot>.5 && Math.random()<.35) {
+    const idle=slots.map((s,i)=>({s,i})).filter(({s})=>!s.playing&&!s.loading&&s.buffer);
+    if (idle.length) { const {i}=idle[Math.floor(Math.random()*idle.length)]; playSlot(i); fadeSlot(i,.3+mot*.5,.8); }
+  }
+
+  updateAllUI(density, energy);
+}
+
+async function forceRotate() {
+  if (!slots.length) return;
+  await rotateSlot(Math.floor(Math.random()*slots.length));
+}
+
+async function injectChaos() {
+  if (!slots.length) return;
+  for (let i=0;i<slots.length;i++) setTimeout(()=>rotateSlot(i),i*350);
+}
+
+// ── SENSOR ──
+async function requestSensor() {
+  if (typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function') {
+    try { const p=await DeviceMotionEvent.requestPermission(); if(p==='granted') activateSensor(); }
+    catch(e){}
+  } else activateSensor();
+}
+function activateSensor() {
+  window.addEventListener('devicemotion',e=>{
+    if(e.rotationRate){SYS.gyro.x=e.rotationRate.alpha||0;SYS.gyro.y=e.rotationRate.beta||0;SYS.gyro.z=e.rotationRate.gamma||0;}
+  },true);
+  window.addEventListener('deviceorientation',e=>{
+    if(SYS.gyro.x===0){SYS.gyro.x=(e.beta||0)/9;SYS.gyro.y=(e.gamma||0)/9;}
+  },true);
+  document.getElementById('btn-sensor').classList.add('on');
+}
+
+// ── UI BOUWEN ──
+function buildUI() {
+  const container = document.getElementById('layers');
+  container.innerHTML='';
+  for (let i=0;i<MAX;i++) {
+    const row = document.createElement('div');
+    row.className='lr'; row.id=`lr-${i}`;
+    const s = slots[i];
+    row.innerHTML=`
+      <span class="lr-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="lr-name" id="ln-${i}">${s?s.name:'--'}</span>
+      <div class="lr-bar"><div class="lr-bar-fill" id="vb-${i}" style="width:0%"></div></div>
+      <span class="lr-vol" id="vn-${i}">0.00</span>`;
+    container.appendChild(row);
+  }
+}
+
+function updateRowUI(i) {
+  const s  = slots[i];
+  const row = document.getElementById(`lr-${i}`);
+  const ln  = document.getElementById(`ln-${i}`);
+  const vb  = document.getElementById(`vb-${i}`);
+  const vn  = document.getElementById(`vn-${i}`);
+  if (!row||!s) return;
+
+  row.className='lr'+(s.playing?' playing':s.loading?' loading':'');
+  row.style.setProperty('--vol', (s.volume*100).toFixed(0)+'%');
+  if(ln){ ln.textContent=s.name; }
+  if(vb){ vb.style.width=(s.volume*100).toFixed(0)+'%'; vb.className='lr-bar-fill'+(s.volume>.75?' hi':s.volume>0&&s.volume<.06?' lo':''); }
+  if(vn){ vn.textContent=s.volume.toFixed(2); }
+}
+
+function updateAllUI(density, energy) {
+  slots.forEach((_,i)=>updateRowUI(i));
+  document.getElementById('sb-active').textContent  = slots.filter(s=>s.playing).length;
+  document.getElementById('sb-energy').textContent  = energy.toFixed(2);
+  const dot = document.getElementById('dot');
+  dot.className = SYS.running?(SYS.balance<.4?'on warn':'on'):'';
+  setBalance(SYS.balance);
+}
+
+function setBalance(b) {
+  const n  = Math.round(b*5);
+  const el = document.getElementById('sb-balance');
+  el.textContent = '●'.repeat(n)+'○'.repeat(5-n);
+  el.className   = 'sb-v'+(b<.4?' warn':' green');
+}
+
+// ── STATUS MELDING (tijdelijk in sb-next) ──
+function showStatus(msg) {
+  // zet het even zichtbaar in de console — de UI is compact genoeg
+  console.log(msg);
+}
+
+// ── RESET ──
+function resetAll() {
+  clearInterval(evalTimer); clearInterval(rotateTimer);
+  slots.forEach((_,i)=>stopSlot(i)); slots.length=0;
+  allFiles=[]; qPtr=0; SYS.running=false; SYS.cycle=0; rotating=false;
+  document.getElementById('file-count').textContent='0 FILES';
+  document.getElementById('btn-start').classList.remove('on');
+  document.getElementById('btn-start').querySelector('.ic').textContent='▶';
+  document.getElementById('dot').className='';
+  document.getElementById('sb-cycle').textContent='0';
+  document.getElementById('sb-active').textContent='0';
+  document.getElementById('sb-energy').textContent='0.0';
+  document.getElementById('sb-next').textContent='--';
+  setBalance(0);
+}
+
+// ── FALLBACK ──
+async function fallback() {
+  const input=document.createElement('input');
+  input.type='file'; input.multiple=true; input.accept='audio/*';
+  input.onchange=async()=>{
+    resetAll();
+    allFiles=shuffle([...input.files].map(f=>({handle:{getFile:()=>Promise.resolve(f)},name:f.name})));
+    document.getElementById('file-count').textContent=allFiles.length+' FILES';
+    await fillSlots();
+  };
+  input.click();
+}
+
+// ── FFT VISUALISATIE IN STATUS BAR ──
+// Kleine canvas per layer-rij als achtergrond — via CSS var(--vol)
+// Geen aparte canvas nodig; de ::before pseudo-elementen doen het werk.
+// Wel: energie-kleur van dot via analyser bijhouden
+function pollAnalyser() {
+  const d=new Uint8Array(masterAnalyser.frequencyBinCount);
+  masterAnalyser.getByteFrequencyData(d);
+  const avg=d.reduce((s,v)=>s+v,0)/(d.length*255);
+  if (SYS.running && avg>.6)
+    document.getElementById('dot').className='on warn';
+  else if (SYS.running)
+    document.getElementById('dot').className='on';
+  requestAnimationFrame(pollAnalyser);
+}
+
+// ── INTERVAL CONTROL ──
+function setRotateInterval(sec) {
+  sec = Math.max(1, Math.min(120, Math.round(sec)));
+  rotateInterval = sec * 1000;
+  document.getElementById('interval-slider').value = sec;
+  document.getElementById('interval-num').value    = sec;
+  // herstart timer als systeem loopt
+  if (SYS.running) {
+    clearInterval(rotateTimer);
+    rotateTimer = setInterval(()=>{ if(!rotating) rotateSlot(Math.floor(Math.random()*slots.length)); }, rotateInterval);
+  }
+}
+
+document.getElementById('interval-slider').addEventListener('input', e => {
+  setRotateInterval(parseInt(e.target.value));
+});
+document.getElementById('interval-num').addEventListener('change', e => {
+  setRotateInterval(parseInt(e.target.value));
+});
+document.getElementById('interval-num').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  if (!isNaN(v)) setRotateInterval(v);
+});
+
+// ── INIT ──
+buildUI();
+setBalance(0);
+pollAnalyser();
+setRotateInterval(1);
+</script>
+</body>
+</html>
