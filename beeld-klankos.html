@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BEELD → KLANKOS · afbeelding naar C++ klankalgoritme</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#06090b;--pn:#0b1114;--ln:#14303a;--cy:#00ffe1;--or:#ff6b35;--tx:#b8d6d2;--dim:#5d7c80}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:'Share Tech Mono',ui-monospace,monospace;font-size:14px}
+header{padding:14px 16px;border-bottom:1px solid var(--ln);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+h1{margin:0;font-size:20px;color:var(--cy);letter-spacing:2px;font-weight:normal}
+h1 b{color:var(--or);font-weight:normal}
+header small{color:var(--dim)}
+main{display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:12px;padding:12px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.pn{background:var(--pn);border:1px solid var(--ln);padding:10px;margin-bottom:12px}
+.pn h2{margin:0 0 8px;font-size:12px;color:var(--or);letter-spacing:2px;font-weight:normal}
+#drop{border:1px dashed var(--ln);min-height:150px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden}
+#drop.over{border-color:var(--cy)}
+#drop canvas{max-width:100%;max-height:220px;display:block}
+#drop .hint{position:absolute;bottom:4px;left:6px;font-size:11px;color:var(--dim);background:#000a;padding:1px 4px}
+button,select,input[type=text]{font-family:inherit;font-size:13px;background:#000;color:var(--cy);border:1px solid var(--ln);padding:6px 10px}
+button{cursor:pointer}
+button:hover{border-color:var(--cy)}
+button.on{background:var(--cy);color:#000}
+button.hot{border-color:var(--or);color:var(--or)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.tabs{display:flex;gap:4px;margin-bottom:8px}
+.tabs button{flex:1}
+.prm{display:grid;grid-template-columns:120px 1fr 54px;gap:6px;align-items:center;margin:5px 0;font-size:12px}
+.prm label{color:var(--dim)}
+.prm span{color:var(--cy);text-align:right}
+input[type=range]{width:100%;accent-color:var(--cy)}
+input[type=checkbox]{accent-color:var(--or)}
+#formula{width:100%;color:var(--or);margin-top:4px}
+.info{font-size:12px;color:var(--dim);line-height:1.5}
+.info em{color:var(--cy);font-style:normal}
+canvas#vis{width:100%;height:auto;display:block;background:#000;border:1px solid var(--ln);image-rendering:pixelated}
+canvas#scope{width:100%;height:60px;display:block;background:#000;border:1px solid var(--ln);margin-top:6px}
+#status{font-size:12px;color:var(--dim);margin-top:6px;min-height:16px}
+#status.err{color:var(--or)}
+pre{margin:0;max-height:440px;overflow:auto;background:#000;border:1px solid var(--ln);padding:10px;font-size:11.5px;line-height:1.4;color:#9fe;white-space:pre}
+#fname{color:var(--or);font-size:12px;word-break:break-all}
+</style>
+</head>
+<body>
+<header>
+  <h1>BEELD <b>→</b> ALGORITME <b>→</b> C++</h1>
+  <small>voor KlankOS · bare-metal (Circle) · Raspberry Pi 400</small>
+</header>
+<main>
+<div>
+  <div class="pn">
+    <h2>01 // BRONBEELD</h2>
+    <div id="drop" title="klik, sleep of plak een afbeelding">
+      <canvas id="src"></canvas>
+      <div class="hint">klik · sleep · plak (ctrl+v)</div>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="row">
+      <button id="bFile">AFBEELDING…</button>
+      <button id="bDemo">DEMO-BEELD</button>
+    </div>
+  </div>
+  <div class="pn">
+    <h2>02 // ALGORITME</h2>
+    <div class="tabs">
+      <button data-m="spec" class="on">SPECTRAAL</button>
+      <button data-m="wt">WAVETABEL</button>
+      <button data-m="bb">BYTEBEAT</button>
+    </div>
+    <div class="info" id="modeInfo"></div>
+    <div id="params"></div>
+    <div id="bbBox" hidden>
+      <div class="prm" style="grid-template-columns:1fr auto"><label>FORMULE f(t) — bewerkbaar</label><button id="bReset" style="padding:2px 8px">↺ uit beeld</button></div>
+      <input type="text" id="formula" spellcheck="false" autocomplete="off">
+      <div class="info">toegestaan: t, getallen, + - * &amp; | ^ ~ &lt;&lt; &gt;&gt; &lt; &gt; ( ) — geen / of %, zodat browser en C++ bit-identiek rekenen.</div>
+    </div>
+  </div>
+</div>
+<div>
+  <div class="pn">
+    <h2>03 // VOORBEELD</h2>
+    <canvas id="vis" width="960" height="360"></canvas>
+    <canvas id="scope" width="960" height="60"></canvas>
+    <div class="row">
+      <button id="bPlay" class="hot">▶ SPEEL</button>
+      <span class="info">wat je hoort is exact dezelfde integer-rekenkunde als de C++ hieronder</span>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div class="pn">
+    <h2>04 // C++ VOOR KLANKOS</h2>
+    <div class="row" style="margin:0 0 8px">
+      <button id="bCopy">KOPIEER C++</button>
+      <span id="fname"></span>
+    </div>
+    <pre id="code">// laad een afbeelding…</pre>
+  </div>
+</div>
+</main>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const SIN=new Int16Array(1024);
+for(let i=0;i<1024;i++)SIN[i]=Math.round(Math.sin(2*Math.PI*i/1024)*32767);
+const PENTA=[0,3,5,7,10,12,15,17,19,22];
+
+const PDEF={
+ g:[{id:'sr',lab:'SAMPLE RATE',type:'sel',opts:['44100','48000'],val:'48000'},
+    {id:'vol',lab:'VOLUME %',min:5,max:100,step:1,val:80}],
+ spec:[{id:'cols',lab:'KOLOMMEN (tijd)',min:8,max:128,step:1,val:64},
+    {id:'rows',lab:'RIJEN (partials)',min:8,max:64,step:1,val:32},
+    {id:'stepMs',lab:'STAP ms',min:20,max:500,step:1,val:90},
+    {id:'fLow',lab:'F LAAG Hz',min:20,max:400,step:1,val:60},
+    {id:'fHigh',lab:'F HOOG Hz',min:800,max:12000,step:10,val:6000},
+    {id:'gamma',lab:'GAMMA',min:0.4,max:4,step:0.05,val:1.6},
+    {id:'floor',lab:'DREMPEL',min:0,max:200,step:1,val:30},
+    {id:'inv',lab:'INVERTEER',type:'chk',val:false}],
+ wt:[{id:'tables',lab:'TABELLEN',min:2,max:16,step:1,val:8},
+    {id:'root',lab:'GRONDTOON MIDI',min:24,max:72,step:1,val:45},
+    {id:'stepMs',lab:'STAP ms',min:60,max:800,step:1,val:180},
+    {id:'decay',lab:'DECAY (K)',min:9,max:15,step:1,val:12},
+    {id:'morph',lab:'MORPH Hz',min:0,max:2,step:0.01,val:0.12},
+    {id:'rest',lab:'RUST-DREMPEL',min:0,max:160,step:1,val:30}],
+ bb:[{id:'rate',lab:'BYTEBEAT RATE',min:4000,max:16000,step:1000,val:8000},
+    {id:'tpl',lab:'SJABLOON',type:'sel',opts:['auto','0','1','2','3','4','5'],val:'auto'}]
+};
+const V={};for(const k in PDEF){V[k]={};for(const p of PDEF[k])V[k][p.id]=p.val;}
+const INFO={
+ spec:'Beeld = spectrogram. <em>Kolommen</em> worden tijdstappen, <em>rijen</em> sinus-partials (boven = hoog, log-verdeeld). Helderheid = amplitude, tussen kolommen geïnterpoleerd.',
+ wt:'<em>Rijen</em> van het beeld worden single-cycle golfvormen die langzaam in elkaar morphen. 16 <em>kolommen</em> geven een melodie: kleurtoon → toon in mineur-pentatonisch, licht → velocity, donker → rust.',
+ bb:'Beeldkenmerken (helderheid, contrast, randen, verzadiging, kleurtoon, symmetrie) kiezen een <em>bytebeat-sjabloon</em> en vullen de constanten in. De formule is daarna vrij te bewerken.'
+};
+let mode='spec', srcName='demo', srcCanvas=$('#src'), hasImg=false;
+let model=null, codeText='', bbEdited=false, feat=null;
+
+/* ---------- UI ---------- */
+function prmHTML(group){
+ return PDEF[group].map(p=>{
+  const v=V[group][p.id];
+  if(p.type==='sel')return `<div class="prm"><label>${p.lab}</label><select data-g="${group}" data-id="${p.id}">${p.opts.map(o=>`<option${o==v?' selected':''}>${o}</option>`).join('')}</select><span></span></div>`;
+  if(p.type==='chk')return `<div class="prm"><label>${p.lab}</label><input type="checkbox" data-g="${group}" data-id="${p.id}"${v?' checked':''}><span></span></div>`;
+  return `<div class="prm"><label>${p.lab}</label><input type="range" data-g="${group}" data-id="${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}"><span>${v}</span></div>`;
+ }).join('');
+}
+function buildParams(){
+ $('#params').innerHTML=prmHTML(mode)+'<div style="border-top:1px solid var(--ln);margin:8px 0"></div>'+prmHTML('g');
+ $('#modeInfo').innerHTML=INFO[mode];
+ $('#bbBox').hidden=mode!=='bb';
+}
+$('#params').addEventListener('input',e=>{
+ const el=e.target,g=el.dataset.g,id=el.dataset.id;if(!g)return;
+ V[g][id]=el.type==='checkbox'?el.checked:(el.type==='range'?+el.value:el.value);
+ if(el.type==='range')el.nextElementSibling.textContent=el.value;
+ if(g==='bb'&&id==='tpl')bbEdited=false;
+ schedule();
+});
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+ mode=b.dataset.m;buildParams();schedule(0);
+});
+$('#formula').addEventListener('input',()=>{bbEdited=true;schedule();});
+$('#bReset').onclick=()=>{bbEdited=false;schedule(0);};
+let tmr=0;function schedule(ms=220){clearTimeout(tmr);tmr=setTimeout(recompute,ms);}
+function status(t,err){const s=$('#status');s.textContent=t;s.className=err?'err':'';}
+
+/* ---------- beeld laden ---------- */
+function setImage(img,name){
+ const sc=Math.min(1,512/Math.max(img.width,img.height));
+ srcCanvas.width=Math.max(1,Math.round(img.width*sc));srcCanvas.height=Math.max(1,Math.round(img.height*sc));
+ srcCanvas.getContext('2d').drawImage(img,0,0,srcCanvas.width,srcCanvas.height);
+ srcName=name||'beeld';hasImg=true;feat=null;bbEdited=false;schedule(0);
+}
+function loadFile(f){
+ if(!f||!f.type.startsWith('image/'))return status('geen afbeelding',true);
+ const url=URL.createObjectURL(f),img=new Image();
+ img.onload=()=>{setImage(img,f.name);URL.revokeObjectURL(url);};
+ img.onerror=()=>status('kan afbeelding niet lezen',true);img.src=url;
+}
+$('#bFile').onclick=()=>$('#file').click();
+$('#drop').onclick=()=>$('#file').click();
+$('#file').onchange=e=>loadFile(e.target.files[0]);
+const dz=$('#drop');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');loadFile(e.dataTransfer.files[0]);});
+window.addEventListener('paste',e=>{for(const it of (e.clipboardData||{}).items||[])if(it.type.startsWith('image/')){loadFile(it.getAsFile());break;}});
+function demo(){
+ const c=document.createElement('canvas');c.width=c.height=384;const x=c.getContext('2d');
+ x.fillStyle='#000';x.fillRect(0,0,384,384);
+ const blobs=[[90,110,90,'#00ffe1'],[280,90,70,'#ff6b35'],[200,260,120,'#3050ff'],[320,300,50,'#ffe14a']];
+ for(const[bx,by,r,col]of blobs){const g=x.createRadialGradient(bx,by,0,bx,by,r);g.addColorStop(0,col);g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,384,384);}
+ x.strokeStyle='#fff';for(let i=0;i<14;i++){x.lineWidth=1+i%3;x.beginPath();x.moveTo(i*28,384);x.lineTo(i*28+120,0);x.stroke();}
+ x.fillStyle='#fff';for(let i=0;i<40;i++){x.fillRect((i*97)%384,40+(i*53)%300,6,3);}
+ setImage(c,'demo');
+}
+$('#bDemo').onclick=demo;
+
+/* ---------- analyse ---------- */
+function grab(w,h){
+ const c=document.createElement('canvas');c.width=w;c.height=h;
+ const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';
+ x.drawImage(srcCanvas,0,0,w,h);return x.getImageData(0,0,w,h).data;
+}
+const lum=(d,i)=>0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+function hsl(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn;let h=0,s=0;
+ if(d>1e-6){s=l>0.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}return[h,s,l];}
+const U32=x=>(Math.round(x)>>>0);
+const clip16=v=>v>32767?32767:v<-32768?-32768:v;
+
+/* ===== SPECTRAAL ===== */
+function buildSpec(p,SR,vol){
+ const C=p.cols,R=p.rows,d=grab(C,R),spec=new Uint8Array(C*R);
+ for(let c=0;c<C;c++)for(let r=0;r<R;r++){
+  let L=lum(d,(r*C+c)*4)/255;if(p.inv)L=1-L;
+  let a=Math.round(255*Math.pow(L,p.gamma));if(a<p.floor)a=0;spec[c*R+r]=a;}
+ const pinc=new Uint32Array(R);
+ for(let r=0;r<R;r++){let f=p.fHigh*Math.pow(p.fLow/p.fHigh,r/(R-1));f=Math.min(f,SR*0.45);pinc[r]=U32(f/SR*4294967296);}
+ const stepLen=Math.max(1,Math.round(p.stepMs*SR/1000));
+ const m={type:'spec',SR,C,R,spec,pinc,stepLen};
+ const N=Math.min(C*stepLen,SR*24);
+ const raw=simSpecRaw(m,N);let pk=0;for(let i=0;i<N;i++){const a=Math.abs(raw[i]);if(a>pk)pk=a;}
+ m.gain=pk?Math.min(16777216,Math.floor(65536*0.89*vol*32767/pk)):0;
+ const pcm=new Int16Array(N);for(let i=0;i<N;i++)pcm[i]=clip16(Math.floor(raw[i]*m.gain/65536));
+ m.pcm=pcm;m.loopDur=N/SR;return m;
+}
+function simSpecRaw(m,N){
+ const {R,C,spec,pinc,stepLen}=m,out=new Int32Array(N),ph=new Uint32Array(R);let col=0,pos=0;
+ for(let n=0;n<N;n++){
+  const frac=Math.floor(pos*256/stepLen),c0=col*R,c1=((col+1)%C)*R;let acc=0;
+  for(let r=0;r<R;r++){const a=(spec[c0+r]*(256-frac)+spec[c1+r]*frac)>>8;if(a)acc+=SIN[ph[r]>>>22]*a;ph[r]=(ph[r]+pinc[r])>>>0;}
+  out[n]=acc>>8;
+  if(++pos>=stepLen){pos=0;if(++col>=C)col=0;}
+ }return out;
+}
+
+/* ===== WAVETABEL ===== */
+function buildWT(p,SR,vol){
+ const T=p.tables,d=grab(128,T),tab=new Int16Array(T*256);
+ for(let t=0;t<T;t++){
+  const v=[];for(let i=0;i<128;i++)v.push(lum(d,(t*128+i)*4)/255);
+  const mean=v.reduce((a,b)=>a+b,0)/128;let pk=0;for(const x of v)pk=Math.max(pk,Math.abs(x-mean));
+  for(let i=0;i<256;i++){
+   if(pk<0.01){tab[t*256+i]=Math.round(Math.sin(2*Math.PI*i/256)*32000);continue;}
+   const x=i<128?v[i]:v[255-i];tab[t*256+i]=Math.round((x-mean)/pk*32000);}
+ }
+ const d2=grab(16,16),pinc=new Uint32Array(16),vel=new Uint8Array(16),notes=[],hues=[];
+ for(let c=0;c<16;c++){
+  let r=0,g=0,b=0;for(let y=0;y<16;y++){const i=(y*16+c)*4;r+=d2[i];g+=d2[i+1];b+=d2[i+2];}
+  const [h,s,l]=hsl(r/16,g/16,b/16);
+  const note=p.root+PENTA[Math.floor(h/36)%10];
+  vel[c]=l*255<p.rest?0:Math.round(90+165*l);
+  pinc[c]=U32(440*Math.pow(2,(note-69)/12)/SR*4294967296);notes.push(note);hues.push([h,s,l]);
+ }
+ const stepLen=Math.max(512,Math.round(p.stepMs*SR/1000)),mspan=T*65536;
+ const m={type:'wt',SR,T,tab,pinc,vel,notes,hues,stepLen,K:p.decay,mspan,minc:Math.min(mspan-1,Math.round(mspan*p.morph/SR)),VOL:Math.round(vol*256)};
+ const N=Math.min(16*stepLen*2,SR*30);m.pcm=simWT(m,N);m.loopDur=N/SR;m.cycleDur=16*stepLen/SR;return m;
+}
+function lerpTab(tab,base,ph){const i0=ph>>>24,i1=(i0+1)&255,f=(ph>>>16)&255;const a=tab[base+i0];return a+(((tab[base+i1]-a)*f)>>8);}
+function simWT(m,N){
+ const {T,tab,pinc,vel,stepLen,K,mspan,minc,VOL}=m,out=new Int16Array(N);
+ let ph=0,pos=0,env=0,mpos=0,step=0;
+ for(let n=0;n<N;n++){
+  if(pos===0)env=vel[step]<<16;
+  const mt=mpos>>>16,mt2=(mt+1)%T,mf=(mpos>>>8)&255;
+  const s0=lerpTab(tab,mt*256,ph),s1=lerpTab(tab,mt2*256,ph),s=s0+(((s1-s0)*mf)>>8);
+  const e=env>>>16;let g=pos;const g2=stepLen-1-pos;if(g2<g)g=g2;if(g>255)g=255;
+  let v=(((s*e)>>8)*g)>>8;v=(v*VOL)>>8;out[n]=clip16(v);
+  ph=(ph+pinc[step])>>>0;env=env-(env>>>K);mpos+=minc;if(mpos>=mspan)mpos-=mspan;
+  if(++pos>=stepLen){pos=0;step=(step+1)&15;}
+ }return out;
+}
+
+/* ===== BYTEBEAT ===== */
+const TPL=[
+ 't*(((t>>S2)|(t>>S3))&(M&(t>>S1)))',
+ '(t*A&t>>S1)|(t*B&t>>S2)',
+ 't*((t>>S1|t>>S2)&M)^(t>>S3)',
+ 't*A&t>>S1|t*B&t>>S2|t*3&t>>S3',
+ '(t*(A+((t>>S3)&3)))&M^(t>>S1)',
+ '(t>>S1|t|t>>S3)*A+((t>>S2)&7)'];
+function features(){
+ const d=grab(64,64),L=new Float32Array(4096);let sum=0,sat=0,hx=0,hy=0;
+ for(let i=0;i<4096;i++){const j=i*4;L[i]=lum(d,j);sum+=L[i];const[h,s]=hsl(d[j],d[j+1],d[j+2]);sat+=s;hx+=Math.cos(h*Math.PI/180)*s;hy+=Math.sin(h*Math.PI/180)*s;}
+ const mean=sum/4096;let vr=0,ed=0,sy=0;
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++){const i=y*64+x;vr+=(L[i]-mean)**2;
+  if(x<63)ed+=Math.abs(L[i+1]-L[i]);if(y<63)ed+=Math.abs(L[i+64]-L[i]);if(x<32)sy+=Math.abs(L[i]-L[y*64+63-x]);}
+ let hue=Math.atan2(hy,hx)*180/Math.PI;if(hue<0)hue+=360;
+ return{bright:Math.round(mean),contrast:Math.min(255,Math.round(Math.sqrt(vr/4096)*2)),edge:Math.min(255,Math.round(ed/(2*63*64)*4)),
+  sat:Math.min(255,Math.round(sat/4096*255)),hue:Math.round(hue),sym:Math.max(0,255-Math.round(sy/2048*2))};
+}
+function autoFormula(f,tplSel){
+ const k={A:1+(f.bright>>5),B:1+(f.hue%7),M:[15,31,63,127,255][Math.min(4,f.contrast>>5)],S1:3+(f.edge>>5),S2:6+(f.sat>>5),S3:8+(f.sym>>6)};
+ const ti=tplSel==='auto'?Math.floor(f.hue/60)%6:+tplSel;
+ return{ti,k,expr:TPL[ti].replace(/S1|S2|S3|A|B|M/g,s=>k[s])};
+}
+function compileBB(expr){
+ if(!/^[t0-9\s+\-*&|^~<>()]+$/.test(expr))throw Error('ongeldige tekens in formule');
+ if(/[0-9]t|t[0-9t]/.test(expr.replace(/\s/g,'')))throw Error('zet een operator tussen t en getallen');
+ const fn=new Function('t','return ('+expr+')');fn(1);fn(12345);return fn;
+}
+function buildBB(p,SR,vol){
+ if(!feat)feat=features();
+ const auto=autoFormula(feat,p.tpl);
+ if(!bbEdited)$('#formula').value=auto.expr;
+ const expr=$('#formula').value.trim();const fn=compileBB(expr);
+ const m={type:'bb',SR,expr,fn,auto,feat,BBR:p.rate,VOL:Math.round(vol*256)};
+ const N=SR*16,out=new Int16Array(N);let t=0,tacc=0;
+ for(let n=0;n<N;n++){const v=fn(t)&255;out[n]=((v-128)*256*m.VOL)>>8;tacc+=m.BBR;if(tacc>=SR){tacc-=SR;t++;}}
+ m.pcm=out;m.loopDur=N/SR;return m;
+}
+
+/* ---------- visualisatie ---------- */
+const vis=$('#vis'),vx=vis.getContext('2d'),base=document.createElement('canvas');base.width=960;base.height=360;
+function drawBase(){
+ const b=base.getContext('2d'),W=960,H=360;b.fillStyle='#000';b.fillRect(0,0,W,H);b.font='13px "Share Tech Mono",monospace';
+ const m=model;
+ if(m.type==='spec'){
+  const cw=W/m.C,rh=H/m.R;
+  for(let c=0;c<m.C;c++)for(let r=0;r<m.R;r++){const a=m.spec[c*m.R+r]/255;
+   b.fillStyle=`rgb(${Math.round(255*Math.max(0,a*2-1))},${Math.round(255*Math.min(1,a*1.4))},${Math.round(225*Math.min(1,a*1.2))})`;
+   b.fillRect(Math.floor(c*cw),Math.floor(r*rh),Math.ceil(cw),Math.ceil(rh));}
+  b.fillStyle='#ff6b35';b.fillText(Math.round(m.pinc[0]/4294967296*m.SR)+' Hz',6,14);b.fillText(Math.round(m.pinc[m.R-1]/4294967296*m.SR)+' Hz',6,H-6);
+ }else if(m.type==='wt'){
+  const LW=560,th=H/m.T;
+  for(let t=0;t<m.T;t++){b.strokeStyle=t%2?'#00ffe1':'#00b8a6';b.beginPath();
+   for(let i=0;i<256;i++){const x=i/255*LW,y=t*th+th/2-m.tab[t*256+i]/32768*th*0.45;i?b.lineTo(x,y):b.moveTo(x,y);}b.stroke();}
+  const bx=580,bw=(W-bx)/16,lo=Math.min(...m.notes),hi=Math.max(...m.notes)+1;
+  for(let s=0;s<16;s++){const[h,sa,l]=m.hues[s],y=H-20-(m.notes[s]-lo)/(hi-lo)*(H-60);
+   b.fillStyle=m.vel[s]?`hsl(${h},${Math.round(40+sa*60)}%,55%)`:'#222';b.fillRect(bx+s*bw+2,y,bw-4,m.vel[s]?m.vel[s]/255*30+6:4);}
+  b.fillStyle='#5d7c80';b.fillText('TABELLEN',6,14);b.fillText('MELODIE',bx,14);
+ }else{
+  const img=b.createImageData(256,128);
+  for(let i=0;i<32768;i++){const v=m.fn(i)&255;img.data[i*4]=v>200?255:0;img.data[i*4+1]=v;img.data[i*4+2]=v*0.88;img.data[i*4+3]=255;}
+  const c=document.createElement('canvas');c.width=256;c.height=128;c.getContext('2d').putImageData(img,0,0);
+  b.imageSmoothingEnabled=false;b.drawImage(c,0,0,640,320);
+  const f=m.feat,rows=[['helderheid',f.bright],['contrast',f.contrast],['randen',f.edge],['verzadiging',f.sat],['kleurtoon°',f.hue],['symmetrie',f.sym],['sjabloon',m.auto.ti]];
+  rows.forEach(([k,v],i)=>{b.fillStyle='#5d7c80';b.fillText(k,660,30+i*24);b.fillStyle='#00ffe1';b.fillText(String(v),800,30+i*24);
+   if(i<6&&k!=='kleurtoon°'){b.fillStyle='#14303a';b.fillRect(840,20+i*24,100,10);b.fillStyle='#ff6b35';b.fillRect(840,20+i*24,v/255*100,10);}});
+  b.fillStyle='#5d7c80';b.fillText('f(t) als raster, t = 0…32767',6,H-14);
+ }
+}
+function frame(){
+ requestAnimationFrame(frame);
+ if(!model)return;vx.drawImage(base,0,0);
+ if(playing&&actx){
+  const el=actx.currentTime-startT;vx.fillStyle='#ff6b35';
+  if(model.type==='spec'){const x=(el%model.loopDur)/model.loopDur*960;vx.fillRect(x,0,2,360);}
+  else if(model.type==='wt'){const s=Math.floor((el%model.cycleDur)/model.cycleDur*16);vx.globalAlpha=.25;vx.fillRect(580+s*(380/16),0,380/16,360);vx.globalAlpha=1;
+   const mp=((el*V.wt.morph)%1)*model.T;vx.fillRect(0,mp/model.T*360,560,2);}
+  else{const t=Math.floor(el*model.BBR)%32768;vx.fillRect((t%256)*2.5,Math.floor(t/256)*2.5,5,5);}
+  drawScope();
+ }
+}
+const sc=$('#scope'),sx=sc.getContext('2d');let sbuf=null;
+function drawScope(){
+ if(!an)return;if(!sbuf)sbuf=new Float32Array(an.fftSize);an.getFloatTimeDomainData(sbuf);
+ sx.fillStyle='#000';sx.fillRect(0,0,960,60);sx.strokeStyle='#00ffe1';sx.beginPath();
+ for(let i=0;i<sbuf.length;i++){const x=i/sbuf.length*960,y=30-sbuf[i]*28;i?sx.lineTo(x,y):sx.moveTo(x,y);}sx.stroke();
+}
+requestAnimationFrame(frame);
+
+/* ---------- audio ---------- */
+let actx=null,an=null,srcNode=null,playing=false,startT=0;
+function startAudio(){
+ stopNode();if(!model)return;
+ const m=model,buf=actx.createBuffer(1,m.pcm.length,m.SR),ch=buf.getChannelData(0);
+ for(let i=0;i<m.pcm.length;i++)ch[i]=m.pcm[i]/32768;
+ srcNode=actx.createBufferSource();srcNode.buffer=buf;srcNode.loop=true;srcNode.connect(an);srcNode.start();startT=actx.currentTime;
+}
+function stopNode(){if(srcNode){try{srcNode.stop();}catch(e){}srcNode.disconnect();srcNode=null;}}
+$('#bPlay').onclick=async()=>{
+ try{
+  if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();an=actx.createAnalyser();an.fftSize=2048;an.connect(actx.destination);}
+  await actx.resume();
+  if(playing){playing=false;stopNode();$('#bPlay').textContent='▶ SPEEL';$('#bPlay').classList.remove('on');}
+  else{playing=true;startAudio();$('#bPlay').textContent='■ STOP';$('#bPlay').classList.add('on');}
+ }catch(e){status('audio kon niet starten: '+e.message,true);}
+};
+
+/* ---------- C++ generator ---------- */
+function arr(a,per,ind){const o=[];for(let i=0;i<a.length;i+=per)o.push(ind+Array.from(a.slice(i,i+per)).join(', '));return o.join(',\n');}
+function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;}
+function ident(){return(srcName.replace(/\.[^.]+$/,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'beeld').replace(/^(\d)/,'b$1').slice(0,24);}
+const MODENAME={spec:'spectraal',wt:'wavetabel',bb:'bytebeat'};
+function head(m,id,fname,extra){
+ return `// ═══════════════════════════════════════════════════════════
+//  KlankOS · BEELD → ALGORITME · ${MODENAME[m.type].toUpperCase()}
+//  bron   : ${srcName.replace(/[^\x20-\x7e]/g,'?')}
+//  bestand: ${fname}
+//  bare-metal C++ (Circle) — geen libc/libm nodig, pure integer-DSP
+//  ${extra}
+//
+//  Gebruik:
+//    #include "${fname}"
+//    static ${id}::Voice voice;              // globaal
+//    voice.render(buf, frames);               // mono int16
+//    voice.renderStereo(lr, frames);          // interleaved L/R int16
+//    float s = voice.nextFloat();             // -1..1 per sample
+//  Sample rate van je audio-device moet ${m.SR} Hz zijn.
+// ═══════════════════════════════════════════════════════════
+#pragma once
+#include <stdint.h>
+
+namespace ${id} {
+
+static const uint32_t SR = ${m.SR};
+`;}
+const SINC=()=>`
+// sinustabel, 1024 punten, ±32767
+static const int16_t SIN[1024] = {
+${arr(SIN,16,'  ')}
+};
+`;
+const TAIL=`
+  void render(int16_t* out, unsigned n) { while (n--) *out++ = next(); }
+  void renderStereo(int16_t* lr, unsigned n) {
+    while (n--) { const int16_t s = next(); *lr++ = s; *lr++ = s; }
+  }
+  float nextFloat() { return (float)next() * (1.0f / 32768.0f); }
+};
+
+} // namespace
+`;
+function genCpp(m){
+ const id='gk_'+ident()+'_'+m.type,fname=`GK_${stamp()}_klank_${MODENAME[m.type]}.h`;let s;
+ if(m.type==='spec'){
+  const rows=[];for(let c=0;c<m.C;c++)rows.push('  { '+Array.from(m.spec.slice(c*m.R,(c+1)*m.R)).join(', ')+' }');
+  s=head(m,id,fname,`additieve synthese · ${m.R} partials × ${m.C} stappen · loop ${(m.C*m.stepLen/m.SR).toFixed(2)} s`)+SINC()+`
+static const int R = ${m.R};          // partials (rij 0 = hoogste toon)
+static const int C = ${m.C};          // tijdstappen (kolommen)
+static const uint32_t STEP = ${m.stepLen};   // samples per kolom
+static const int64_t GAIN = ${m.gain};       // 16.16 normalisatie
+
+static const uint32_t PINC[R] = {
+${arr(m.pinc,8,'  ')}
+};
+
+static const uint8_t SPEC[C][R] = {
+${rows.join(',\n')}
+};
+
+struct Voice {
+  uint32_t ph[R];
+  uint32_t pos;
+  int col;
+
+  Voice() { reset(); }
+  void reset() { for (int r = 0; r < R; r++) ph[r] = 0; pos = 0; col = 0; }
+
+  int16_t next() {
+    const int32_t frac = (int32_t)((pos * 256u) / STEP);
+    const uint8_t* a0 = SPEC[col];
+    const uint8_t* a1 = SPEC[(col + 1) % C];
+    int32_t acc = 0;
+    for (int r = 0; r < R; r++) {
+      const int32_t a = ((int32_t)a0[r] * (256 - frac) + (int32_t)a1[r] * frac) >> 8;
+      if (a) acc += (int32_t)SIN[ph[r] >> 22] * a;
+      ph[r] += PINC[r];
+    }
+    int64_t v = ((int64_t)(acc >> 8) * GAIN) >> 16;
+    if (v > 32767) v = 32767; else if (v < -32768) v = -32768;
+    if (++pos >= STEP) { pos = 0; if (++col >= C) col = 0; }
+    return (int16_t)v;
+  }
+`+TAIL;
+ }else if(m.type==='wt'){
+  const rows=[];for(let t=0;t<m.T;t++)rows.push('  {\n'+arr(m.tab.slice(t*256,(t+1)*256),16,'    ')+'\n  }');
+  s=head(m,id,fname,`wavetable-morph · ${m.T} tabellen · 16-staps melodie (MIDI ${m.notes.join(' ')})`)+`
+static const int T = ${m.T};
+static const int STEPS = 16;
+static const uint32_t STEP = ${m.stepLen};    // samples per stap
+static const int K = ${m.K};                  // decay: env -= env >> K
+static const uint32_t MSPAN = ${m.mspan}u;   // T << 16
+static const uint32_t MINC = ${m.minc};       // morph-snelheid (16.16)
+static const int32_t VOL = ${m.VOL};          // 0..256
+
+static const uint32_t PINC[STEPS] = {
+${arr(m.pinc,8,'  ')}
+};
+static const uint8_t VEL[STEPS] = { ${Array.from(m.vel).join(', ')} };   // 0 = rust
+
+static const int16_t TAB[T][256] = {
+${rows.join(',\n')}
+};
+
+static inline int32_t lerpTab(const int16_t* tb, uint32_t ph) {
+  const uint32_t i0 = ph >> 24, i1 = (i0 + 1) & 255;
+  const int32_t f = (int32_t)((ph >> 16) & 255);
+  return tb[i0] + ((((int32_t)tb[i1] - tb[i0]) * f) >> 8);
+}
+
+struct Voice {
+  uint32_t ph, pos, env, mpos;
+  int step;
+
+  Voice() { reset(); }
+  void reset() { ph = 0; pos = 0; env = 0; mpos = 0; step = 0; }
+
+  int16_t next() {
+    if (pos == 0) env = (uint32_t)VEL[step] << 16;
+    const uint32_t mt = mpos >> 16, mt2 = (mt + 1) % T;
+    const int32_t mf = (int32_t)((mpos >> 8) & 255);
+    const int32_t s0 = lerpTab(TAB[mt], ph), s1 = lerpTab(TAB[mt2], ph);
+    const int32_t s = s0 + (((s1 - s0) * mf) >> 8);
+    const int32_t e = (int32_t)(env >> 16);
+    int32_t g = (int32_t)pos;
+    const int32_t g2 = (int32_t)(STEP - 1 - pos);
+    if (g2 < g) g = g2;
+    if (g > 255) g = 255;                       // klikvrije poort
+    int32_t v = (((s * e) >> 8) * g) >> 8;
+    v = (v * VOL) >> 8;
+    if (v > 32767) v = 32767; else if (v < -32768) v = -32768;
+    ph += PINC[step];
+    env -= env >> K;
+    mpos += MINC; if (mpos >= MSPAN) mpos -= MSPAN;
+    if (++pos >= STEP) { pos = 0; step = (step + 1) & (STEPS - 1); }
+    return (int16_t)v;
+  }
+`+TAIL;
+ }else{
+  const f=m.feat;
+  s=head(m,id,fname,`bytebeat @ ${m.BBR} Hz · kenmerken: helder ${f.bright} contrast ${f.contrast} randen ${f.edge} verz ${f.sat} toon ${f.hue}° sym ${f.sym}`)+`
+static const uint32_t BBR = ${m.BBR};   // bytebeat-klok
+static const int32_t VOL = ${m.VOL};    // 0..256
+
+static inline uint32_t f(uint32_t t) {
+  return (uint32_t)(${m.expr});
+}
+
+struct Voice {
+  uint32_t t, tacc;
+
+  Voice() { reset(); }
+  void reset() { t = 0; tacc = 0; }
+
+  int16_t next() {
+    const int32_t v = (int32_t)(f(t) & 255u);
+    const int32_t o = ((v - 128) * 256 * VOL) >> 8;
+    tacc += BBR; if (tacc >= SR) { tacc -= SR; t++; }
+    return (int16_t)o;
+  }
+`+TAIL;
+ }
+ $('#fname').textContent=fname;return s;
+}
+
+/* ---------- hoofdlus ---------- */
+function recompute(){
+ if(!hasImg)return;
+ const SR=+V.g.sr,vol=V.g.vol/100,t0=performance.now();
+ try{
+  model=mode==='spec'?buildSpec(V.spec,SR,vol):mode==='wt'?buildWT(V.wt,SR,vol):buildBB(V.bb,SR,vol);
+ }catch(e){status('fout: '+e.message,true);return;}
+ drawBase();codeText=genCpp(model);$('#code').textContent=codeText;
+ status(`${MODENAME[model.type]} · ${codeText.split('\n').length} regels C++ · ${(codeText.length/1024).toFixed(1)} kB · voorbeeld ${model.loopDur.toFixed(1)} s · ${Math.round(performance.now()-t0)} ms`);
+ if(playing&&actx)startAudio();
+}
+$('#bCopy').onclick=async()=>{
+ try{await navigator.clipboard.writeText(codeText);status('C++ gekopieerd → plak in '+$('#fname').textContent);}
+ catch(e){const r=document.createRange();r.selectNodeContents($('#code'));const s=getSelection();s.removeAllRanges();s.addRange(r);
+  try{document.execCommand('copy');status('C++ gekopieerd');}catch(_){status('code geselecteerd — kopieer met ctrl+c / lang drukken');}}
+};
+buildParams();demo();
+</script>
+</body>
+</html>
